@@ -1,7 +1,7 @@
 """DeepSeek provider implementation for pydantic-ai."""
 
 from typing import Any
-from typing import Dict
+from typing import ClassVar
 
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.deepseek import DeepSeekProvider as PydanticDeepSeekProvider
@@ -12,7 +12,10 @@ from ..config import get_config
 class DeepSeekProvider:
     """DeepSeek LLM provider using pydantic-ai."""
 
-    SUPPORTED_MODELS = {"deepseek-chat": "DeepSeek Chat Model", "deepseek-reasoner": "DeepSeek Reasoner Model"}
+    SUPPORTED_MODELS: ClassVar[dict[str, str]] = {
+        "deepseek-chat": "DeepSeek Chat Model",
+        "deepseek-reasoner": "DeepSeek Reasoner Model",
+    }
 
     @classmethod
     def create_model(cls, model_name: str, **kwargs: Any) -> OpenAIChatModel:
@@ -33,15 +36,17 @@ class DeepSeekProvider:
             raise ValueError(f"Unsupported DeepSeek model: {model_name}. Supported models: {supported}")
 
         config = get_config()
-        provider_config = config.get_provider_config("deepseek")
 
         api_key = config.get_api_key("deepseek")
-        base_url = provider_config.base_url or "https://api.deepseek.com"
 
-        return OpenAIChatModel(model_name=model_name, provider=PydanticDeepSeekProvider(api_key=api_key), **kwargs)
+        return OpenAIChatModel(
+            model_name=model_name,
+            provider=PydanticDeepSeekProvider(api_key=api_key),
+            **kwargs,
+        )
 
     @classmethod
-    def get_supported_models(cls) -> Dict[str, str]:
+    def get_supported_models(cls) -> dict[str, str]:
         """Get list of supported models and their descriptions."""
         return cls.SUPPORTED_MODELS.copy()
 

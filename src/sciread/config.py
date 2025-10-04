@@ -3,7 +3,6 @@
 import os
 import sys
 from pathlib import Path
-from typing import Dict
 from typing import Optional
 
 from pydantic import BaseModel
@@ -16,7 +15,7 @@ if sys.version_info >= (3, 11):
     import tomllib
 else:
     try:
-        import tomli as tomllib
+        import tomllib
     except ImportError:
         pass
 
@@ -45,7 +44,7 @@ class ScireadConfig(BaseSettings):
         extra="ignore",
     )
 
-    llm_providers: Dict[str, LLMProviderConfig] = Field(
+    llm_providers: dict[str, LLMProviderConfig] = Field(
         default_factory=lambda: {
             "deepseek": LLMProviderConfig(default_model="deepseek-chat", base_url="https://api.deepseek.com"),
             "zhipu": LLMProviderConfig(default_model="glm-4.6", base_url="https://open.bigmodel.cn/api/anthropic"),
@@ -60,7 +59,6 @@ class ScireadConfig(BaseSettings):
     @classmethod
     def load_from_file(cls, config_path: Optional[Path] = None) -> "ScireadConfig":
         """Load configuration from file and environment variables."""
-        import tomllib
 
         if config_path is None:
             # Look for config in standard locations
@@ -80,7 +78,7 @@ class ScireadConfig(BaseSettings):
                 return cls()
 
         try:
-            with open(config_path, "rb") as f:
+            with config_path.open("rb") as f:
                 config_data = tomllib.load(f)
 
             # Extract provider configurations

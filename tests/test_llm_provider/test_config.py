@@ -1,6 +1,7 @@
 """Tests for configuration management."""
 
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -124,7 +125,7 @@ model = "from-{config_file.stem}"
             config_file.write_text(config_content)
 
         # Change to tmp_path to test relative paths
-        original_cwd = os.getcwd()
+        original_cwd = Path.cwd()
         try:
             os.chdir(tmp_path)
             config = ScireadConfig.load_from_file()

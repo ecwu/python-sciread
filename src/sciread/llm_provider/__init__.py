@@ -19,9 +19,6 @@ Example Usage:
     model = get_model("glm-4.6")        # Uses zhipu provider
 """
 
-from typing import Any
-from typing import Union
-
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -31,15 +28,12 @@ from .factory import UnsupportedModelError
 from .factory import get_model
 
 __all__ = [
-    # Main interface
-    "get_model",
-    "ModelFactory",
-    # Exceptions
-    "UnsupportedModelError",
-    "InvalidModelIdentifierError",
-    # Type hints
-    "OpenAIChatModel",
     "AnthropicModel",
+    "InvalidModelIdentifierError",
+    "ModelFactory",
+    "OpenAIChatModel",
+    "UnsupportedModelError",
+    "get_model",
 ]
 
 # Version of the llm_provider module

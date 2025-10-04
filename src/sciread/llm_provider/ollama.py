@@ -1,7 +1,6 @@
 """Ollama provider implementation for pydantic-ai."""
 
 from typing import Any
-from typing import Dict
 
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider as PydanticOllamaProvider
@@ -36,7 +35,7 @@ class OllamaProvider:
         return OpenAIChatModel(model_name=model_name, provider=PydanticOllamaProvider(base_url=base_url), **kwargs)
 
     @classmethod
-    def get_supported_models(cls) -> Dict[str, str]:
+    def get_supported_models(cls) -> dict[str, str]:
         """Get list of supported models.
 
         Note: Ollama supports any model that is available locally.

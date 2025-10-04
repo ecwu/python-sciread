@@ -1,6 +1,7 @@
 """Factory for creating LLM model instances from string identifiers."""
 
 from typing import Any
+from typing import ClassVar
 from typing import Union
 
 from pydantic_ai.models.anthropic import AnthropicModel
@@ -23,7 +24,7 @@ class InvalidModelIdentifierError(Exception):
 class ModelFactory:
     """Factory for creating LLM model instances."""
 
-    PROVIDERS = {
+    PROVIDERS: ClassVar[dict[str, type]] = {
         "deepseek": DeepSeekProvider,
         "zhipu": ZhipuProvider,
         "ollama": OllamaProvider,
@@ -58,7 +59,6 @@ class ModelFactory:
             # No provider specified, use default
             config = get_config()
             default_provider = config.default.provider
-            default_model = config.default.model
 
             # If the identifier is a known model name for a provider, use that provider
             for provider_name, provider_class in cls.PROVIDERS.items():

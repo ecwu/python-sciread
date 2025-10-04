@@ -1,7 +1,7 @@
 """Zhipu GLM provider implementation for pydantic-ai."""
 
 from typing import Any
-from typing import Dict
+from typing import ClassVar
 
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.providers.anthropic import AnthropicProvider as PydanticAnthropicProvider
@@ -12,7 +12,7 @@ from ..config import get_config
 class ZhipuProvider:
     """Zhipu GLM LLM provider using pydantic-ai."""
 
-    SUPPORTED_MODELS = {"glm-4.6": "GLM-4.6 Model", "glm-4.5": "GLM-4.5 Model"}
+    SUPPORTED_MODELS: ClassVar[dict[str, str]] = {"glm-4.6": "GLM-4.6 Model", "glm-4.5": "GLM-4.5 Model"}
 
     @classmethod
     def create_model(cls, model_name: str, **kwargs: Any) -> AnthropicModel:
@@ -42,7 +42,7 @@ class ZhipuProvider:
         return AnthropicModel(model_name=model_name, provider=provider, **kwargs)
 
     @classmethod
-    def get_supported_models(cls) -> Dict[str, str]:
+    def get_supported_models(cls) -> dict[str, str]:
         """Get list of supported models and their descriptions."""
         return cls.SUPPORTED_MODELS.copy()
 
