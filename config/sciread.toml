@@ -1,0 +1,21 @@
+# Configuration file for sciread package
+# Copy this file to ~/.config/sciread/config.toml and update with your API keys
+
+[llm_providers.deepseek]
+api_key = "${DEEPSEEK_API_KEY}"
+default_model = "deepseek-chat"
+base_url = "https://api.deepseek.com"
+
+[llm_providers.zhipu]
+api_key = "${ZHIPU_API_KEY}"
+default_model = "glm-4.6"
+base_url = "https://open.bigmodel.cn/api/anthropic"
+
+[llm_providers.ollama]
+base_url = "http://localhost:11434/v1"
+default_model = "qwen3:4b"
+
+[llm_providers.default]
+# Default provider to use when none is specified
+provider = "deepseek"
+model = "deepseek-chat"
