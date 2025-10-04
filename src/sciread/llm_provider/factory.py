@@ -1,33 +1,32 @@
 """Factory for creating LLM model instances from string identifiers."""
 
-from typing import Any, Union
+from typing import Any
+from typing import Union
 
-from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.models.anthropic import AnthropicModel
+from pydantic_ai.models.openai import OpenAIChatModel
 
-from .deepseek import DeepSeekProvider
-from .zhipu import ZhipuProvider
-from .ollama import OllamaProvider
 from ..config import get_config
+from .deepseek import DeepSeekProvider
+from .ollama import OllamaProvider
+from .zhipu import ZhipuProvider
 
 
 class UnsupportedModelError(Exception):
     """Raised when an unsupported model is requested."""
-    pass
 
 
 class InvalidModelIdentifierError(Exception):
     """Raised when a model identifier is in an invalid format."""
-    pass
 
 
 class ModelFactory:
     """Factory for creating LLM model instances."""
 
     PROVIDERS = {
-        'deepseek': DeepSeekProvider,
-        'zhipu': ZhipuProvider,
-        'ollama': OllamaProvider,
+        "deepseek": DeepSeekProvider,
+        "zhipu": ZhipuProvider,
+        "ollama": OllamaProvider,
     }
 
     @classmethod
@@ -48,12 +47,11 @@ class ModelFactory:
 
         model_identifier = model_identifier.strip()
 
-        if '/' in model_identifier:
-            parts = model_identifier.split('/', 1)
+        if "/" in model_identifier:
+            parts = model_identifier.split("/", 1)
             if len(parts) != 2 or not parts[0] or not parts[1]:
                 raise InvalidModelIdentifierError(
-                    f"Invalid model identifier format: {model_identifier}. "
-                    "Expected format: 'provider/model' or 'model'"
+                    f"Invalid model identifier format: {model_identifier}. Expected format: 'provider/model' or 'model'"
                 )
             return parts[0].strip(), parts[1].strip()
         else:
@@ -84,11 +82,8 @@ class ModelFactory:
             UnsupportedModelError: If the provider is not supported
         """
         if provider_name not in cls.PROVIDERS:
-            supported = ', '.join(cls.PROVIDERS.keys())
-            raise UnsupportedModelError(
-                f"Unsupported provider: {provider_name}. "
-                f"Supported providers: {supported}"
-            )
+            supported = ", ".join(cls.PROVIDERS.keys())
+            raise UnsupportedModelError(f"Unsupported provider: {provider_name}. Supported providers: {supported}")
         return cls.PROVIDERS[provider_name]
 
     @classmethod
@@ -113,8 +108,7 @@ class ModelFactory:
         if not provider_class.is_model_supported(model_name):
             supported_models = list(provider_class.get_supported_models().keys())
             raise UnsupportedModelError(
-                f"Model '{model_name}' is not supported by provider '{provider_name}'. "
-                f"Supported models: {', '.join(supported_models)}"
+                f"Model '{model_name}' is not supported by provider '{provider_name}'. Supported models: {', '.join(supported_models)}"
             )
 
         # Create the model instance

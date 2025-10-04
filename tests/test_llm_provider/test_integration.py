@@ -1,10 +1,11 @@
 """Integration tests for LLM provider module."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-from sciread.llm_provider import get_model, ModelFactory
-from sciread.config import ScireadConfig, LLMProviderConfig, DefaultConfig
+from sciread.config import ScireadConfig
+from sciread.llm_provider import ModelFactory
+from sciread.llm_provider import get_model
 
 
 class TestIntegration:
@@ -12,10 +13,11 @@ class TestIntegration:
 
     def test_deepseek_end_to_end(self):
         """Test DeepSeek model creation end-to-end with simplified mocking."""
-        with patch('sciread.llm_provider.deepseek.get_config') as mock_config, \
-             patch('sciread.llm_provider.deepseek.PydanticDeepSeekProvider') as mock_provider, \
-             patch('sciread.llm_provider.deepseek.OpenAIChatModel') as mock_openai:
-
+        with (
+            patch("sciread.llm_provider.deepseek.get_config") as mock_config,
+            patch("sciread.llm_provider.deepseek.PydanticDeepSeekProvider") as mock_provider,
+            patch("sciread.llm_provider.deepseek.OpenAIChatModel") as mock_openai,
+        ):
             # Mock config
             mock_config.return_value.get_provider_config.return_value.base_url = "https://api.deepseek.com"
             mock_config.return_value.get_api_key.return_value = "test-api-key"
@@ -31,10 +33,7 @@ class TestIntegration:
 
             # Verify the correct calls were made
             mock_provider.assert_called_once_with(api_key="test-api-key")
-            mock_openai.assert_called_once_with(
-                model_name="deepseek-chat",
-                provider=mock_provider_instance
-            )
+            mock_openai.assert_called_once_with(model_name="deepseek-chat", provider=mock_provider_instance)
             assert model == mock_model
 
     def test_model_parsing_edge_cases(self):
@@ -56,7 +55,7 @@ class TestIntegration:
         assert provider == "deepseek"
         assert model == "deepseek-chat"
 
-    @patch.dict('os.environ', {'DEEPSEEK_API_KEY': 'env-test-key'})
+    @patch.dict("os.environ", {"DEEPSEEK_API_KEY": "env-test-key"})
     def test_environment_variable_fallback(self, tmp_path):
         """Test that environment variables are used as fallback."""
         config_file = tmp_path / "test_config.toml"
@@ -67,10 +66,10 @@ default_model = "deepseek-chat"
 """
         config_file.write_text(config_content)
 
-        with patch('sciread.llm_provider.factory.get_config') as mock_get_config:
+        with patch("sciread.llm_provider.factory.get_config") as mock_get_config:
             config = ScireadConfig.load_from_file(config_file)
             mock_get_config.return_value = config
 
             # Should not raise an error since env var is available
-            api_key = config.get_api_key('deepseek')
-            assert api_key == 'env-test-key'
+            api_key = config.get_api_key("deepseek")
+            assert api_key == "env-test-key"

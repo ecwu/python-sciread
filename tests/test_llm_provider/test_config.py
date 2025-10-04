@@ -1,11 +1,12 @@
 """Tests for configuration management."""
 
-import pytest
 import os
-from pathlib import Path
 from unittest.mock import patch
 
-from sciread.config import ScireadConfig, LLMProviderConfig, DefaultConfig, get_config
+import pytest
+
+from sciread.config import LLMProviderConfig
+from sciread.config import ScireadConfig
 
 
 class TestScireadConfig:
@@ -53,7 +54,7 @@ default_model = "test-model"
 """
         config_file.write_text(config_content)
 
-        with patch.dict(os.environ, {'TEST_API_KEY': 'env-substituted-key'}):
+        with patch.dict(os.environ, {"TEST_API_KEY": "env-substituted-key"}):
             config = ScireadConfig.load_from_file(config_file)
             assert config.llm_providers["test"].api_key == "env-substituted-key"
 
@@ -90,7 +91,7 @@ default_model = "test-model"
         """Test getting API key from environment variable."""
         config = ScireadConfig()
 
-        with patch.dict(os.environ, {'DEEPSEEK_API_KEY': 'env-key'}):
+        with patch.dict(os.environ, {"DEEPSEEK_API_KEY": "env-key"}):
             api_key = config.get_api_key("deepseek")
             assert api_key == "env-key"
 

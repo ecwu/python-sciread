@@ -1,7 +1,7 @@
 """Simplified tests for Ollama provider based on official documentation."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
 from sciread.llm_provider.ollama import OllamaProvider
 
@@ -9,14 +9,15 @@ from sciread.llm_provider.ollama import OllamaProvider
 class TestOllamaProvider:
     """Test cases for Ollama provider."""
 
-    @patch('sciread.llm_provider.ollama.get_config')
+    @patch("sciread.llm_provider.ollama.get_config")
     def test_create_model_success(self, mock_config):
         """Test successful model creation following official API pattern."""
         mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
 
-        with patch('sciread.llm_provider.ollama.OpenAIChatModel') as mock_model_class, \
-             patch('sciread.llm_provider.ollama.PydanticOllamaProvider') as mock_provider:
-
+        with (
+            patch("sciread.llm_provider.ollama.OpenAIChatModel") as mock_model_class,
+            patch("sciread.llm_provider.ollama.PydanticOllamaProvider") as mock_provider,
+        ):
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
 
@@ -26,31 +27,25 @@ class TestOllamaProvider:
             mock_provider.assert_called_once_with(base_url="http://localhost:11434/v1")
 
             # Verify the model was created following the official pattern
-            mock_model_class.assert_called_once_with(
-                model_name="qwen3:4b",
-                provider=mock_provider.return_value
-            )
+            mock_model_class.assert_called_once_with(model_name="qwen3:4b", provider=mock_provider.return_value)
             assert result == mock_model
 
-    @patch('sciread.llm_provider.ollama.get_config')
+    @patch("sciread.llm_provider.ollama.get_config")
     def test_create_model_with_kwargs(self, mock_config):
         """Test model creation with additional parameters."""
         mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
 
-        with patch('sciread.llm_provider.ollama.OpenAIChatModel') as mock_model_class, \
-             patch('sciread.llm_provider.ollama.PydanticOllamaProvider') as mock_provider:
-
+        with (
+            patch("sciread.llm_provider.ollama.OpenAIChatModel") as mock_model_class,
+            patch("sciread.llm_provider.ollama.PydanticOllamaProvider") as mock_provider,
+        ):
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
 
             OllamaProvider.create_model("qwen3:4b", temperature=0.7)
 
             # Verify kwargs are passed through correctly
-            mock_model_class.assert_called_once_with(
-                model_name="qwen3:4b",
-                provider=mock_provider.return_value,
-                temperature=0.7
-            )
+            mock_model_class.assert_called_once_with(model_name="qwen3:4b", provider=mock_provider.return_value, temperature=0.7)
 
     def test_get_supported_models(self):
         """Test getting supported models."""

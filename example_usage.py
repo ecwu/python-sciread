@@ -6,8 +6,8 @@ This script demonstrates how to use the unified LLM provider interface
 to create model instances for different providers.
 """
 
-import os
-from sciread.llm_provider import get_model, ModelFactory, UnsupportedModelError
+from sciread.llm_provider import ModelFactory
+
 
 def main():
     """Demonstrate LLM provider usage."""
@@ -72,6 +72,7 @@ agent = Agent(model)
 # Or use directly
 result = await model.run("Hello, world!")
 """)
+
 
 if __name__ == "__main__":
     main()

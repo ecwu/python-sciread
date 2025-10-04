@@ -1,6 +1,7 @@
 """Ollama provider implementation for pydantic-ai."""
 
-from typing import Any, Dict
+from typing import Any
+from typing import Dict
 
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider as PydanticOllamaProvider
@@ -26,17 +27,13 @@ class OllamaProvider:
             ValueError: If base_url is not configured
         """
         config = get_config()
-        provider_config = config.get_provider_config('ollama')
+        provider_config = config.get_provider_config("ollama")
 
-        base_url = provider_config.base_url or 'http://localhost:11434/v1'
+        base_url = provider_config.base_url or "http://localhost:11434/v1"
 
         # Ollama doesn't require an API key since it's local
         # The base_url is handled by the OllamaProvider, not OpenAIChatModel
-        return OpenAIChatModel(
-            model_name=model_name,
-            provider=PydanticOllamaProvider(base_url=base_url),
-            **kwargs
-        )
+        return OpenAIChatModel(model_name=model_name, provider=PydanticOllamaProvider(base_url=base_url), **kwargs)
 
     @classmethod
     def get_supported_models(cls) -> Dict[str, str]:
@@ -46,15 +43,15 @@ class OllamaProvider:
         This method returns some common examples.
         """
         return {
-            'qwen3:4b': 'Qwen3 4B parameter model',
-            'qwen3:8b': 'Qwen3 8B parameter model',
-            'qwen3:14b': 'Qwen3 14B parameter model',
-            'llama2:7b': 'Llama2 7B parameter model',
-            'llama2:13b': 'Llama2 13B parameter model',
-            'llama3:8b': 'Llama3 8B parameter model',
-            'llama3:70b': 'Llama3 70B parameter model',
-            'mistral:7b': 'Mistral 7B parameter model',
-            'codellama:7b': 'Code Llama 7B parameter model',
+            "qwen3:4b": "Qwen3 4B parameter model",
+            "qwen3:8b": "Qwen3 8B parameter model",
+            "qwen3:14b": "Qwen3 14B parameter model",
+            "llama2:7b": "Llama2 7B parameter model",
+            "llama2:13b": "Llama2 13B parameter model",
+            "llama3:8b": "Llama3 8B parameter model",
+            "llama3:70b": "Llama3 70B parameter model",
+            "mistral:7b": "Mistral 7B parameter model",
+            "codellama:7b": "Code Llama 7B parameter model",
         }
 
     @classmethod
@@ -71,8 +68,13 @@ class OllamaProvider:
 
         # Return True for common Ollama patterns
         ollama_patterns = [
-            ':',  # Tag patterns like "qwen3:4b"
-            'llama', 'mistral', 'codellama', 'qwen', 'gemma', 'phi'
+            ":",  # Tag patterns like "qwen3:4b"
+            "llama",
+            "mistral",
+            "codellama",
+            "qwen",
+            "gemma",
+            "phi",
         ]
 
         model_lower = model_name.lower()

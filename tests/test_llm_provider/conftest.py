@@ -1,11 +1,11 @@
 """Test configuration and fixtures for llm_provider tests."""
 
 import os
-from pathlib import Path
 from unittest.mock import patch
+
 import pytest
 
-from sciread.config import ScireadConfig, LLMProviderConfig, DefaultConfig
+from sciread.config import ScireadConfig
 
 
 @pytest.fixture
@@ -46,11 +46,12 @@ model = "deepseek-chat"
 @pytest.fixture
 def mock_config(test_config_file):
     """Mock configuration for testing."""
-    with patch('sciread.llm_provider.deepseek.get_config') as mock_deepseek, \
-         patch('sciread.llm_provider.zhipu.get_config') as mock_zhipu, \
-         patch('sciread.llm_provider.ollama.get_config') as mock_ollama, \
-         patch('sciread.llm_provider.factory.get_config') as mock_factory:
-
+    with (
+        patch("sciread.llm_provider.deepseek.get_config") as mock_deepseek,
+        patch("sciread.llm_provider.zhipu.get_config") as mock_zhipu,
+        patch("sciread.llm_provider.ollama.get_config") as mock_ollama,
+        patch("sciread.llm_provider.factory.get_config") as mock_factory,
+    ):
         config = ScireadConfig.load_from_file(test_config_file)
         mock_deepseek.return_value = config
         mock_zhipu.return_value = config
@@ -63,8 +64,11 @@ def mock_config(test_config_file):
 @pytest.fixture
 def mock_env_vars():
     """Mock environment variables for testing."""
-    with patch.dict(os.environ, {
-        'DEEPSEEK_API_KEY': 'test-deepseek-key-from-env',
-        'ZHIPU_API_KEY': 'test-zhipu-key-from-env',
-    }):
+    with patch.dict(
+        os.environ,
+        {
+            "DEEPSEEK_API_KEY": "test-deepseek-key-from-env",
+            "ZHIPU_API_KEY": "test-zhipu-key-from-env",
+        },
+    ):
         yield

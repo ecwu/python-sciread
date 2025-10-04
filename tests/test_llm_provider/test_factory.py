@@ -1,17 +1,17 @@
 """Tests for the model factory."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock
+from unittest.mock import patch
 
-from sciread.llm_provider.factory import (
-    ModelFactory,
-    get_model,
-    UnsupportedModelError,
-    InvalidModelIdentifierError,
-)
+import pytest
+
 from sciread.llm_provider.deepseek import DeepSeekProvider
-from sciread.llm_provider.zhipu import ZhipuProvider
+from sciread.llm_provider.factory import InvalidModelIdentifierError
+from sciread.llm_provider.factory import ModelFactory
+from sciread.llm_provider.factory import UnsupportedModelError
+from sciread.llm_provider.factory import get_model
 from sciread.llm_provider.ollama import OllamaProvider
+from sciread.llm_provider.zhipu import ZhipuProvider
 
 
 class TestModelFactory:
@@ -25,7 +25,7 @@ class TestModelFactory:
 
     def test_parse_model_identifier_without_provider(self):
         """Test parsing model identifier without explicit provider."""
-        with patch('sciread.llm_provider.factory.get_config') as mock_config:
+        with patch("sciread.llm_provider.factory.get_config") as mock_config:
             mock_config.return_value.default.provider = "deepseek"
             mock_config.return_value.default.model = "deepseek-chat"
 
@@ -62,13 +62,13 @@ class TestModelFactory:
         with pytest.raises(UnsupportedModelError):
             ModelFactory.get_provider_class("invalid")
 
-    @patch('sciread.llm_provider.factory.get_config')
+    @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_deepseek(self, mock_config):
         """Test creating DeepSeek model."""
         mock_config.return_value.get_provider_config.return_value.base_url = "https://api.deepseek.com"
         mock_config.return_value.get_api_key.return_value = "test-key"
 
-        with patch.object(DeepSeekProvider, 'create_model') as mock_create:
+        with patch.object(DeepSeekProvider, "create_model") as mock_create:
             mock_model = MagicMock()
             mock_create.return_value = mock_model
 
@@ -77,13 +77,13 @@ class TestModelFactory:
             mock_create.assert_called_once_with("deepseek-chat")
             assert result == mock_model
 
-    @patch('sciread.llm_provider.factory.get_config')
+    @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_zhipu(self, mock_config):
         """Test creating Zhipu model."""
         mock_config.return_value.get_provider_config.return_value.base_url = "https://open.bigmodel.cn/api/anthropic"
         mock_config.return_value.get_api_key.return_value = "test-key"
 
-        with patch.object(ZhipuProvider, 'create_model') as mock_create:
+        with patch.object(ZhipuProvider, "create_model") as mock_create:
             mock_model = MagicMock()
             mock_create.return_value = mock_model
 
@@ -92,12 +92,12 @@ class TestModelFactory:
             mock_create.assert_called_once_with("glm-4.6")
             assert result == mock_model
 
-    @patch('sciread.llm_provider.factory.get_config')
+    @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_ollama(self, mock_config):
         """Test creating Ollama model."""
         mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
 
-        with patch.object(OllamaProvider, 'create_model') as mock_create:
+        with patch.object(OllamaProvider, "create_model") as mock_create:
             mock_model = MagicMock()
             mock_create.return_value = mock_model
 
@@ -113,8 +113,8 @@ class TestModelFactory:
 
     def test_create_model_unsupported_model(self):
         """Test creating model with unsupported model."""
-        with patch('sciread.llm_provider.factory.get_config'):
-            with patch.object(DeepSeekProvider, 'is_model_supported', return_value=False):
+        with patch("sciread.llm_provider.factory.get_config"):
+            with patch.object(DeepSeekProvider, "is_model_supported", return_value=False):
                 with pytest.raises(UnsupportedModelError):
                     ModelFactory.create_model("deepseek/unsupported-model")
 
@@ -138,7 +138,7 @@ class TestModelFactory:
 class TestGetModel:
     """Test cases for get_model convenience function."""
 
-    @patch('sciread.llm_provider.factory.ModelFactory.create_model')
+    @patch("sciread.llm_provider.factory.ModelFactory.create_model")
     def test_get_model(self, mock_create):
         """Test get_model convenience function."""
         mock_model = MagicMock()
@@ -149,7 +149,7 @@ class TestGetModel:
         mock_create.assert_called_once_with("deepseek/deepseek-chat")
         assert result == mock_model
 
-    @patch('sciread.llm_provider.factory.ModelFactory.create_model')
+    @patch("sciread.llm_provider.factory.ModelFactory.create_model")
     def test_get_model_with_kwargs(self, mock_create):
         """Test get_model with additional kwargs."""
         mock_model = MagicMock()
