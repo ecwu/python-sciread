@@ -15,10 +15,13 @@ include pyproject.toml
 include pytest.ini
 include tox.ini
 
+include *.md
 include AUTHORS.rst
 include CHANGELOG.rst
 include CONTRIBUTING.rst
 include LICENSE
 include README.rst
+include example_usage.py
 
+recursive-include config *.toml
 global-exclude *.py[cod] __pycache__/* *.so *.dylib

@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.deepseek import DeepSeekProvider
+from pydantic_ai.providers.deepseek import DeepSeekProvider as PydanticDeepSeekProvider
 
 from ..config import get_config
 
@@ -45,7 +45,7 @@ class DeepSeekProvider:
 
         return OpenAIChatModel(
             model_name=model_name,
-            provider=DeepSeekProvider(api_key=api_key),
+            provider=PydanticDeepSeekProvider(api_key=api_key),
             **kwargs
         )
 

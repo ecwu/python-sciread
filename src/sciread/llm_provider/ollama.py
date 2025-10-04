@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.ollama import OllamaProvider
+from pydantic_ai.providers.ollama import OllamaProvider as PydanticOllamaProvider
 
 from ..config import get_config
 
@@ -31,15 +31,10 @@ class OllamaProvider:
         base_url = provider_config.base_url or 'http://localhost:11434/v1'
 
         # Ollama doesn't require an API key since it's local
-        provider = OllamaProvider()
-        if base_url != "http://localhost:11434/v1":
-            # For custom base URL, we need to handle it differently
-            provider = OllamaProvider()
-
+        # The base_url is handled by the OllamaProvider, not OpenAIChatModel
         return OpenAIChatModel(
             model_name=model_name,
-            provider=provider,
-            base_url=base_url,
+            provider=PydanticOllamaProvider(base_url=base_url),
             **kwargs
         )
 
@@ -66,8 +61,19 @@ class OllamaProvider:
     def is_model_supported(cls, model_name: str) -> bool:
         """Check if a model name could be supported by this provider.
 
-        Ollama can theoretically support any model, so we return True
-        for any non-empty model name. The actual availability depends
-        on what models are installed in the local Ollama instance.
+        Ollama can theoretically support any model, but we should only
+        return True for models that are clearly Ollama models (contain
+        typical Ollama naming patterns) to avoid conflicts with specific
+        provider models.
         """
-        return bool(model_name and model_name.strip())
+        if not model_name or not model_name.strip():
+            return False
+
+        # Return True for common Ollama patterns
+        ollama_patterns = [
+            ':',  # Tag patterns like "qwen3:4b"
+            'llama', 'mistral', 'codellama', 'qwen', 'gemma', 'phi'
+        ]
+
+        model_lower = model_name.lower()
+        return any(pattern in model_lower for pattern in ollama_patterns)

@@ -3,7 +3,7 @@
 from typing import Any, Dict
 
 from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.providers.anthropic import AnthropicProvider
+from pydantic_ai.providers.anthropic import AnthropicProvider as PydanticAnthropicProvider
 
 from ..config import get_config
 
@@ -43,12 +43,10 @@ class ZhipuProvider:
         api_key = config.get_api_key('zhipu')
         base_url = provider_config.base_url or 'https://open.bigmodel.cn/api/anthropic'
 
-        provider = AnthropicProvider(api_key=api_key)
-        # Set base_url through the model constructor instead
+        provider = PydanticAnthropicProvider(api_key=api_key, base_url=base_url)
         return AnthropicModel(
             model_name=model_name,
             provider=provider,
-            base_url=base_url,
             **kwargs
         )
 

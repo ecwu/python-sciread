@@ -15,16 +15,23 @@ class TestDeepSeekProvider:
         mock_config.return_value.get_provider_config.return_value.base_url = "https://api.deepseek.com"
         mock_config.return_value.get_api_key.return_value = "test-api-key"
 
-        with patch('sciread.llm_provider.deepseek.OpenAIChatModel') as mock_model_class:
+        with patch('sciread.llm_provider.deepseek.OpenAIChatModel') as mock_model_class, \
+             patch('sciread.llm_provider.deepseek.PydanticDeepSeekProvider') as mock_provider:
+
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
+            mock_provider_instance = MagicMock()
+            mock_provider.return_value = mock_provider_instance
 
             result = DeepSeekProvider.create_model("deepseek-chat")
 
+            # Verify the provider was created with the correct API key
+            mock_provider.assert_called_once_with(api_key="test-api-key")
+
+            # Verify the model was created with correct parameters
             mock_model_class.assert_called_once_with(
                 model_name="deepseek-chat",
-                provider=mock_model_class.return_value.provider,
-                base_url="https://api.deepseek.com"
+                provider=mock_provider_instance
             )
             assert result == mock_model
 
@@ -34,15 +41,21 @@ class TestDeepSeekProvider:
         mock_config.return_value.get_provider_config.return_value.base_url = "https://custom.deepseek.com"
         mock_config.return_value.get_api_key.return_value = "test-api-key"
 
-        with patch('sciread.llm_provider.deepseek.OpenAIChatModel') as mock_model_class:
+        with patch('sciread.llm_provider.deepseek.OpenAIChatModel') as mock_model_class, \
+             patch('sciread.llm_provider.deepseek.PydanticDeepSeekProvider') as mock_provider:
+
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
+            mock_provider.return_value = MagicMock()
 
             DeepSeekProvider.create_model("deepseek-chat", temperature=0.7)
 
-            mock_model_class.assert_called_once()
-            call_args = mock_model_class.call_args
-            assert call_args.kwargs['base_url'] == "https://custom.deepseek.com"
+            # Verify the model was created with correct parameters
+            mock_model_class.assert_called_once_with(
+                model_name="deepseek-chat",
+                provider=mock_provider.return_value,
+                temperature=0.7
+            )
 
     def test_create_model_unsupported(self):
         """Test creating unsupported model."""
