@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python package called `sciread` designed to understand papers with LLM-driven agents. It's a lightweight package currently in early development stages with a simple command-line interface.
+This is a Python package called `sciread` designed to understand papers with LLM-driven agents. It provides comprehensive document processing capabilities including loading academic papers from various formats, intelligent text splitting, and chunk-based processing for LLM analysis.
 
 ## Common Development Commands
 
@@ -32,10 +32,25 @@ This is a Python package called `sciread` designed to understand papers with LLM
 ### Package Structure
 ```
 src/sciread/
-├── __init__.py      # Package initialization, exports compute function
+├── __init__.py      # Package initialization, exports main functions
 ├── cli.py          # Command-line interface entry point
 ├── config.py       # Configuration management for API keys and provider settings
 ├── core.py         # Core functionality (compute function)
+├── document/       # Document processing module
+│   ├── __init__.py # Document module exports
+│   ├── document.py # Main Document class for managing document lifecycle
+│   ├── models.py   # Core data models (Chunk, DocumentMetadata, etc.)
+│   ├── loaders/    # Document loaders for different file formats
+│   │   ├── __init__.py
+│   │   ├── base.py      # Base loader interface
+│   │   ├── pdf_loader.py # PDF file loader
+│   │   └── txt_loader.py # Text file loader
+│   └── splitters/   # Text splitters for chunking documents
+│       ├── __init__.py
+│       ├── base.py         # Base splitter interface
+│       ├── fixed_size.py   # Fixed-size text splitter
+│       ├── rule_based.py   # Academic paper rule-based splitter
+│       └── hybrid.py       # Hybrid splitter combining multiple approaches
 ├── llm_provider/   # LLM provider module with factory pattern
 │   ├── __init__.py  # Main interface exports get_model() function
 │   ├── factory.py   # ModelFactory for creating model instances
@@ -50,7 +65,43 @@ src/sciread/
 - **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution
 - **Package Interface**: `__init__.py` exports the `compute` function as the main API
 - **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
+- **Document Module**: `document/` provides comprehensive document processing capabilities
 - **LLM Provider Module**: `llm_provider/` provides unified interface for multiple LLM providers
+
+#### Document Processing System
+The `document` module provides a complete pipeline for processing academic papers:
+
+**Main Document Class**: `Document` in `src/sciread/document/document.py`
+- Factory methods: `Document.from_file(path)` and `Document.from_text(text)`
+- Lifecycle management: `load()` → `split()` → processing
+- State tracking: loading status, splitting status, processing history
+- Chunk management: get chunks, filter by type/processing status
+
+**Core Data Models** in `src/sciread/document/models.py`:
+- **Chunk**: Text chunk with metadata (content, type, position, confidence, processing status)
+- **DocumentMetadata**: Document metadata (file info, timestamps, title, author, page count)
+- **ProcessingState**: Processing lifecycle tracking (timestamps, notes, version)
+- **CoverageStats**: Coverage statistics for processed chunks and words
+
+**Document Loaders** in `src/sciread/document/loaders/`:
+- **BaseLoader**: Abstract interface with common functionality
+- **PdfLoader**: PDF loading with PyPDF2 and pdfplumber fallbacks
+- **TxtLoader**: Text file loading with encoding detection
+- LoadResult: Standardized result format with text, metadata, warnings, and errors
+
+**Text Splitters** in `src/sciread/document/splitters/`:
+- **BaseSplitter**: Abstract interface for text splitting strategies
+- **FixedSizeSplitter**: Fixed-size chunking with overlap support
+- **RuleBasedSplitter**: Academic paper section detection (abstract, introduction, methods, etc.)
+- **HybridSplitter**: Intelligent splitting combining multiple approaches
+
+**Key Features**:
+- Multi-format document loading (PDF, TXT, MD, RST)
+- Intelligent text splitting optimized for academic papers
+- Comprehensive metadata tracking and state management
+- Error handling with detailed warnings and extraction statistics
+- Processing pipeline with chunk-level operations
+- Coverage tracking and progress monitoring
 
 #### LLM Provider System
 The `llm_provider` module implements a factory pattern for working with different LLM providers using pydantic-ai:
@@ -98,4 +149,54 @@ The `config/sciread.toml` file supports:
 - The project uses setuptools with namespace packages in `src/` layout
 - Tests are located in `tests/` directory and included in coverage reports
 - The package is designed to be cross-platform (Windows, macOS, Linux)
-- Currently has minimal functionality - serves as a foundation for LLM-driven paper analysis
+- The document module provides a complete foundation for LLM-driven paper analysis
+- All components follow modern Python practices with type hints and comprehensive error handling
+- The architecture is designed to be extensible for new file formats and processing strategies
+
+### Document Module Usage Examples
+
+```python
+from sciread.document import Document
+from pathlib import Path
+
+# Load and process a document
+doc = Document.from_file("paper.pdf")
+result = doc.load()  # Returns LoadResult with text and metadata
+
+if result.success:
+    # Split into chunks (uses HybridSplitter by default)
+    chunks = doc.split()
+
+    # Get all chunks
+    all_chunks = doc.get_chunks()
+
+    # Get chunks by type
+    abstract_chunks = doc.get_chunks(chunk_type="abstract")
+    unprocessed_chunks = doc.get_unprocessed_chunks()
+
+    # Check processing state
+    coverage_stats = doc.get_coverage_stats()
+    print(f"Processed {coverage_stats.chunk_coverage}% of chunks")
+```
+
+### Adding Custom Loaders and Splitters
+
+The document module is designed to be extensible:
+
+```python
+from sciread.document.loaders import BaseLoader
+from sciread.document.splitters import BaseSplitter
+
+class CustomLoader(BaseLoader):
+    # Implement loading logic for new format
+    pass
+
+class CustomSplitter(BaseSplitter):
+    # Implement custom splitting strategy
+    pass
+
+# Use with Document class
+doc = Document.from_file("custom.ext")
+doc.add_loader(CustomLoader())
+doc.set_splitter(CustomSplitter())
+```
