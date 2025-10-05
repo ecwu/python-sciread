@@ -137,6 +137,101 @@ The `config/sciread.toml` file supports:
 - Base URL customization
 - Model-specific settings
 
+#### Logging System
+The project uses loguru for structured logging with comprehensive configuration options:
+
+**Logging Configuration Module**: `src/sciread/logging_config.py`
+- **Default setup**: INFO level to console with colored output
+- **Flexible configuration**: Support for file logging, rotation, and custom formats
+- **Module-specific loggers**: Each module can get its own logger instance
+- **Convenience functions**: Direct access to debug, info, warning, error, critical
+
+**Key Features**:
+- Structured logging with timestamps, levels, and source location
+- Console output with colors and file logging with rotation
+- Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+- Automatic setup on import with sensible defaults
+
+**Log Level Guidelines**:
+
+- **DEBUG**: Detailed diagnostic information for development
+  - Function entry/exit with parameters
+  - Internal state changes
+  - Detailed processing steps
+  - Use cases: Debugging complex algorithms, tracking data flow
+
+- **INFO**: General information about application progress
+  - Successful completion of major operations
+  - Application startup/shutdown
+  - Configuration loaded
+  - File processing started/completed
+  - Use cases: Monitoring application progress, user-facing status updates
+
+- **WARNING**: Potentially problematic situations that don't prevent execution
+  - Fallback to alternative methods (e.g., PDF extraction method changes)
+  - Missing metadata that can be defaulted
+  - Performance concerns (slow operations, large file sizes)
+  - Non-critical data quality issues
+  - Use cases: Alerting about recoverable issues, performance monitoring
+
+- **ERROR**: Serious problems that prevent specific operations from completing
+  - Failed file loading/parsing
+  - Network/API request failures
+  - Validation errors
+  - Missing required dependencies
+  - Use cases: Error tracking, debugging failures, user error messages
+
+- **CRITICAL**: Severe errors that may cause application termination
+  - Out of memory errors
+  - Critical system failures
+  - Unrecoverable data corruption
+  - Use cases: System monitoring, emergency alerts
+
+**Usage Examples**:
+
+```python
+# Basic usage (uses default configuration)
+from sciread import get_logger
+logger = get_logger(__name__)
+logger.info("Operation completed successfully")
+
+# Custom logging setup
+from sciread import setup_logging
+setup_logging(
+    level="DEBUG",
+    log_file="app.log",
+    rotation="10 MB",
+    retention="7 days"
+)
+
+# Convenience functions
+from sciread.logging_config import debug, info, warning, error
+debug("Detailed diagnostic information")
+info("General progress information")
+warning("Potential issue detected")
+error("Operation failed")
+
+# In class methods
+class MyClass:
+    def __init__(self):
+        self.logger = get_logger(__name__)
+
+    def process(self):
+        self.logger.info("Starting processing")
+        try:
+            # ... processing logic
+            self.logger.info("Processing completed")
+        except Exception as e:
+            self.logger.error(f"Processing failed: {e}")
+            raise
+```
+
+**Default Configuration**:
+- Console output with colors
+- INFO level logging
+- Format: `time | level | module:function:line | message`
+- Automatic backtrace and diagnose for errors
+
 ### Code Style
 - **Line Length**: 140 characters
 - **Quote Style**: Double quotes
