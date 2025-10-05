@@ -1,18 +1,23 @@
 """PDF file loader implementation."""
 
-import logging
 import re
 from pathlib import Path
 
 import pdfplumber
 import pypdf
 
+from ...logging_config import get_logger
 from .base import BaseLoader
 from .base import LoadResult
 
 
 class PdfLoader(BaseLoader):
     """Loader for PDF files using multiple extraction methods."""
+
+    def __init__(self):
+        """Initialize the PDF loader."""
+        super().__init__()
+        self.logger = get_logger(__name__)
 
     @property
     def supported_extensions(self) -> list[str]:
@@ -26,6 +31,7 @@ class PdfLoader(BaseLoader):
 
     def load(self, file_path: Path) -> LoadResult:
         """Load text content from a PDF file."""
+        self.logger.info(f"Loading PDF file: {file_path}")
         result = LoadResult(text="", metadata=self._create_metadata(file_path))
 
         try:
@@ -40,6 +46,7 @@ class PdfLoader(BaseLoader):
 
             # If text extraction failed or is too short, try pdfplumber
             if len(text.strip()) < 100:
+                self.logger.warning("PyPDF2 extraction yielded little text, trying pdfplumber")
                 result.add_warning("PyPDF2 extraction yielded little text, trying pdfplumber")
                 pdfplumber_text = self._extract_with_pdfplumber(file_path)
                 if len(pdfplumber_text) > len(text):
@@ -47,6 +54,7 @@ class PdfLoader(BaseLoader):
 
             # Validate extracted text
             if not result.text.strip():
+                self.logger.error("No text could be extracted from PDF")
                 result.add_error("No text could be extracted from PDF")
                 return result
 
@@ -59,10 +67,13 @@ class PdfLoader(BaseLoader):
                 }
             )
 
+            self.logger.info(f"Successfully extracted {len(result.text)} characters from PDF")
+
             # Check for common extraction issues
             self._check_extraction_quality(result)
 
         except Exception as e:
+            self.logger.error(f"Failed to load PDF {file_path}: {e}")
             result.add_error(f"Failed to load PDF: {e}")
 
         return result
@@ -89,7 +100,7 @@ class PdfLoader(BaseLoader):
                         text_parts.append(page_text)
                 except Exception as e:
                     # Continue with other pages if one fails
-                    logging.warning(f"Failed to extract text from page {_page_num}: {e}")
+                    self.logger.warning(f"Failed to extract text from page {_page_num}: {e}")
                     continue
 
             return "\n\n".join(text_parts), metadata
@@ -109,7 +120,7 @@ class PdfLoader(BaseLoader):
                             text_parts.append(page_text)
                     except Exception as e:
                         # Continue with other pages
-                        logging.warning(f"Failed to extract text from page {page_num} with pdfplumber: {e}")
+                        self.logger.warning(f"Failed to extract text from page {page_num} with pdfplumber: {e}")
                         continue
 
             return "\n\n".join(text_parts)
@@ -123,14 +134,17 @@ class PdfLoader(BaseLoader):
 
         # Check for excessive whitespace
         if re.search(r"\s{10,}", text):
+            self.logger.warning("Document contains excessive whitespace")
             result.add_warning("Document contains excessive whitespace")
 
         # Check for potential OCR artifacts (if this was a scanned PDF)
         if re.search(r"\|\s*\|\s*\|", text) or re.search(r"\.{5,}", text):
+            self.logger.warning("Document may contain OCR artifacts or tables")
             result.add_warning("Document may contain OCR artifacts or tables")
 
         # Check for encoding issues
         if "�" in text:
+            self.logger.warning("Document contains encoding issues")
             result.add_warning("Document contains encoding issues")
 
         # Check for very short average line length (might indicate column formatting issues)
@@ -138,4 +152,5 @@ class PdfLoader(BaseLoader):
         if lines:
             avg_line_length = sum(len(line) for line in lines) / len(lines)
             if avg_line_length < 20:
+                self.logger.warning("Average line length is very short, may have formatting issues")
                 result.add_warning("Average line length is very short, may have formatting issues")

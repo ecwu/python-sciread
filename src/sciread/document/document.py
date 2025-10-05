@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 from typing import Union
 
+from ..logging_config import get_logger
 from .loaders import BaseLoader
 from .loaders import LoadResult
 from .loaders.pdf_loader import PdfLoader
@@ -28,6 +29,7 @@ class Document:
         processing_state: Optional[ProcessingState] = None,
     ):
         """Initialize a Document instance."""
+        self.logger = get_logger(__name__)
         self.source_path = source_path
         self._raw_text = text or ""
         self.metadata = metadata or DocumentMetadata(source_path=source_path)
@@ -46,17 +48,24 @@ class Document:
     def from_file(cls, file_path: Union[str, Path]) -> "Document":
         """Create a Document from a file path."""
         path = Path(file_path)
+        logger = get_logger(__name__)
+        logger.debug(f"Creating document from file: {path}")
         return cls(source_path=path)
 
     @classmethod
     def from_text(cls, text: str, metadata: Optional[DocumentMetadata] = None) -> "Document":
         """Create a Document from raw text."""
+        logger = get_logger(__name__)
+        logger.debug(f"Creating document from text ({len(text)} characters)")
         return cls(text=text, metadata=metadata)
 
     def load(self) -> LoadResult:
         """Load the document from the source path."""
         if self.source_path is None:
+            self.logger.error("No source path specified for loading")
             raise ValueError("No source path specified for loading")
+
+        self.logger.info(f"Loading document from: {self.source_path}")
 
         # Find appropriate loader
         loader = None
@@ -66,7 +75,10 @@ class Document:
                 break
 
         if loader is None:
+            self.logger.error(f"No loader available for file: {self.source_path}")
             raise ValueError(f"No loader available for file: {self.source_path}")
+
+        self.logger.debug(f"Using loader: {loader.loader_name}")
 
         # Load the document
         result = loader.load(self.source_path)
@@ -76,23 +88,30 @@ class Document:
             self._loaded = True
             self.processing_state.update_timestamp("loaded")
             self.processing_state.add_note(f"Document loaded using {loader.loader_name}")
+            self.logger.info(f"Successfully loaded document using {loader.loader_name}: {len(result.text)} characters")
 
             # Add any warnings to processing state
             for warning in result.warnings:
                 self.processing_state.add_note(f"Warning: {warning}")
+                self.logger.warning(f"Document loading warning: {warning}")
+        else:
+            self.logger.error("Failed to load document")
 
         return result
 
     def split(self, splitter: Optional[BaseSplitter] = None) -> list[Chunk]:
         """Split the document into chunks."""
         if not self._loaded:
+            self.logger.error("Attempted to split document before loading")
             raise ValueError("Document must be loaded before splitting")
 
         if not self._raw_text.strip():
+            self.logger.error("Attempted to split empty document")
             raise ValueError("Cannot split empty document")
 
         # Use provided splitter or default
         active_splitter = splitter or self._splitter
+        self.logger.info(f"Splitting document using {active_splitter.splitter_name}")
 
         # Split the text
         self._chunks = active_splitter.split(self._raw_text)
@@ -100,6 +119,7 @@ class Document:
         self.processing_state.update_timestamp("split")
         self.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
+        self.logger.info(f"Document split into {len(self._chunks)} chunks")
         return self._chunks
 
     @property

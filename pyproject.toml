@@ -51,6 +51,7 @@ dependencies = [
     "pypdf>=3.0.0",
     "pdfplumber>=0.7.0",
     "chardet>=5.0.0",
+    "loguru>=0.7.0",
 ]
 
 [project.optional-dependencies]

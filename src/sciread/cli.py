@@ -18,6 +18,7 @@ Why does this file exist, and why not put this in __main__?
 import sys
 
 from .core import compute
+from .logging_config import logger
 
 
 def run(argv=sys.argv):
@@ -30,5 +31,8 @@ def run(argv=sys.argv):
 
     Does stuff.
     """
-    print(compute(argv[1:]))
+    logger.info(f"Running sciread with arguments: {argv[1:]}")
+    result = compute(argv[1:])
+    logger.info(f"Compute result: {result}")
+    print(result)
     sys.exit(0)
