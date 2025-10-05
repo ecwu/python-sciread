@@ -1,5 +1,6 @@
 """PDF file loader implementation."""
 
+import logging
 import re
 from pathlib import Path
 
@@ -81,13 +82,14 @@ class PdfLoader(BaseLoader):
 
             # Extract text from all pages
             text_parts = []
-            for page_num, page in enumerate(reader.pages):
+            for _page_num, page in enumerate(reader.pages):
                 try:
                     page_text = page.extract_text()
                     if page_text:
                         text_parts.append(page_text)
-                except Exception:
+                except Exception as e:
                     # Continue with other pages if one fails
+                    logging.warning(f"Failed to extract text from page {_page_num}: {e}")
                     continue
 
             return "\n\n".join(text_parts), metadata
@@ -100,13 +102,14 @@ class PdfLoader(BaseLoader):
         try:
             text_parts = []
             with pdfplumber.open(file_path) as pdf:
-                for page in pdf.pages:
+                for page_num, page in enumerate(pdf.pages):
                     try:
                         page_text = page.extract_text()
                         if page_text:
                             text_parts.append(page_text)
-                    except Exception:
+                    except Exception as e:
                         # Continue with other pages
+                        logging.warning(f"Failed to extract text from page {page_num} with pdfplumber: {e}")
                         continue
 
             return "\n\n".join(text_parts)

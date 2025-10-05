@@ -2,6 +2,7 @@
 
 from sciread.document.loaders.base import BaseLoader
 from sciread.document.loaders.base import LoadResult
+from sciread.document.models import DocumentMetadata
 
 
 class TestBaseLoader:
@@ -9,8 +10,6 @@ class TestBaseLoader:
 
     def test_load_result_creation(self):
         """Test LoadResult creation and properties."""
-        from sciread.document.models import DocumentMetadata
-
         metadata = DocumentMetadata(title="Test")
         result = LoadResult(
             text="Test content",
@@ -31,8 +30,6 @@ class TestBaseLoader:
 
     def test_load_result_add_warning(self):
         """Test adding warnings to LoadResult."""
-        from sciread.document.models import DocumentMetadata
-
         metadata = DocumentMetadata()
         result = LoadResult(text="test", metadata=metadata, success=True)
         assert len(result.warnings) == 0
@@ -44,8 +41,6 @@ class TestBaseLoader:
 
     def test_load_result_add_error(self):
         """Test adding errors to LoadResult."""
-        from sciread.document.models import DocumentMetadata
-
         metadata = DocumentMetadata()
         result = LoadResult(text="test", metadata=metadata, success=True)
         assert result.success

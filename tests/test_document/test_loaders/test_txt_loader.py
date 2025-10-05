@@ -1,5 +1,7 @@
 """Tests for TXT loader."""
 
+from pathlib import Path
+
 import pytest
 
 from sciread.document.loaders.txt_loader import TxtLoader
@@ -38,8 +40,6 @@ class TestTxtLoader:
 
     def test_can_load_nonexistent_file(self, loader):
         """Test loader cannot load nonexistent files."""
-        from pathlib import Path
-
         nonexistent = Path("/nonexistent/file.txt")
         assert not loader.can_load(nonexistent)
 

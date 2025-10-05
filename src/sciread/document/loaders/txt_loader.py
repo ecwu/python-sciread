@@ -31,7 +31,7 @@ class TxtLoader(BaseLoader):
             result.extraction_info["detected_encoding"] = encoding
 
             # Read file with detected encoding
-            with open(file_path, encoding=encoding) as f:
+            with file_path.open(encoding=encoding) as f:
                 text = f.read()
 
             if not text.strip():
@@ -61,7 +61,7 @@ class TxtLoader(BaseLoader):
     def _detect_encoding(self, file_path: Path) -> str:
         """Detect file encoding using chardet."""
         try:
-            with open(file_path, "rb") as f:
+            with file_path.open("rb") as f:
                 raw_data = f.read(10240)  # Read first 10KB for detection
                 if not raw_data:
                     return "utf-8"  # Default for empty files

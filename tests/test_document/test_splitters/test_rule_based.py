@@ -213,7 +213,7 @@ This is methods content."""
             ("6. Bibliography", "references"),
         ]
 
-        for title, expected_type in test_cases:
+        for title, _expected_type in test_cases:
             text = f"{title}\nThis is the content for the section."
             chunks = splitter.split(text)
             # The actual classification might be more nuanced

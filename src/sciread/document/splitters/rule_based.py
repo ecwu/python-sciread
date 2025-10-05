@@ -85,7 +85,7 @@ class RuleBasedSplitter(BaseSplitter):
 
         # Create chunks from sections
         position = 0
-        for i, (start, end, section_type, confidence) in enumerate(section_boundaries):
+        for _i, (start, end, section_type, confidence) in enumerate(section_boundaries):
             section_text = text[start:end].strip()
             if len(section_text) >= self.min_section_size:
                 chunks.append(
@@ -104,7 +104,6 @@ class RuleBasedSplitter(BaseSplitter):
     def _find_section_boundaries(self, text: str) -> list[tuple[int, int, str, float]]:
         """Find section boundaries using various patterns."""
         boundaries = []
-        text_lower = text.lower()
 
         # Check each section pattern
         for section_type, pattern in self.section_patterns.items():

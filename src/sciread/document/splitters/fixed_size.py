@@ -1,6 +1,7 @@
 """Fixed-size text splitter implementation."""
 
 import re
+import warnings
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -24,9 +25,7 @@ class FixedSizeSplitter(BaseSplitter):
     @property
     def splitter_name(self) -> str:
         """Return the splitter name."""
-        return (
-            f"FixedSizeSplitter(size={self.chunk_size}, overlap={self.chunk_overlap})"
-        )
+        return f"FixedSizeSplitter(size={self.chunk_size}, overlap={self.chunk_overlap})"
 
     def split(self, text: str) -> list[Chunk]:
         """Split text into fixed-size chunks."""
@@ -60,10 +59,9 @@ class FixedSizeSplitter(BaseSplitter):
 
             if iteration >= max_iterations - 1:
                 # Safety break to prevent infinite loop
-                import warnings
-
                 warnings.warn(
-                    "FixedSizeSplitter: Safety break triggered to prevent infinite loop"
+                    "FixedSizeSplitter: Safety break triggered to prevent infinite loop",
+                    stacklevel=2,
                 )
                 break
             # Calculate end position
@@ -72,9 +70,7 @@ class FixedSizeSplitter(BaseSplitter):
             # Try to end at word boundary if possible
             if end_pos < len(text):
                 # Look for word boundary near the end
-                word_boundary = text.rfind(
-                    " ", start_pos + self.chunk_size // 2, end_pos
-                )
+                word_boundary = text.rfind(" ", start_pos + self.chunk_size // 2, end_pos)
                 if word_boundary > start_pos + self.chunk_size // 2:
                     end_pos = word_boundary + 1  # Include the space
 
