@@ -57,7 +57,11 @@ class Document:
         """Create a Document from raw text."""
         logger = get_logger(__name__)
         logger.debug(f"Creating document from text ({len(text)} characters)")
-        return cls(text=text, metadata=metadata)
+        doc = cls(text=text, metadata=metadata)
+        doc._loaded = True  # Text-based documents are already "loaded"
+        doc.processing_state.update_timestamp("loaded")
+        doc.processing_state.add_note("Document created from text")
+        return doc
 
     def load(self) -> LoadResult:
         """Load the document from the source path."""
@@ -99,8 +103,17 @@ class Document:
 
         return result
 
-    def split(self, splitter: Optional[BaseSplitter] = None) -> list[Chunk]:
-        """Split the document into chunks."""
+    def split(
+        self,
+        splitter: Optional[BaseSplitter] = None,
+        confidence_threshold: Optional[float] = None,
+        min_length: Optional[int] = None,
+        exclude_types: Optional[set[str]] = None,
+        auto_filter_quality: bool = False,
+        quality_confidence_threshold: float = 0.3,
+        quality_min_length: int = 20,
+    ) -> list[Chunk]:
+        """Split the document into chunks with optional quality filtering."""
         if not self._loaded:
             self.logger.error("Attempted to split document before loading")
             raise ValueError("Document must be loaded before splitting")
@@ -120,6 +133,28 @@ class Document:
         self.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
         self.logger.info(f"Document split into {len(self._chunks)} chunks")
+
+        # Apply quality filtering if requested
+        if auto_filter_quality:
+            deactivated_count = self.deactivate_low_quality_chunks(
+                confidence_threshold=quality_confidence_threshold,
+                min_length=quality_min_length,
+                exclude_types=exclude_types,
+            )
+            if deactivated_count > 0:
+                self.logger.info(f"Auto-filtered {deactivated_count} low-quality chunks")
+
+        # Apply manual filtering if criteria provided
+        elif confidence_threshold is not None or min_length is not None or exclude_types:
+            # Get filtered chunks for return, but keep all chunks in self._chunks
+            filtered_chunks = self.get_chunks(
+                confidence_threshold=confidence_threshold,
+                min_length=min_length,
+                exclude_types=exclude_types,
+            )
+            self.logger.info(f"Returning {len(filtered_chunks)} filtered chunks out of {len(self._chunks)} total")
+            return filtered_chunks
+
         return self._chunks
 
     @property
@@ -147,6 +182,9 @@ class Document:
         processed: Optional[bool] = None,
         chunk_type: Optional[str] = None,
         limit: Optional[int] = None,
+        confidence_threshold: Optional[float] = None,
+        min_length: Optional[int] = None,
+        exclude_types: Optional[set[str]] = None,
     ) -> list[Chunk]:
         """Get chunks with optional filtering."""
         chunks = self._chunks
@@ -159,6 +197,18 @@ class Document:
         if chunk_type is not None:
             chunks = [chunk for chunk in chunks if chunk.chunk_type == chunk_type]
 
+        # Filter by confidence threshold
+        if confidence_threshold is not None:
+            chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
+
+        # Filter by minimum length
+        if min_length is not None:
+            chunks = [chunk for chunk in chunks if len(chunk.content) >= min_length]
+
+        # Exclude specific chunk types
+        if exclude_types:
+            chunks = [chunk for chunk in chunks if chunk.chunk_type not in exclude_types]
+
         # Apply limit
         if limit is not None:
             chunks = chunks[:limit]
@@ -168,6 +218,53 @@ class Document:
     def get_unprocessed_chunks(self, limit: Optional[int] = None) -> list[Chunk]:
         """Get unprocessed chunks."""
         return self.get_chunks(processed=False, limit=limit)
+
+    def get_quality_chunks(
+        self,
+        confidence_threshold: float = 0.5,
+        min_length: int = 50,
+        exclude_types: Optional[set[str]] = None,
+        processed: Optional[bool] = None,
+    ) -> list[Chunk]:
+        """Get high-quality chunks based on quality criteria."""
+        return self.get_chunks(
+            confidence_threshold=confidence_threshold,
+            min_length=min_length,
+            exclude_types=exclude_types,
+            processed=processed,
+        )
+
+    def filter_chunks(self, **filter_kwargs) -> list[Chunk]:
+        """Filter chunks using any combination of criteria."""
+        return self.get_chunks(**filter_kwargs)
+
+    def deactivate_low_quality_chunks(
+        self,
+        confidence_threshold: float = 0.3,
+        min_length: int = 20,
+        exclude_types: Optional[set[str]] = None,
+    ) -> int:
+        """
+        Deactivate low-quality chunks by marking them as processed (so they're skipped).
+
+        Returns the number of chunks deactivated.
+        """
+        low_quality_chunks = self.get_chunks(
+            confidence_threshold=confidence_threshold,
+            min_length=min_length,
+            exclude_types=exclude_types,
+            processed=False,
+        )
+
+        # Mark low-quality chunks as processed so they won't be included in processing
+        for chunk in low_quality_chunks:
+            chunk.mark_processed()
+
+        if low_quality_chunks:
+            self.processing_state.add_note(f"Deactivated {len(low_quality_chunks)} low-quality chunks")
+            self.logger.info(f"Deactivated {len(low_quality_chunks)} low-quality chunks")
+
+        return len(low_quality_chunks)
 
     def next_unprocessed(self) -> Optional[Chunk]:
         """Get the next unprocessed chunk."""

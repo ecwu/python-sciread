@@ -21,7 +21,7 @@ class TestDocument:
         assert doc.text == text
         assert doc.metadata.title == "Test Document"
         assert doc.source_path is None
-        assert not doc.is_loaded
+        assert doc.is_loaded  # Text-based documents are automatically loaded
         assert not doc.is_split
 
     def test_document_from_file(self, sample_txt_file):

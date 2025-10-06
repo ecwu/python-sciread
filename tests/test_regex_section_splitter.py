@@ -141,29 +141,32 @@ This is the introduction content with substantial text that should be above the 
                 # These should be substantial or merged
                 assert len(chunk.content) >= 100 or chunk.confidence < 0.5
 
-    def test_confidence_threshold_filtering(self):
-        """Test confidence threshold filtering."""
+    def test_document_level_filtering(self):
+        """Test that Document class handles confidence threshold filtering."""
+        from sciread.document import Document
+
         text = """Abstract
 
-Abstract content.
+This is a comprehensive abstract that provides sufficient content to meet the minimum chunk size requirements. It contains a detailed summary of the research paper, including the methodology, key findings, and implications. This abstract is designed to be long enough to avoid the small chunk penalty that reduces confidence scores by 50%. The content discusses important aspects of the research and provides enough substance for meaningful analysis.
 
-Some random text without clear section headers.
+1. Introduction
 
-Introduction
+This introduction section provides substantial background information and context for the research. It includes a comprehensive review of related work, establishes the research problem, and outlines the contributions of this paper. The introduction is deliberately made extensive to ensure it meets the minimum chunk size criteria and maintains high confidence scores without being penalized for brevity. This section sets the stage for the detailed methodology and results that follow in subsequent sections of the paper."""
 
-Introduction content."""
+        doc = Document.from_text(text)
+        chunks = doc.split()  # Get all chunks
 
-        splitter = RegexSectionSplitter(confidence_threshold=0.7)
-        chunks = splitter.split(text)
+        assert len(chunks) > 0
 
-        # Should only include high confidence chunks
-        for chunk in chunks:
+        # Now test Document-level filtering
+        high_quality_chunks = doc.get_quality_chunks(confidence_threshold=0.7)
+        for chunk in high_quality_chunks:
             assert chunk.confidence >= 0.7
 
         # Should include abstract and introduction (high confidence patterns)
-        chunk_types = [chunk.chunk_type for chunk in chunks]
-        if len(chunks) > 0:
-            assert any(ct in ["abstract", "introduction"] for ct in chunk_types)
+        chunk_types = [chunk.chunk_type for chunk in high_quality_chunks]
+        if len(high_quality_chunks) > 0:
+            assert any(ct in ["abstract", "introduction", "section"] for ct in chunk_types)
 
     def test_custom_patterns(self):
         """Test adding custom patterns."""

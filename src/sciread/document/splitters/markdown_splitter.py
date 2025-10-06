@@ -112,12 +112,11 @@ class MarkdownSplitter(BaseSplitter):
         if self.merge_related_sections:
             chunks = self._merge_related_sections(chunks)
 
-        # Filter by confidence threshold and ensure continuity
-        filtered_chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
-        for i, chunk in enumerate(filtered_chunks):
+        # Ensure continuity by reassigning positions
+        for i, chunk in enumerate(chunks):
             chunk.position = i
 
-        return filtered_chunks
+        return chunks
 
     def _extract_code_blocks(self, text: str) -> tuple[str, list[dict]]:
         """Extract code blocks and replace them with placeholders."""

@@ -163,7 +163,7 @@ class TopicFlowSplitter(BaseSplitter):
         for split_pos in split_positions:
             if split_pos > prev_pos:
                 sentence_text = text[prev_pos:split_pos].strip()
-                if sentence_text and len(sentence_text) > 10:  # Filter very short fragments
+                if sentence_text:  # Keep all non-empty fragments
                     sentences.append(
                         {
                             "id": sentence_id,

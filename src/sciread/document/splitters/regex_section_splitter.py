@@ -58,14 +58,11 @@ class RegexSectionSplitter(BaseSplitter):
         if self.merge_small_chunks:
             chunks = self._merge_small_chunks(chunks)
 
-        # Filter by confidence threshold and reassign positions to maintain continuity
-        filtered_chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
-
         # Reassign positions to ensure continuous ordering
-        for i, chunk in enumerate(filtered_chunks):
+        for i, chunk in enumerate(chunks):
             chunk.position = i
 
-        return filtered_chunks
+        return chunks
 
     def _get_default_patterns(self) -> dict[str, str]:
         """Get default academic paper patterns."""
