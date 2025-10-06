@@ -522,7 +522,7 @@ class RegexSectionSplitter(BaseSplitter):
                 "confidence": confidence,
             }
         except re.error as e:
-            raise ValueError(f"Invalid regex pattern '{pattern}': {e}")
+            raise ValueError(f"Invalid regex pattern '{pattern}': {e}") from e
 
     def remove_pattern(self, name: str) -> bool:
         """Remove a pattern by name."""
