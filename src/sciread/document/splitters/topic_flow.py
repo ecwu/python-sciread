@@ -163,7 +163,9 @@ class TopicFlowSplitter(BaseSplitter):
         for split_pos in split_positions:
             if split_pos > prev_pos:
                 sentence_text = text[prev_pos:split_pos].strip()
-                if sentence_text and len(sentence_text) > 10:  # Filter very short fragments
+                if (
+                    sentence_text and len(sentence_text) > 10
+                ):  # Filter very short fragments
                     sentences.append(
                         {
                             "id": sentence_id,
@@ -250,7 +252,9 @@ class TopicFlowSplitter(BaseSplitter):
 
         return dot_product / (magnitude1 * magnitude2)
 
-    def _grow_segments(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[dict[str, Any]]:
+    def _grow_segments(
+        self, sentences: list[dict[str, Any]], embeddings: list[list[float]]
+    ) -> list[dict[str, Any]]:
         """Grow segments using continuity signals."""
         if len(sentences) != len(embeddings):
             return [{"sentences": sentences, "cut_reason": "embedding_mismatch"}]
@@ -265,7 +269,9 @@ class TopicFlowSplitter(BaseSplitter):
 
         # Calculate adaptive thresholds based on text statistics
         avg_sentence_length = sum(s["length"] for s in sentences) / len(sentences)
-        adaptive_local_threshold = self._calculate_adaptive_threshold(avg_sentence_length)
+        adaptive_local_threshold = self._calculate_adaptive_threshold(
+            avg_sentence_length
+        )
 
         for i in range(1, len(sentences)):
             sentence = sentences[i]
@@ -273,15 +279,20 @@ class TopicFlowSplitter(BaseSplitter):
 
             # Calculate continuity signals
             local_continuity = self._cosine_similarity(embeddings[i - 1], embedding)
-            context_continuity = self._calculate_context_continuity(current_segment, embedding)
+            context_continuity = self._calculate_context_continuity(
+                current_segment, embedding
+            )
 
             # Check budget constraint
             current_chars = sum(s["length"] for s in current_segment["sentences"])
-            would_exceed_budget = current_chars + sentence["length"] > self.max_segment_chars
+            would_exceed_budget = (
+                current_chars + sentence["length"] > self.max_segment_chars
+            )
 
             # Check readiness for content-based cuts
             ready_for_content_cut = (
-                len(current_segment["sentences"]) >= self.min_segment_sentences and current_chars >= self.min_segment_chars
+                len(current_segment["sentences"]) >= self.min_segment_sentences
+                and current_chars >= self.min_segment_chars
             )
 
             # Decision logic
@@ -293,7 +304,10 @@ class TopicFlowSplitter(BaseSplitter):
                 cut_reason = "budget"
             elif ready_for_content_cut:
                 # Check content-based cut conditions
-                local_drop = local_continuity < adaptive_local_threshold and local_continuity < self.adaptive_floor
+                local_drop = (
+                    local_continuity < adaptive_local_threshold
+                    and local_continuity < self.adaptive_floor
+                )
                 context_drop = context_continuity < self.soft_target
 
                 if local_drop or context_drop:
@@ -339,7 +353,9 @@ class TopicFlowSplitter(BaseSplitter):
             return self.local_continuity_threshold + 0.05
         return self.local_continuity_threshold
 
-    def _calculate_context_continuity(self, segment: dict[str, Any], next_embedding: list[float]) -> float:
+    def _calculate_context_continuity(
+        self, segment: dict[str, Any], next_embedding: list[float]
+    ) -> float:
         """Calculate context continuity between segment and next sentence."""
         if not segment["embeddings"]:
             return 0.0
@@ -363,7 +379,9 @@ class TopicFlowSplitter(BaseSplitter):
 
         return [value / len(embeddings) for value in centroid]
 
-    def _create_chunks_from_segments(self, segments: list[dict[str, Any]]) -> list[Chunk]:
+    def _create_chunks_from_segments(
+        self, segments: list[dict[str, Any]]
+    ) -> list[Chunk]:
         """Create Chunk objects from segments."""
         chunks = []
 
@@ -489,7 +507,9 @@ class TopicFlowSplitter(BaseSplitter):
 
 def main():
     """Main function to demonstrate TopicFlowSplitter on a txt file."""
-    parser = argparse.ArgumentParser(description="Split a text file using TopicFlowSplitter and display chunks with metadata")
+    parser = argparse.ArgumentParser(
+        description="Split a text file using TopicFlowSplitter and display chunks with metadata"
+    )
     parser.add_argument("file_path", type=str, help="Path to the text file to split")
     parser.add_argument(
         "--model",
@@ -550,7 +570,9 @@ def main():
     print(f"Testing connection to Ollama at {args.base_url}...")
     if not splitter.test_ollama_connection():
         print("Warning: Could not connect to Ollama. Make sure Ollama is running.")
-        print("Continuing anyway - fallback splitting may be used if embeddings fail...")
+        print(
+            "Continuing anyway - fallback splitting may be used if embeddings fail..."
+        )
     else:
         print("✓ Ollama connection successful")
 
@@ -572,7 +594,9 @@ def main():
                 continue
 
         if text is None:
-            print(f"Error: Could not read file with any of the attempted encodings: {', '.join(encodings_to_try)}")
+            print(
+                f"Error: Could not read file with any of the attempted encodings: {', '.join(encodings_to_try)}"
+            )
             return 1
 
         if not text.strip():
@@ -596,10 +620,16 @@ def main():
         # Display chunks with metadata
         for i, chunk in enumerate(chunks, 1):
             word_count = len(chunk.content.split())
-            confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
+            confidence_str = (
+                f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
+            )
 
             # Get the cut reason from chunk metadata
-            cut_reason = chunk.metadata.get("cut_reason", "unknown") if chunk.metadata else "unknown"
+            cut_reason = (
+                chunk.metadata.get("cut_reason", "unknown")
+                if chunk.metadata
+                else "unknown"
+            )
 
             header = (
                 f"============= Chunk #{i} ({word_count} words) ============= "
@@ -612,7 +642,8 @@ def main():
         # Print summary
         total_words = sum(len(chunk.content.split()) for chunk in chunks)
         avg_confidence = (
-            sum(c.confidence for c in chunks if c.confidence is not None) / len([c for c in chunks if c.confidence is not None])
+            sum(c.confidence for c in chunks if c.confidence is not None)
+            / len([c for c in chunks if c.confidence is not None])
             if any(c.confidence for c in chunks)
             else 0
         )

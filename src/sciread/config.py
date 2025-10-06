@@ -66,6 +66,17 @@ class DocumentSplitterConfig(BaseModel):
     topic_flow: TopicFlowSplitterConfig = Field(default_factory=TopicFlowSplitterConfig)
 
 
+class MineruConfig(BaseModel):
+    """Configuration for Mineru API."""
+
+    token: Optional[str] = Field(default=None, description="API token for Mineru service")
+    enable_formula: bool = Field(default=True, description="Enable formula extraction")
+    enable_table: bool = Field(default=True, description="Enable table extraction")
+    language: str = Field(default="ch", description="Document language (ch/en)")
+    timeout: int = Field(default=600, description="Processing timeout in seconds")
+    poll_interval: int = Field(default=10, description="Status poll interval in seconds")
+
+
 class DefaultConfig(BaseModel):
     """Default provider and model settings."""
 
@@ -95,6 +106,7 @@ class ScireadConfig(BaseSettings):
 
     default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-chat"))
     document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
+    mineru: MineruConfig = Field(default_factory=MineruConfig)
 
     config_file: Optional[Path] = Field(default=None, description="Path to configuration file")
 
@@ -151,10 +163,21 @@ class ScireadConfig(BaseSettings):
             splitters_config = config_data.get("document_splitters", {})
             document_splitters = DocumentSplitterConfig(**splitters_config)
 
+            # Extract Mineru configuration
+            mineru_config = config_data.get("mineru", {})
+            # Support environment variable substitution for token
+            mineru_token = mineru_config.get("token")
+            if mineru_token and isinstance(mineru_token, str) and mineru_token.startswith("${") and mineru_token.endswith("}"):
+                env_var = mineru_token[2:-1]
+                mineru_token = os.getenv(env_var)
+            mineru_config["token"] = mineru_token
+            mineru = MineruConfig(**mineru_config)
+
             return cls(
                 llm_providers=providers,
                 default=default_settings,
                 document_splitters=document_splitters,
+                mineru=mineru,
                 config_file=config_path,
             )
 
@@ -198,6 +221,16 @@ class ScireadConfig(BaseSettings):
         """Get configuration for the default splitter."""
         default_name = self.document_splitters.default_splitter
         return self.get_splitter_config(default_name)
+
+    def get_mineru_token(self) -> str:
+        """Get Mineru API token."""
+        if not self.mineru.token:
+            # Try environment variable
+            api_key = os.getenv("MINERU_TOKEN")
+            if not api_key:
+                raise ValueError("No Mineru token found. Set MINERU_TOKEN environment variable or configure in config file.")
+            return api_key
+        return self.mineru.token
 
 
 # Global configuration instance
