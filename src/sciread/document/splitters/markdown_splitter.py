@@ -55,9 +55,7 @@ class MarkdownSplitter(BaseSplitter):
             "h6": re.compile(r"^(#{6})\s+(.+)$", re.MULTILINE),
             # Code blocks (high confidence)
             "fenced_code": re.compile(r"^```[\w]*\n.*?\n```", re.MULTILINE | re.DOTALL),
-            "indented_code": re.compile(
-                r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE
-            ),
+            "indented_code": re.compile(r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE),
             "inline_code": re.compile(r"`[^`]+`"),
             # Lists (medium confidence)
             "unordered_list": re.compile(r"^[*+-]\s+.+$", re.MULTILINE),
@@ -115,9 +113,7 @@ class MarkdownSplitter(BaseSplitter):
             chunks = self._merge_related_sections(chunks)
 
         # Filter by confidence threshold and ensure continuity
-        filtered_chunks = [
-            chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold
-        ]
+        filtered_chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
         for i, chunk in enumerate(filtered_chunks):
             chunk.position = i
 
@@ -185,9 +181,7 @@ class MarkdownSplitter(BaseSplitter):
 
         return filtered_points
 
-    def _create_markdown_chunks(
-        self, text: str, split_points: list[tuple[int, str, float]]
-    ) -> list[Chunk]:
+    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float]]) -> list[Chunk]:
         """Create chunks based on markdown split points."""
         if not split_points:
             # No markdown structure found, treat as single chunk
@@ -200,9 +194,7 @@ class MarkdownSplitter(BaseSplitter):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
-                    chunk = self._create_chunk_from_content(
-                        chunk_text, prev_pos, pos, element_type, confidence
-                    )
+                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence)
                     chunks.append(chunk)
             prev_pos = pos
 
@@ -210,9 +202,7 @@ class MarkdownSplitter(BaseSplitter):
         if prev_pos < len(text):
             chunk_text = text[prev_pos:].strip()
             if chunk_text:
-                chunk = self._create_chunk_from_content(
-                    chunk_text, prev_pos, len(text), "final", 0.5
-                )
+                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5)
                 chunks.append(chunk)
 
         return chunks
@@ -227,9 +217,7 @@ class MarkdownSplitter(BaseSplitter):
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
-        chunk_type, confidence = self._analyze_chunk_content(
-            content, default_confidence
-        )
+        chunk_type, confidence = self._analyze_chunk_content(content, default_confidence)
 
         return Chunk(
             content=content,
@@ -239,16 +227,12 @@ class MarkdownSplitter(BaseSplitter):
             confidence=confidence,
         )
 
-    def _analyze_chunk_content(
-        self, content: str, default_confidence: float
-    ) -> tuple[str, float]:
+    def _analyze_chunk_content(self, content: str, default_confidence: float) -> tuple[str, float]:
         """Analyze chunk content to determine type and confidence."""
         content_lower = content.lower()
 
         # Check for code content first (highest priority)
-        if self.patterns["fenced_code"].search(content) or self.patterns[
-            "indented_code"
-        ].search(content):
+        if self.patterns["fenced_code"].search(content) or self.patterns["indented_code"].search(content):
             return "code", self.confidence_scores["fenced_code"]
 
         # Check for tables
@@ -256,9 +240,7 @@ class MarkdownSplitter(BaseSplitter):
             return "table", self.confidence_scores["table"]
 
         # Check for lists
-        if self.patterns["unordered_list"].search(content) or self.patterns[
-            "ordered_list"
-        ].search(content):
+        if self.patterns["unordered_list"].search(content) or self.patterns["ordered_list"].search(content):
             return "list", self.confidence_scores["unordered_list"]
 
         # Check for blockquotes
@@ -284,9 +266,7 @@ class MarkdownSplitter(BaseSplitter):
         first_line = content.split("\n")[0].strip()
         for element_type, pattern in self.patterns.items():
             if element_type.startswith("h") and pattern.match(first_line):
-                confidence = self.confidence_scores.get(
-                    element_type, default_confidence
-                )
+                confidence = self.confidence_scores.get(element_type, default_confidence)
                 return element_type, confidence
 
         # Default classification
@@ -309,16 +289,12 @@ class MarkdownSplitter(BaseSplitter):
             confidence=confidence,
         )
 
-    def _restore_code_blocks(
-        self, chunks: list[Chunk], code_blocks: list[dict]
-    ) -> list[Chunk]:
+    def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:
         """Restore extracted code blocks to their original positions."""
         for chunk in chunks:
             for code_block in code_blocks:
                 if code_block["placeholder"] in chunk.content:
-                    chunk.content = chunk.content.replace(
-                        code_block["placeholder"], code_block["content"]
-                    )
+                    chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
         return chunks
 
     def _merge_related_sections(self, chunks: list[Chunk]) -> list[Chunk]:
@@ -344,9 +320,7 @@ class MarkdownSplitter(BaseSplitter):
                         chunk_type=next_chunk.chunk_type,
                         position=current.position,
                         char_range=(
-                            (current.char_range[0], next_chunk.char_range[1])
-                            if current.char_range and next_chunk.char_range
-                            else None
+                            (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
                         ),
                         confidence=max(current.confidence, next_chunk.confidence),
                     )
@@ -378,18 +352,12 @@ class MarkdownSplitter(BaseSplitter):
             "discussion",
             "conclusion",
         }
-        if (
-            chunk1.chunk_type in academic_sections
-            and chunk2.chunk_type in academic_sections
-        ):
+        if chunk1.chunk_type in academic_sections and chunk2.chunk_type in academic_sections:
             return True
 
         # Content types that can be merged
         mergeable_types = {"content", "list", "table"}
-        if (
-            chunk1.chunk_type in mergeable_types
-            and chunk2.chunk_type in mergeable_types
-        ):
+        if chunk1.chunk_type in mergeable_types and chunk2.chunk_type in mergeable_types:
             return True
 
         return False
@@ -417,17 +385,11 @@ if __name__ == "__main__":
     import argparse
     from pathlib import Path
 
-    parser = argparse.ArgumentParser(
-        description="Split a markdown file using MarkdownSplitter"
-    )
-    parser.add_argument(
-        "file_path", type=str, help="Path to the markdown file to split"
-    )
+    parser = argparse.ArgumentParser(description="Split a markdown file using MarkdownSplitter")
+    parser.add_argument("file_path", type=str, help="Path to the markdown file to split")
     parser.add_argument("--min-size", type=int, default=200, help="Minimum chunk size")
     parser.add_argument("--max-size", type=int, default=2000, help="Maximum chunk size")
-    parser.add_argument(
-        "--no-merge", action="store_true", help="Disable merging related sections"
-    )
+    parser.add_argument("--no-merge", action="store_true", help="Disable merging related sections")
 
     args = parser.parse_args()
 
@@ -452,9 +414,7 @@ if __name__ == "__main__":
 
         for i, chunk in enumerate(chunks):
             word_count = len(chunk.content.split())
-            print(
-                f"Chunk {i}: {chunk.chunk_type} (confidence: {chunk.confidence:.2f}, words: {word_count})"
-            )
+            print(f"Chunk {i}: {chunk.chunk_type} (confidence: {chunk.confidence:.2f}, words: {word_count})")
             print("-" * 40)
             print(chunk.content)
             print("=" * 80)

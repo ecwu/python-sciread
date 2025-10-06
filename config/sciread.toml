@@ -54,8 +54,8 @@ soft_target = 0.7
 [mineru]
 # Set your Mineru API token here or use MINERU_TOKEN environment variable
 token = "${MINERU_TOKEN}"
-enable_formula = true      # Enable formula extraction
-enable_table = true        # Enable table extraction
-language = "ch"            # Document language: "ch" for Chinese, "en" for English
-timeout = 600              # Processing timeout in seconds
-poll_interval = 10         # Status poll interval in seconds
+enable_formula = true     # Enable formula extraction
+enable_table = true       # Enable table extraction
+language = "ch"           # Document language: "ch" for Chinese, "en" for English
+timeout = 600             # Processing timeout in seconds
+poll_interval = 10        # Status poll interval in seconds

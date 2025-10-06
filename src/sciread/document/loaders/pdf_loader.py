@@ -40,9 +40,7 @@ class PdfLoader(BaseLoader):
 
     def load(self, file_path: Path) -> LoadResult:
         """Load text content from a PDF file."""
-        self.logger.info(
-            f"Loading PDF file: {file_path} (to_markdown={self.to_markdown})"
-        )
+        self.logger.info(f"Loading PDF file: {file_path} (to_markdown={self.to_markdown})")
         result = LoadResult(text="", metadata=self._create_metadata(file_path))
 
         try:
@@ -58,9 +56,7 @@ class PdfLoader(BaseLoader):
                     # Extract fallback method from error message
                     fallback_method = "pypdf"  # default
                     if "fallback extraction method:" in str(e):
-                        fallback_method = (
-                            str(e).split("fallback extraction method:")[-1].strip()
-                        )
+                        fallback_method = str(e).split("fallback extraction method:")[-1].strip()
 
                     # Perform fallback extraction
                     text, pdf_metadata = self._extract_with_pypdf(file_path)
@@ -73,21 +69,15 @@ class PdfLoader(BaseLoader):
 
                     # If pypdf extraction is too short, try pdfplumber
                     if len(text.strip()) < 100:
-                        self.logger.warning(
-                            "PyPDF2 extraction yielded little text, trying pdfplumber"
-                        )
-                        result.add_warning(
-                            "PyPDF2 extraction yielded little text, trying pdfplumber"
-                        )
+                        self.logger.warning("PyPDF2 extraction yielded little text, trying pdfplumber")
+                        result.add_warning("PyPDF2 extraction yielded little text, trying pdfplumber")
                         pdfplumber_text = self._extract_with_pdfplumber(file_path)
                         if len(pdfplumber_text) > len(text):
                             result.text = pdfplumber_text
                             fallback_method = "pdfplumber"
 
                     result.extraction_info["extraction_method"] = fallback_method
-                    result.add_warning(
-                        f"Mineru extraction failed, used {fallback_method} fallback"
-                    )
+                    result.add_warning(f"Mineru extraction failed, used {fallback_method} fallback")
             else:
                 # Use traditional text extraction methods
                 text, pdf_metadata = self._extract_with_pypdf(file_path)
@@ -100,19 +90,13 @@ class PdfLoader(BaseLoader):
 
                 # If text extraction failed or is too short, try pdfplumber
                 if len(text.strip()) < 100:
-                    self.logger.warning(
-                        "PyPDF2 extraction yielded little text, trying pdfplumber"
-                    )
-                    result.add_warning(
-                        "PyPDF2 extraction yielded little text, trying pdfplumber"
-                    )
+                    self.logger.warning("PyPDF2 extraction yielded little text, trying pdfplumber")
+                    result.add_warning("PyPDF2 extraction yielded little text, trying pdfplumber")
                     pdfplumber_text = self._extract_with_pdfplumber(file_path)
                     if len(pdfplumber_text) > len(text):
                         result.text = pdfplumber_text
 
-                result.extraction_info["extraction_method"] = (
-                    "pypdf" if len(text.strip()) >= 100 else "pdfplumber"
-                )
+                result.extraction_info["extraction_method"] = "pypdf" if len(text.strip()) >= 100 else "pdfplumber"
 
             # Validate extracted text
             if not result.text.strip():
@@ -128,9 +112,7 @@ class PdfLoader(BaseLoader):
                 }
             )
 
-            self.logger.info(
-                f"Successfully extracted {len(result.text)} characters from PDF"
-            )
+            self.logger.info(f"Successfully extracted {len(result.text)} characters from PDF")
 
             # Check for common extraction issues (only for non-markdown extraction)
             if not self.to_markdown:
@@ -164,9 +146,7 @@ class PdfLoader(BaseLoader):
                         text_parts.append(page_text)
                 except Exception as e:
                     # Continue with other pages if one fails
-                    self.logger.warning(
-                        f"Failed to extract text from page {_page_num}: {e}"
-                    )
+                    self.logger.warning(f"Failed to extract text from page {_page_num}: {e}")
                     continue
 
             return "\n\n".join(text_parts), metadata
@@ -186,9 +166,7 @@ class PdfLoader(BaseLoader):
                             text_parts.append(page_text)
                     except Exception as e:
                         # Continue with other pages
-                        self.logger.warning(
-                            f"Failed to extract text from page {page_num} with pdfplumber: {e}"
-                        )
+                        self.logger.warning(f"Failed to extract text from page {page_num} with pdfplumber: {e}")
                         continue
 
             return "\n\n".join(text_parts)
@@ -220,12 +198,8 @@ class PdfLoader(BaseLoader):
         if lines:
             avg_line_length = sum(len(line) for line in lines) / len(lines)
             if avg_line_length < 20:
-                self.logger.warning(
-                    "Average line length is very short, may have formatting issues"
-                )
-                result.add_warning(
-                    "Average line length is very short, may have formatting issues"
-                )
+                self.logger.warning("Average line length is very short, may have formatting issues")
+                result.add_warning("Average line length is very short, may have formatting issues")
 
     def _extract_with_mineru(self, file_path: Path) -> str:
         """Extract markdown content using Mineru API."""
@@ -260,9 +234,7 @@ class PdfLoader(BaseLoader):
             response = requests.post(url, headers=headers, json=data, timeout=30)
 
             if response.status_code != 200:
-                self.logger.error(
-                    f"Mineru API request failed: {response.status_code} - {response.text}"
-                )
+                self.logger.error(f"Mineru API request failed: {response.status_code} - {response.text}")
                 raise RuntimeError(f"Mineru API request failed: {response.status_code}")
 
             result = response.json()
@@ -288,12 +260,8 @@ class PdfLoader(BaseLoader):
                 upload_response = requests.put(upload_url, data=f, timeout=300)
 
             if upload_response.status_code != 200:
-                self.logger.error(
-                    f"Failed to upload PDF to Mineru: {upload_response.status_code}"
-                )
-                raise RuntimeError(
-                    f"Failed to upload PDF to Mineru: {upload_response.status_code}"
-                )
+                self.logger.error(f"Failed to upload PDF to Mineru: {upload_response.status_code}")
+                raise RuntimeError(f"Failed to upload PDF to Mineru: {upload_response.status_code}")
 
             self.logger.info("PDF uploaded successfully, waiting for processing...")
 
@@ -304,14 +272,10 @@ class PdfLoader(BaseLoader):
 
             while attempt < max_attempts:
                 attempt += 1
-                self.logger.debug(
-                    f"Checking processing status (attempt {attempt}/{max_attempts})"
-                )
+                self.logger.debug(f"Checking processing status (attempt {attempt}/{max_attempts})")
 
                 try:
-                    status_response = requests.get(
-                        result_url, headers=headers, timeout=30
-                    )
+                    status_response = requests.get(result_url, headers=headers, timeout=30)
 
                     if status_response.status_code == 200:
                         status_data = status_response.json()
@@ -324,27 +288,15 @@ class PdfLoader(BaseLoader):
                                 # Extract markdown content
                                 markdown_content = result_info.get("content", "")
                                 if markdown_content:
-                                    self.logger.info(
-                                        f"Successfully extracted {len(markdown_content)} characters from Mineru"
-                                    )
+                                    self.logger.info(f"Successfully extracted {len(markdown_content)} characters from Mineru")
                                     return markdown_content
                                 else:
-                                    self.logger.error(
-                                        "Mineru processing completed but no content returned"
-                                    )
-                                    raise RuntimeError(
-                                        "No content returned from Mineru"
-                                    )
+                                    self.logger.error("Mineru processing completed but no content returned")
+                                    raise RuntimeError("No content returned from Mineru")
                             elif status == "failed":
-                                error_msg = result_info.get(
-                                    "error_msg", "Processing failed"
-                                )
-                                self.logger.error(
-                                    f"Mineru processing failed: {error_msg}"
-                                )
-                                raise RuntimeError(
-                                    f"Mineru processing failed: {error_msg}"
-                                )
+                                error_msg = result_info.get("error_msg", "Processing failed")
+                                self.logger.error(f"Mineru processing failed: {error_msg}")
+                                raise RuntimeError(f"Mineru processing failed: {error_msg}")
                             elif status in ["processing", "pending"]:
                                 # Still processing, wait and retry
                                 time.sleep(mineru_config.poll_interval)
@@ -355,15 +307,11 @@ class PdfLoader(BaseLoader):
                                 continue
                         else:
                             error_msg = status_data.get("msg", "Unknown error")
-                            self.logger.error(
-                                f"Mineru status check failed: {error_msg}"
-                            )
+                            self.logger.error(f"Mineru status check failed: {error_msg}")
                             time.sleep(mineru_config.poll_interval)
                             continue
                     else:
-                        self.logger.warning(
-                            f"Failed to check status: {status_response.status_code}"
-                        )
+                        self.logger.warning(f"Failed to check status: {status_response.status_code}")
                         time.sleep(mineru_config.poll_interval)
                         continue
 
@@ -373,12 +321,8 @@ class PdfLoader(BaseLoader):
                     continue
 
             # Timeout reached
-            self.logger.error(
-                f"Mineru processing timed out after {mineru_config.timeout} seconds"
-            )
-            raise RuntimeError(
-                f"Mineru processing timed out after {mineru_config.timeout} seconds"
-            )
+            self.logger.error(f"Mineru processing timed out after {mineru_config.timeout} seconds")
+            raise RuntimeError(f"Mineru processing timed out after {mineru_config.timeout} seconds")
 
         except Exception as e:
             self.logger.error(f"Failed to extract markdown with Mineru: {e}")
@@ -390,6 +334,4 @@ class PdfLoader(BaseLoader):
                 text = self._extract_with_pdfplumber(file_path)
                 extraction_method = "pdfplumber"
             # Raise the exception to be handled by the caller
-            raise RuntimeError(
-                f"Mineru extraction failed, fallback extraction method: {extraction_method}"
-            ) from e
+            raise RuntimeError(f"Mineru extraction failed, fallback extraction method: {extraction_method}") from e
