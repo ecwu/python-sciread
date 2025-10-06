@@ -489,9 +489,7 @@ class TopicFlowSplitter(BaseSplitter):
 
 def main():
     """Main function to demonstrate TopicFlowSplitter on a txt file."""
-    parser = argparse.ArgumentParser(
-        description="Split a text file using TopicFlowSplitter and display chunks with metadata"
-    )
+    parser = argparse.ArgumentParser(description="Split a text file using TopicFlowSplitter and display chunks with metadata")
     parser.add_argument("file_path", type=str, help="Path to the text file to split")
     parser.add_argument(
         "--model",
@@ -566,7 +564,7 @@ def main():
 
         for encoding in encodings_to_try:
             try:
-                with open(file_path, "r", encoding=encoding) as f:
+                with open(file_path, encoding=encoding) as f:
                     text = f.read()
                 print(f"Successfully read file with {encoding} encoding")
                 break
@@ -601,7 +599,7 @@ def main():
             confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
 
             # Get the cut reason from chunk metadata
-            cut_reason = chunk.metadata.get('cut_reason', 'unknown') if chunk.metadata else 'unknown'
+            cut_reason = chunk.metadata.get("cut_reason", "unknown") if chunk.metadata else "unknown"
 
             header = (
                 f"============= Chunk #{i} ({word_count} words) ============= "
@@ -614,12 +612,12 @@ def main():
         # Print summary
         total_words = sum(len(chunk.content.split()) for chunk in chunks)
         avg_confidence = (
-            sum(c.confidence for c in chunks if c.confidence is not None) /
-            len([c for c in chunks if c.confidence is not None])
-            if any(c.confidence for c in chunks) else 0
+            sum(c.confidence for c in chunks if c.confidence is not None) / len([c for c in chunks if c.confidence is not None])
+            if any(c.confidence for c in chunks)
+            else 0
         )
 
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Total chunks: {len(chunks)}")
         print(f"  Total words: {total_words}")
         print(f"  Average confidence: {avg_confidence:.2f}")

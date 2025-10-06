@@ -53,9 +53,7 @@ class Document:
         return cls(source_path=path)
 
     @classmethod
-    def from_text(
-        cls, text: str, metadata: Optional[DocumentMetadata] = None
-    ) -> "Document":
+    def from_text(cls, text: str, metadata: Optional[DocumentMetadata] = None) -> "Document":
         """Create a Document from raw text."""
         logger = get_logger(__name__)
         logger.debug(f"Creating document from text ({len(text)} characters)")
@@ -89,12 +87,8 @@ class Document:
             self.metadata = result.metadata
             self._loaded = True
             self.processing_state.update_timestamp("loaded")
-            self.processing_state.add_note(
-                f"Document loaded using {loader.loader_name}"
-            )
-            self.logger.info(
-                f"Successfully loaded document using {loader.loader_name}: {len(result.text)} characters"
-            )
+            self.processing_state.add_note(f"Document loaded using {loader.loader_name}")
+            self.logger.info(f"Successfully loaded document using {loader.loader_name}: {len(result.text)} characters")
 
             # Add any warnings to processing state
             for warning in result.warnings:
@@ -123,9 +117,7 @@ class Document:
         self._chunks = active_splitter.split(self._raw_text)
         self._split = True
         self.processing_state.update_timestamp("split")
-        self.processing_state.add_note(
-            f"Document split using {active_splitter.splitter_name}"
-        )
+        self.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
         self.logger.info(f"Document split into {len(self._chunks)} chunks")
         return self._chunks
@@ -188,9 +180,7 @@ class Document:
         processed_chunks = sum(1 for chunk in self._chunks if chunk.processed)
 
         total_words = sum(chunk.word_count for chunk in self._chunks)
-        processed_words = sum(
-            chunk.word_count for chunk in self._chunks if chunk.processed
-        )
+        processed_words = sum(chunk.word_count for chunk in self._chunks if chunk.processed)
 
         return CoverageStats(
             processed_chunks=processed_chunks,

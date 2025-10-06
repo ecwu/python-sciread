@@ -58,10 +58,14 @@ class RegexSectionSplitter(BaseSplitter):
         if self.merge_small_chunks:
             chunks = self._merge_small_chunks(chunks)
 
-        # Filter by confidence threshold
-        chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
+        # Filter by confidence threshold and reassign positions to maintain continuity
+        filtered_chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
 
-        return chunks
+        # Reassign positions to ensure continuous ordering
+        for i, chunk in enumerate(filtered_chunks):
+            chunk.position = i
+
+        return filtered_chunks
 
     def _get_default_patterns(self) -> dict[str, str]:
         """Get default academic paper patterns."""
@@ -512,6 +516,10 @@ class RegexSectionSplitter(BaseSplitter):
 
             i += 1
 
+        # Reassign positions to ensure continuity after merging
+        for i, chunk in enumerate(merged):
+            chunk.position = i
+
         return merged
 
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
@@ -538,9 +546,7 @@ class RegexSectionSplitter(BaseSplitter):
 
 def main():
     """Main function to demonstrate RegexSectionSplitter on a txt file."""
-    parser = argparse.ArgumentParser(
-        description="Split a text file using RegexSectionSplitter and display chunks with metadata"
-    )
+    parser = argparse.ArgumentParser(description="Split a text file using RegexSectionSplitter and display chunks with metadata")
     parser.add_argument("file_path", type=str, help="Path to the text file to split")
     parser.add_argument(
         "--min-chunk-size",
@@ -585,7 +591,7 @@ def main():
 
         for encoding in encodings_to_try:
             try:
-                with open(file_path, "r", encoding=encoding) as f:
+                with open(file_path, encoding=encoding) as f:
                     text = f.read()
                 print(f"Successfully read file with {encoding} encoding")
                 break
@@ -623,8 +629,8 @@ def main():
 
             # Get pattern/matching info from chunk metadata
             split_reason = chunk.chunk_type
-            if hasattr(chunk, 'metadata') and chunk.metadata:
-                split_reason = chunk.metadata.get('pattern', chunk.chunk_type)
+            if hasattr(chunk, "metadata") and chunk.metadata:
+                split_reason = chunk.metadata.get("pattern", chunk.chunk_type)
 
             header = (
                 f"============= Chunk #{i} ({word_count} words) ============= "
@@ -637,9 +643,9 @@ def main():
         # Print summary
         total_words = sum(len(chunk.content.split()) for chunk in chunks)
         avg_confidence = (
-            sum(c.confidence for c in chunks if c.confidence is not None) /
-            len([c for c in chunks if c.confidence is not None])
-            if any(c.confidence for c in chunks) else 0
+            sum(c.confidence for c in chunks if c.confidence is not None) / len([c for c in chunks if c.confidence is not None])
+            if any(c.confidence for c in chunks)
+            else 0
         )
 
         # Chunk type distribution
@@ -648,14 +654,14 @@ def main():
             chunk_type = chunk.chunk_type
             type_counts[chunk_type] = type_counts.get(chunk_type, 0) + 1
 
-        print(f"\nSummary:")
+        print("\nSummary:")
         print(f"  Total chunks: {len(chunks)}")
         print(f"  Total words: {total_words}")
         print(f"  Average confidence: {avg_confidence:.2f}")
         print(f"  Chunk types: {dict(type_counts)}")
 
         # Show patterns used
-        print(f"\nPatterns used in splitting:")
+        print("\nPatterns used in splitting:")
         for pattern_name, pattern_info in splitter.compiled_patterns.items():
             print(f"  {pattern_name}: confidence={pattern_info['confidence']:.2f}")
 
