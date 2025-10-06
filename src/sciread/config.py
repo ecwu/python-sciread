@@ -28,6 +28,44 @@ class LLMProviderConfig(BaseModel):
     default_model: str = Field(description="Default model name for this provider")
 
 
+class RegexSectionSplitterConfig(BaseModel):
+    """Configuration for RegexSectionSplitter."""
+
+    min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
+    confidence_threshold: float = Field(default=0.3, description="Minimum confidence score for chunks")
+    merge_small_chunks: bool = Field(default=True, description="Whether to merge small chunks with neighbors")
+    custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
+
+
+class TopicFlowSplitterConfig(BaseModel):
+    """Configuration for TopicFlowSplitter."""
+
+    model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
+    base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
+    # Continuity thresholds
+    local_continuity_threshold: float = Field(default=0.6, description="Threshold for local continuity (adjacent sentences)")
+    context_continuity_threshold: float = Field(default=0.65, description="Threshold for context continuity (segment vs sentence)")
+    # Size constraints
+    min_segment_sentences: int = Field(default=4, description="Minimum sentences per segment for content-based cuts")
+    min_segment_chars: int = Field(default=300, description="Minimum characters per segment")
+    max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
+    # Processing parameters
+    embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
+    timeout: int = Field(default=30, description="Request timeout in seconds")
+    cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
+    # Adaptive thresholds
+    adaptive_floor: float = Field(default=0.4, description="Adaptive floor for local continuity detection")
+    soft_target: float = Field(default=0.7, description="Soft target for context continuity")
+
+
+class DocumentSplitterConfig(BaseModel):
+    """Configuration for document splitters."""
+
+    default_splitter: str = Field(default="topic_flow", description="Default splitter to use")
+    regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
+    topic_flow: TopicFlowSplitterConfig = Field(default_factory=TopicFlowSplitterConfig)
+
+
 class DefaultConfig(BaseModel):
     """Default provider and model settings."""
 
@@ -47,12 +85,16 @@ class ScireadConfig(BaseSettings):
     llm_providers: dict[str, LLMProviderConfig] = Field(
         default_factory=lambda: {
             "deepseek": LLMProviderConfig(default_model="deepseek-chat", base_url="https://api.deepseek.com"),
-            "zhipu": LLMProviderConfig(default_model="glm-4.6", base_url="https://open.bigmodel.cn/api/anthropic"),
+            "zhipu": LLMProviderConfig(
+                default_model="glm-4.6",
+                base_url="https://open.bigmodel.cn/api/anthropic",
+            ),
             "ollama": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:11434/v1"),
         }
     )
 
     default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-chat"))
+    document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
 
     config_file: Optional[Path] = Field(default=None, description="Path to configuration file")
 
@@ -93,16 +135,28 @@ class ScireadConfig(BaseSettings):
                     api_key = os.getenv(env_var)
 
                 providers[provider_name] = LLMProviderConfig(
-                    api_key=api_key, base_url=provider_data.get("base_url"), default_model=provider_data.get("default_model", provider_name)
+                    api_key=api_key,
+                    base_url=provider_data.get("base_url"),
+                    default_model=provider_data.get("default_model", provider_name),
                 )
 
             # Extract default configuration
             default_config = config_data.get("llm_providers", {}).get("default", {})
             default_settings = DefaultConfig(
-                provider=default_config.get("provider", "deepseek"), model=default_config.get("model", "deepseek-chat")
+                provider=default_config.get("provider", "deepseek"),
+                model=default_config.get("model", "deepseek-chat"),
             )
 
-            return cls(llm_providers=providers, default=default_settings, config_file=config_path)
+            # Extract document splitters configuration
+            splitters_config = config_data.get("document_splitters", {})
+            document_splitters = DocumentSplitterConfig(**splitters_config)
+
+            return cls(
+                llm_providers=providers,
+                default=default_settings,
+                document_splitters=document_splitters,
+                config_file=config_path,
+            )
 
         except Exception:
             # If config file is invalid, use defaults
@@ -127,6 +181,23 @@ class ScireadConfig(BaseSettings):
                 )
             return api_key
         return provider_config.api_key
+
+    def get_splitter_config(self, splitter_name: str):
+        """Get configuration for a specific splitter."""
+        if splitter_name == "regex_section":
+            return self.document_splitters.regex_section
+        elif splitter_name == "regex":
+            # Backward compatibility - map to regex_section
+            return self.document_splitters.regex_section
+        elif splitter_name == "topic_flow":
+            return self.document_splitters.topic_flow
+        else:
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section, topic_flow")
+
+    def get_default_splitter_config(self):
+        """Get configuration for the default splitter."""
+        default_name = self.document_splitters.default_splitter
+        return self.get_splitter_config(default_name)
 
 
 # Global configuration instance

@@ -19,3 +19,33 @@ default_model = "qwen3:4b"
 # Default provider to use when none is specified
 provider = "deepseek"
 model = "deepseek-chat"
+
+# Document splitting configuration
+[document_splitters]
+# Default splitter to use: "regex_section", "topic_flow"
+default_splitter = "topic_flow"
+
+[document_splitters.regex_section]
+min_chunk_size = 200
+confidence_threshold = 0.3
+merge_small_chunks = true
+# Custom patterns (optional)
+# custom_patterns = { "my_pattern" = "my regex pattern" }
+
+[document_splitters.topic_flow]
+model = "embeddinggemma:latest"
+base_url = "http://localhost:11434"
+# Continuity thresholds
+local_continuity_threshold = 0.6
+context_continuity_threshold = 0.65
+# Size constraints
+min_segment_sentences = 4
+min_segment_chars = 300
+max_segment_chars = 2000
+# Processing parameters
+embedding_batch_size = 10
+timeout = 30
+cache_embeddings = true
+# Adaptive thresholds
+adaptive_floor = 0.4
+soft_target = 0.7

@@ -6,7 +6,7 @@ from sciread.document import Document
 from sciread.document.models import Chunk
 from sciread.document.models import CoverageStats
 from sciread.document.models import DocumentMetadata
-from sciread.document.splitters.fixed_size import FixedSizeSplitter
+from sciread.document.splitters.topic_flow import TopicFlowSplitter
 
 
 class TestDocument:
@@ -83,11 +83,11 @@ class TestDocument:
         doc = Document.from_file(sample_txt_file)
         doc.load()
 
-        custom_splitter = FixedSizeSplitter(chunk_size=1000, chunk_overlap=100)
+        custom_splitter = TopicFlowSplitter(min_segment_sentences=3, min_segment_chars=100, max_segment_chars=1000, cache_embeddings=False)
         chunks = doc.split(custom_splitter)
 
         assert len(chunks) > 0
-        # Should use fixed-size splitting, so chunks might be "unknown" type
+        # Should use TopicFlow splitting
 
     def test_get_chunks_filtered(self, sample_txt_file):
         """Test getting chunks with filters."""

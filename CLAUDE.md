@@ -91,9 +91,8 @@ The `document` module provides a complete pipeline for processing academic paper
 
 **Text Splitters** in `src/sciread/document/splitters/`:
 - **BaseSplitter**: Abstract interface for text splitting strategies
-- **FixedSizeSplitter**: Fixed-size chunking with overlap support
-- **RuleBasedSplitter**: Academic paper section detection (abstract, introduction, methods, etc.)
-- **HybridSplitter**: Intelligent splitting combining multiple approaches
+- **RegexSectionSplitter**: Advanced regex-based academic paper section detection
+- **TopicFlowSplitter**: Bottom-up sentence splitter that grows segments based on semantic continuity
 
 **Key Features**:
 - Multi-format document loading (PDF, TXT, MD, RST)
@@ -259,7 +258,7 @@ doc = Document.from_file("paper.pdf")
 result = doc.load()  # Returns LoadResult with text and metadata
 
 if result.success:
-    # Split into chunks (uses HybridSplitter by default)
+    # Split into chunks (uses TopicFlowSplitter by default)
     chunks = doc.split()
 
     # Get all chunks

@@ -1,0 +1,534 @@
+"""Advanced regex-based text splitter for academic documents."""
+
+import re
+from re import Pattern
+from typing import Optional
+
+from ..models import Chunk
+from .base import BaseSplitter
+
+
+class RegexSectionSplitter(BaseSplitter):
+    """Advanced regex-based text splitter using pattern library."""
+
+    def __init__(
+        self,
+        patterns: Optional[dict[str, str]] = None,
+        min_chunk_size: int = 200,
+        confidence_threshold: float = 0.3,
+        merge_small_chunks: bool = True,
+    ):
+        """Initialize regex splitter with configuration.
+
+        Args:
+            patterns: Custom patterns dictionary. If None, uses default academic patterns.
+            min_chunk_size: Minimum chunk size in characters.
+            confidence_threshold: Minimum confidence score for chunks.
+            merge_small_chunks: Whether to merge small chunks with neighbors.
+        """
+        self.min_chunk_size = min_chunk_size
+        self.confidence_threshold = confidence_threshold
+        self.merge_small_chunks = merge_small_chunks
+
+        # Load patterns (custom or default)
+        self.patterns = patterns or self._get_default_patterns()
+        self.compiled_patterns = self._compile_patterns()
+
+    @property
+    def splitter_name(self) -> str:
+        """Return the splitter name."""
+        return f"RegexSectionSplitter(patterns={len(self.patterns)}, min_size={self.min_chunk_size})"
+
+    def split(self, text: str) -> list[Chunk]:
+        """Split text using regex patterns."""
+        text = self._validate_text(text)
+
+        # Apply patterns to find split points
+        split_points = self._find_split_points(text)
+
+        # Create chunks based on split points
+        raw_chunks = self._create_raw_chunks(text, split_points)
+
+        # Create Chunk objects with metadata
+        chunks = self._create_chunks(raw_chunks)
+
+        # Merge small chunks if requested
+        if self.merge_small_chunks:
+            chunks = self._merge_small_chunks(chunks)
+
+        # Filter by confidence threshold
+        chunks = [chunk for chunk in chunks if chunk.confidence >= self.confidence_threshold]
+
+        return chunks
+
+    def _get_default_patterns(self) -> dict[str, str]:
+        """Get default academic paper patterns."""
+        return {
+            # Major section boundaries (high confidence) - enhanced from RuleBasedSplitter
+            "abstract": r"^\s*(?:abstract|summary)\s*[:\.]?\s*$",
+            "introduction": r"^\s*(?:introduction|introduction\s+and\s+background|overview)\s*[:\.]?\s*$",
+            "related_work": r"^\s*(?:related\s+work|literature\s+review|background)\s*[:\.]?\s*$",
+            "methodology": r"^\s*(?:method(?:s|ology)?|approach|materials\s+and\s+methods|experimental\s+setup|design)\s*[:\.]?\s*$",
+            "results": r"^\s*(?:results|findings|outcomes|evaluation|experiment|experiments)\s*[:\.]?\s*$",
+            "discussion": r"^\s*(?:discussion|analysis|interpretation)\s*[:\.]?\s*$",
+            "conclusion": r"^\s*(?:conclusion|conclusions|future\s+work|limitations|summary)\s*[:\.]?\s*$",
+            "references": r"^\s*(?:references|bibliography|works\s+cited)\s*[:\.]?\s*$",
+            "appendix": r"^\s*(?:appendix|appendices|supplementary\s+material)\s*[:\.]?\s*$",
+            # Numbered sections (medium confidence) - enhanced from RuleBasedSplitter
+            "section_number": r"^\s*(\d+)\.\s+([A-Z][^\n]*?)\s*$",
+            "subsection": r"^\s*(\d+\.\d+)\s+([^\n]*?)\s*$",
+            # Medium confidence patterns
+            "figure_table": r"(?i)^(?:Figure|Table)\s+\d+[:\.\s]",
+            # Structural patterns (lower confidence)
+            "paragraph_break": r"\n\s*\n",
+            "page_break": r"\f",
+            "citation_block": r"\n\s*\[\d+\][^\n]*\n",
+            # Common academic phrases
+            "contributions": r"(?i)^(?:\s*(?:Our\s+contributions|This\s+paper\s+contributes))",
+            "limitations": r"(?i)^(?:\s*(?:Limitations|Limitation))",
+        }
+
+    def _compile_patterns(self) -> dict[str, Pattern]:
+        """Compile regex patterns with confidence scores."""
+        pattern_confidence = {
+            # High confidence (0.8-0.95)
+            "abstract": 0.95,
+            "introduction": 0.9,
+            "methodology": 0.9,
+            "results": 0.85,
+            "discussion": 0.85,
+            "conclusion": 0.9,
+            "references": 0.95,
+            "appendix": 0.9,
+            # Medium confidence (0.5-0.7)
+            "related_work": 0.8,
+            "section_number": 0.9,  # Enhanced confidence for numbered sections
+            "subsection": 0.7,  # Enhanced confidence for subsections
+            "figure_table": 0.6,
+            # Lower confidence (0.2-0.4)
+            "paragraph_break": 0.3,
+            "page_break": 0.4,
+            "citation_block": 0.4,
+            "contributions": 0.5,
+            "limitations": 0.5,
+        }
+
+        compiled = {}
+        for name, pattern in self.patterns.items():
+            try:
+                # All patterns should be multiline for academic paper detection
+                compiled[name] = {
+                    "pattern": re.compile(pattern, re.IGNORECASE | re.MULTILINE),
+                    "confidence": pattern_confidence.get(name, 0.5),
+                }
+            except re.error:
+                # Skip invalid patterns
+                continue
+
+        return compiled
+
+    def _find_split_points(self, text: str) -> list[tuple[int, str, float]]:
+        """Find split points in text using patterns.
+
+        Returns:
+            List of (position, pattern_name, confidence) tuples.
+        """
+        split_points = []
+
+        # Process patterns in order of confidence (high to low)
+        pattern_items = sorted(
+            self.compiled_patterns.items(),
+            key=lambda x: x[1]["confidence"],
+            reverse=True,
+        )
+
+        for pattern_name, pattern_info in pattern_items:
+            pattern = pattern_info["pattern"]
+            confidence = pattern_info["confidence"]
+
+            for match in pattern.finditer(text):
+                split_points.append((match.start(), pattern_name, confidence))
+
+        # Sort by position
+        split_points.sort(key=lambda x: x[0])
+
+        # Remove duplicates and prioritize higher confidence patterns
+        filtered_points = []
+        for pos, name, conf in split_points:
+            if not filtered_points or pos != filtered_points[-1][0]:
+                filtered_points.append((pos, name, conf))
+            else:
+                # Keep the highest confidence for this position
+                if conf > filtered_points[-1][2]:
+                    filtered_points[-1] = (pos, name, conf)
+
+        # Filter out low-confidence split points that are too close to high-confidence ones
+        final_points = []
+        for _i, (pos, name, conf) in enumerate(filtered_points):
+            # Keep medium-confidence patterns (0.5-0.7) even if near high-confidence ones
+            if conf >= 0.5:
+                final_points.append((pos, name, conf))
+                continue
+
+            # For low-confidence points, check if there's a high-confidence point nearby
+            if conf < 0.5:
+                # Check if there's a high-confidence point nearby
+                has_nearby_high_conf = any(
+                    abs(pos - other_pos) < 20 and other_conf >= 0.7
+                    for other_pos, other_name, other_conf in filtered_points
+                    if other_pos != pos
+                )
+                if has_nearby_high_conf:
+                    continue
+            final_points.append((pos, name, conf))
+
+        return final_points
+
+    def _create_raw_chunks(self, text: str, split_points: list[tuple[int, str, float]]) -> list[dict]:
+        """Create raw chunks based on split points."""
+        if not split_points:
+            return [
+                {
+                    "text": text,
+                    "pattern": "no_split",
+                    "confidence": 0.1,
+                    "start_pos": 0,
+                    "end_pos": len(text),
+                }
+            ]
+
+        chunks = []
+        prev_pos = 0
+
+        for _i, (pos, _pattern_name, _confidence) in enumerate(split_points):
+            if pos > prev_pos:
+                chunk_text = text[prev_pos:pos].strip()
+                if chunk_text:
+                    # Find the best pattern for this chunk by checking what it contains
+                    best_pattern, best_confidence = self._find_pattern_for_chunk(chunk_text)
+                    chunks.append(
+                        {
+                            "text": chunk_text,
+                            "pattern": best_pattern,
+                            "confidence": best_confidence,
+                            "start_pos": prev_pos,
+                            "end_pos": pos,
+                        }
+                    )
+            prev_pos = pos
+
+        # Add final chunk
+        if prev_pos < len(text):
+            chunk_text = text[prev_pos:].strip()
+            if chunk_text:
+                # Find the best pattern for the final chunk
+                best_pattern, best_confidence = self._find_pattern_for_chunk(chunk_text)
+                chunks.append(
+                    {
+                        "text": chunk_text,
+                        "pattern": best_pattern,
+                        "confidence": best_confidence,
+                        "start_pos": prev_pos,
+                        "end_pos": len(text),
+                    }
+                )
+
+        return chunks
+
+    def _find_pattern_for_chunk(self, chunk_text: str) -> tuple[str, float]:
+        """Find the best matching pattern for a chunk of text."""
+        best_pattern = "unknown"
+        best_confidence = 0.1
+
+        # Check all patterns to see what matches this chunk
+        for pattern_name, pattern_info in self.compiled_patterns.items():
+            pattern = pattern_info["pattern"]
+            confidence = pattern_info["confidence"]
+
+            # Check if pattern matches within this chunk
+            match = pattern.search(chunk_text)
+            if match:
+                # Enhanced handling for numbered sections
+                if pattern_name in ["section_number", "subsection"] and match.groups():
+                    section_title = match.group(2) if len(match.groups()) >= 2 else ""
+                    if section_title:
+                        # Classify the section by title for better accuracy
+                        classified_type = self._classify_section_by_title(section_title.strip())
+                        if classified_type != "unknown":
+                            best_pattern = classified_type
+                            best_confidence = confidence
+                            continue
+
+                # Use the pattern with highest confidence
+                if confidence > best_confidence:
+                    best_pattern = pattern_name
+                    best_confidence = confidence
+
+        return best_pattern, best_confidence
+
+    def _create_chunks(self, raw_chunks: list[dict]) -> list[Chunk]:
+        """Create Chunk objects from raw chunks."""
+        chunks = []
+
+        for i, raw_chunk in enumerate(raw_chunks):
+            content = raw_chunk["text"]
+            if len(content) < self.min_chunk_size:
+                confidence = raw_chunk["confidence"] * 0.5  # Reduce confidence for small chunks
+            else:
+                confidence = raw_chunk["confidence"]
+
+            # Determine chunk type based on the split point pattern (not the current chunk pattern)
+            # For the first chunk, check if it starts with a high-confidence pattern
+            if i == 0:
+                # Check if content starts with a section header
+                chunk_type = self._infer_chunk_type_from_content(content)
+            else:
+                # Use the pattern that caused the split before this chunk
+                chunk_type = self._infer_chunk_type(raw_chunk["pattern"], content)
+
+            chunk = Chunk(
+                content=content,
+                chunk_type=chunk_type,
+                position=i,
+                char_range=(raw_chunk["start_pos"], raw_chunk["end_pos"]),
+                confidence=confidence,
+            )
+            chunks.append(chunk)
+
+        return chunks
+
+    def _infer_chunk_type_from_content(self, content: str) -> str:
+        """Infer chunk type from the content itself."""
+        _content_lower = content.lower()
+        content_stripped = content.strip()
+
+        # Check for section headers at the start
+        if content_stripped.startswith(("abstract", "abstract\n")):
+            return "abstract"
+        elif content_stripped.startswith(("introduction", "introduction\n")):
+            return "introduction"
+        elif content_stripped.startswith(("method", "methodology", "methods")):
+            return "methods"
+        elif content_stripped.startswith(("result", "experiment", "evaluation")):
+            return "results"
+        elif content_stripped.startswith(("discussion", "conclusion")):
+            return "discussion"
+        elif content_stripped.startswith(("references", "bibliography")):
+            return "references"
+
+        return self._infer_chunk_type("", content)
+
+    def _infer_chunk_type(self, pattern_name: str, content: str) -> str:
+        """Infer chunk type based on pattern and content."""
+        # Direct mapping from pattern to chunk type
+        pattern_mapping = {
+            "abstract": "abstract",
+            "introduction": "introduction",
+            "related_work": "related_work",
+            "methodology": "methods",
+            "experiments": "results",
+            "discussion": "discussion",
+            "conclusion": "conclusion",
+            "references": "references",
+            "appendix": "appendix",
+            "figure_table": "figure",
+            "section_number": "section",
+            "subsection": "subsection",
+        }
+
+        if pattern_name in pattern_mapping:
+            return pattern_mapping[pattern_name]
+
+        # Enhanced heuristic inference based on content (from RuleBasedSplitter)
+        return self._classify_section_by_content(content)
+
+    def _classify_section_by_content(self, content: str) -> str:
+        """Classify a section based on its content using enhanced keywords (from RuleBasedSplitter)."""
+        content_lower = content.lower()
+
+        # Enhanced keywords for different section types
+        classification_keywords = {
+            "introduction": ["introduction", "overview", "background", "motivation"],
+            "related_work": [
+                "related",
+                "literature",
+                "survey",
+                "background",
+                "previous",
+                "prior",
+            ],
+            "methods": [
+                "method",
+                "approach",
+                "algorithm",
+                "technique",
+                "design",
+                "implementation",
+                "procedure",
+                "experimental",
+            ],
+            "results": [
+                "results",
+                "evaluation",
+                "experiment",
+                "findings",
+                "performance",
+                "outcome",
+                "data",
+            ],
+            "discussion": ["discussion", "analysis", "interpretation", "implications"],
+            "conclusion": [
+                "conclusion",
+                "summary",
+                "future",
+                "limitations",
+                "concluding",
+                "final",
+            ],
+            "references": ["references", "bibliography", "citation", "cite"],
+            "abstract": ["abstract", "summary"],
+        }
+
+        # Check each category with keyword weighting
+        for section_type, keywords in classification_keywords.items():
+            keyword_count = sum(1 for keyword in keywords if keyword in content_lower)
+            if keyword_count >= 2:  # Require at least 2 keywords for classification
+                return section_type
+
+        # Single keyword fallback
+        for section_type, keywords in classification_keywords.items():
+            if any(keyword in content_lower for keyword in keywords):
+                return section_type
+
+        return "unknown"
+
+    def _classify_section_by_title(self, title: str) -> str:
+        """Classify a section based on its title (from RuleBasedSplitter)."""
+        return self._classify_section_by_content(title)
+
+    def _merge_small_chunks(self, chunks: list[Chunk]) -> list[Chunk]:
+        """Merge small chunks with neighbors."""
+        if not chunks:
+            return chunks
+
+        merged = []
+        i = 0
+
+        while i < len(chunks):
+            current = chunks[i]
+
+            if len(current.content) < self.min_chunk_size:
+                # Try to merge with next chunk, but avoid merging high-confidence chunks
+                if i + 1 < len(chunks):
+                    next_chunk = chunks[i + 1]
+
+                    # Don't merge high-confidence chunks (abstract, introduction, etc.)
+                    if current.confidence >= 0.8 and current.chunk_type in [
+                        "abstract",
+                        "introduction",
+                        "methods",
+                        "results",
+                        "discussion",
+                        "conclusion",
+                    ]:
+                        merged.append(current)
+                        i += 1
+                        continue
+
+                    merged_content = current.content + "\n\n" + next_chunk.content
+
+                    # Preserve the confidence of the more significant chunk (higher confidence or specific section types)
+                    if next_chunk.chunk_type in ["section", "subsection"] and next_chunk.confidence >= current.confidence:
+                        merged_confidence = next_chunk.confidence
+                    elif (
+                        current.chunk_type
+                        in [
+                            "abstract",
+                            "introduction",
+                            "methods",
+                            "results",
+                            "discussion",
+                            "conclusion",
+                        ]
+                        and current.confidence >= next_chunk.confidence
+                    ):
+                        merged_confidence = current.confidence
+                    else:
+                        merged_confidence = max(current.confidence, next_chunk.confidence)
+
+                    merged_chunk = Chunk(
+                        content=merged_content,
+                        chunk_type=next_chunk.chunk_type,  # Keep next chunk's type
+                        position=current.position,
+                        char_range=(
+                            (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
+                        ),
+                        confidence=merged_confidence,
+                    )
+                    merged.append(merged_chunk)
+                    i += 2  # Skip next chunk as it's merged
+                    continue
+                else:
+                    # Last chunk, try to merge with previous
+                    if merged:
+                        prev_chunk = merged[-1]
+                        merged_content = prev_chunk.content + "\n\n" + current.content
+
+                        # Preserve the confidence of the more significant chunk
+                        if prev_chunk.chunk_type in ["section", "subsection"] and prev_chunk.confidence >= current.confidence:
+                            merged_confidence = prev_chunk.confidence
+                        elif (
+                            current.chunk_type
+                            in [
+                                "abstract",
+                                "introduction",
+                                "methods",
+                                "results",
+                                "discussion",
+                                "conclusion",
+                            ]
+                            and current.confidence >= prev_chunk.confidence
+                        ):
+                            merged_confidence = current.confidence
+                        else:
+                            merged_confidence = max(prev_chunk.confidence, current.confidence)
+
+                        merged[-1] = Chunk(
+                            content=merged_content,
+                            chunk_type=prev_chunk.chunk_type,
+                            position=prev_chunk.position,
+                            char_range=(
+                                (prev_chunk.char_range[0], current.char_range[1]) if prev_chunk.char_range and current.char_range else None
+                            ),
+                            confidence=merged_confidence,
+                        )
+                    else:
+                        # No previous chunk, keep as is
+                        merged.append(current)
+            else:
+                merged.append(current)
+
+            i += 1
+
+        return merged
+
+    def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
+        """Add a custom pattern."""
+        self.patterns[name] = pattern
+        try:
+            compiled_pattern = re.compile(pattern, re.MULTILINE)
+            self.compiled_patterns[name] = {
+                "pattern": compiled_pattern,
+                "confidence": confidence,
+            }
+        except re.error as e:
+            raise ValueError(f"Invalid regex pattern '{pattern}': {e}")
+
+    def remove_pattern(self, name: str) -> bool:
+        """Remove a pattern by name."""
+        if name in self.patterns:
+            del self.patterns[name]
+            if name in self.compiled_patterns:
+                del self.compiled_patterns[name]
+            return True
+        return False
