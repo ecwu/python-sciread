@@ -21,6 +21,7 @@ class Chunk:
     word_count: int = 0
     confidence: float = 1.0  # Confidence in classification (0.0-1.0)
     processed: bool = False  # Processing status
+    metadata: Optional[dict] = None  # Additional metadata like cut reason
 
     def __post_init__(self):
         """Validate and initialize derived fields."""
@@ -29,6 +30,9 @@ class Chunk:
 
         if self.confidence < 0.0 or self.confidence > 1.0:
             raise ValueError("Confidence must be between 0.0 and 1.0")
+
+        if self.metadata is None:
+            self.metadata = {}
 
     def toggle_processed(self) -> None:
         """Toggle the processed status of this chunk."""

@@ -1,6 +1,8 @@
 """Advanced regex-based text splitter for academic documents."""
 
+import argparse
 import re
+from pathlib import Path
 from re import Pattern
 from typing import Optional
 
@@ -532,3 +534,137 @@ class RegexSectionSplitter(BaseSplitter):
                 del self.compiled_patterns[name]
             return True
         return False
+
+
+def main():
+    """Main function to demonstrate RegexSectionSplitter on a txt file."""
+    parser = argparse.ArgumentParser(
+        description="Split a text file using RegexSectionSplitter and display chunks with metadata"
+    )
+    parser.add_argument("file_path", type=str, help="Path to the text file to split")
+    parser.add_argument(
+        "--min-chunk-size",
+        type=int,
+        default=200,
+        help="Minimum chunk size in characters (default: 200)",
+    )
+    parser.add_argument(
+        "--confidence-threshold",
+        type=float,
+        default=0.3,
+        help="Minimum confidence threshold for chunks (default: 0.3)",
+    )
+    parser.add_argument(
+        "--no-merge",
+        action="store_true",
+        help="Disable merging of small chunks",
+    )
+
+    args = parser.parse_args()
+
+    # Check if file exists
+    file_path = Path(args.file_path)
+    if not file_path.exists():
+        print(f"Error: File '{args.file_path}' not found.")
+        return 1
+
+    # Initialize the splitter
+    splitter = RegexSectionSplitter(
+        min_chunk_size=args.min_chunk_size,
+        confidence_threshold=args.confidence_threshold,
+        merge_small_chunks=not args.no_merge,
+    )
+
+    try:
+        # Read the text file with encoding detection
+        print(f"Reading file: {args.file_path}")
+        text = None
+
+        # Try different encodings in order of preference
+        encodings_to_try = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
+
+        for encoding in encodings_to_try:
+            try:
+                with open(file_path, "r", encoding=encoding) as f:
+                    text = f.read()
+                print(f"Successfully read file with {encoding} encoding")
+                break
+            except UnicodeDecodeError:
+                continue
+
+        if text is None:
+            print(f"Error: Could not read file with any of the attempted encodings: {', '.join(encodings_to_try)}")
+            return 1
+
+        if not text.strip():
+            print("Error: File is empty.")
+            return 1
+
+        print(f"File loaded: {len(text)} characters")
+        print(f"Splitter configuration: {splitter.splitter_name}")
+        print(f"Patterns loaded: {len(splitter.patterns)}")
+        print("-" * 80)
+
+        # Split the text
+        print("Splitting text using RegexSectionSplitter...")
+        chunks = splitter.split(text)
+
+        if not chunks:
+            print("No chunks were generated.")
+            return 1
+
+        print(f"Generated {len(chunks)} chunks")
+        print("-" * 80)
+
+        # Display chunks with metadata
+        for i, chunk in enumerate(chunks, 1):
+            word_count = len(chunk.content.split())
+            confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
+
+            # Get pattern/matching info from chunk metadata
+            split_reason = chunk.chunk_type
+            if hasattr(chunk, 'metadata') and chunk.metadata:
+                split_reason = chunk.metadata.get('pattern', chunk.chunk_type)
+
+            header = (
+                f"============= Chunk #{i} ({word_count} words) ============= "
+                f"Conf: {confidence_str} ============= Type: {split_reason} ============="
+            )
+            print(header)
+            print(chunk.content)
+            print("-" * 80)
+
+        # Print summary
+        total_words = sum(len(chunk.content.split()) for chunk in chunks)
+        avg_confidence = (
+            sum(c.confidence for c in chunks if c.confidence is not None) /
+            len([c for c in chunks if c.confidence is not None])
+            if any(c.confidence for c in chunks) else 0
+        )
+
+        # Chunk type distribution
+        type_counts = {}
+        for chunk in chunks:
+            chunk_type = chunk.chunk_type
+            type_counts[chunk_type] = type_counts.get(chunk_type, 0) + 1
+
+        print(f"\nSummary:")
+        print(f"  Total chunks: {len(chunks)}")
+        print(f"  Total words: {total_words}")
+        print(f"  Average confidence: {avg_confidence:.2f}")
+        print(f"  Chunk types: {dict(type_counts)}")
+
+        # Show patterns used
+        print(f"\nPatterns used in splitting:")
+        for pattern_name, pattern_info in splitter.compiled_patterns.items():
+            print(f"  {pattern_name}: confidence={pattern_info['confidence']:.2f}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())

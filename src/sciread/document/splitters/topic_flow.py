@@ -1,6 +1,8 @@
 """TopicFlow splitter: Bottom-up sentence merging with semantic continuity detection."""
 
+import argparse
 import math
+from pathlib import Path
 from typing import Any
 from typing import Optional
 
@@ -372,12 +374,20 @@ class TopicFlowSplitter(BaseSplitter):
             # Calculate confidence based on segment quality
             confidence = self._calculate_segment_confidence(segment)
 
+            # Store cut reason in metadata
+            metadata = {
+                "cut_reason": segment.get("cut_reason", "unknown"),
+                "sentence_count": len(segment["sentences"]),
+                "segment_chars": sum(s["length"] for s in segment["sentences"]),
+            }
+
             chunk = Chunk(
                 content=content,
                 chunk_type="topic_flow",
                 position=i,
                 char_range=segment["char_span"],
                 confidence=confidence,
+                metadata=metadata,
             )
             chunks.append(chunk)
 
@@ -475,3 +485,155 @@ class TopicFlowSplitter(BaseSplitter):
             return response.status_code == 200
         except Exception:
             return False
+
+
+def main():
+    """Main function to demonstrate TopicFlowSplitter on a txt file."""
+    parser = argparse.ArgumentParser(
+        description="Split a text file using TopicFlowSplitter and display chunks with metadata"
+    )
+    parser.add_argument("file_path", type=str, help="Path to the text file to split")
+    parser.add_argument(
+        "--model",
+        type=str,
+        default="embeddinggemma:latest",
+        help="Ollama model name for embeddings (default: embeddinggemma:latest)",
+    )
+    parser.add_argument(
+        "--base-url",
+        type=str,
+        default="http://localhost:11434",
+        help="Ollama API base URL (default: http://localhost:11434)",
+    )
+    parser.add_argument(
+        "--local-threshold",
+        type=float,
+        default=0.6,
+        help="Local continuity threshold (default: 0.6)",
+    )
+    parser.add_argument(
+        "--context-threshold",
+        type=float,
+        default=0.65,
+        help="Context continuity threshold (default: 0.65)",
+    )
+    parser.add_argument(
+        "--min-chars",
+        type=int,
+        default=300,
+        help="Minimum characters per segment (default: 300)",
+    )
+    parser.add_argument(
+        "--max-chars",
+        type=int,
+        default=2000,
+        help="Maximum characters per segment (default: 2000)",
+    )
+
+    args = parser.parse_args()
+
+    # Check if file exists
+    file_path = Path(args.file_path)
+    if not file_path.exists():
+        print(f"Error: File '{args.file_path}' not found.")
+        return 1
+
+    # Initialize the splitter
+    splitter = TopicFlowSplitter(
+        model=args.model,
+        base_url=args.base_url,
+        local_continuity_threshold=args.local_threshold,
+        context_continuity_threshold=args.context_threshold,
+        min_segment_chars=args.min_chars,
+        max_segment_chars=args.max_chars,
+    )
+
+    # Test Ollama connection
+    print(f"Testing connection to Ollama at {args.base_url}...")
+    if not splitter.test_ollama_connection():
+        print("Warning: Could not connect to Ollama. Make sure Ollama is running.")
+        print("Continuing anyway - fallback splitting may be used if embeddings fail...")
+    else:
+        print("✓ Ollama connection successful")
+
+    try:
+        # Read the text file with encoding detection
+        print(f"Reading file: {args.file_path}")
+        text = None
+
+        # Try different encodings in order of preference
+        encodings_to_try = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
+
+        for encoding in encodings_to_try:
+            try:
+                with open(file_path, "r", encoding=encoding) as f:
+                    text = f.read()
+                print(f"Successfully read file with {encoding} encoding")
+                break
+            except UnicodeDecodeError:
+                continue
+
+        if text is None:
+            print(f"Error: Could not read file with any of the attempted encodings: {', '.join(encodings_to_try)}")
+            return 1
+
+        if not text.strip():
+            print("Error: File is empty.")
+            return 1
+
+        print(f"File loaded: {len(text)} characters")
+        print("-" * 80)
+
+        # Split the text
+        print("Splitting text using TopicFlowSplitter...")
+        chunks = splitter.split(text)
+
+        if not chunks:
+            print("No chunks were generated.")
+            return 1
+
+        print(f"Generated {len(chunks)} chunks")
+        print("-" * 80)
+
+        # Display chunks with metadata
+        for i, chunk in enumerate(chunks, 1):
+            word_count = len(chunk.content.split())
+            confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
+
+            # Get the cut reason from chunk metadata
+            cut_reason = chunk.metadata.get('cut_reason', 'unknown') if chunk.metadata else 'unknown'
+
+            header = (
+                f"============= Chunk #{i} ({word_count} words) ============= "
+                f"Conf: {confidence_str} ============= Reason: {cut_reason} ============="
+            )
+            print(header)
+            print(chunk.content)
+            print("-" * 80)
+
+        # Print summary
+        total_words = sum(len(chunk.content.split()) for chunk in chunks)
+        avg_confidence = (
+            sum(c.confidence for c in chunks if c.confidence is not None) /
+            len([c for c in chunks if c.confidence is not None])
+            if any(c.confidence for c in chunks) else 0
+        )
+
+        print(f"\nSummary:")
+        print(f"  Total chunks: {len(chunks)}")
+        print(f"  Total words: {total_words}")
+        print(f"  Average confidence: {avg_confidence:.2f}")
+
+        # Print cache stats
+        cache_stats = splitter.get_cache_stats()
+        print(f"  Embeddings cached: {cache_stats['cache_size']}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    exit(main())
