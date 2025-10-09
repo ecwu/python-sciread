@@ -61,6 +61,7 @@ dependencies = [
 [dependency-groups]
 test = [
     "pytest",
+    "pytest-asyncio",
 ]
 
 [project.scripts]
