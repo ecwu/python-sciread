@@ -1,27 +1,39 @@
 """Prompt templates for different agent types and analysis tasks."""
 
+import re
 from typing import Dict
 from typing import List
 
 
 def get_simple_analysis_prompt() -> str:
-    """Get prompt template for simple document analysis."""
-    return """You are an expert academic research analyst. Analyze the following research paper and provide a comprehensive analysis based on the given question.
+    """Get prompt template for simple document analysis using Feynman technique."""
+    return """Your task is to write a detailed report using the Feynman technique to explain a given paper. When creating this report, you should approach it as if you were the author of the paper.
 
 RESEARCH PAPER:
 {context}
 
-QUESTION:
+TASK:
 {question}
 
-Please provide a detailed, well-structured analysis in markdown format. Include:
-- Direct answers to the question
-- Supporting evidence from the paper
-- Key findings and insights
-- Relevant quotes or data points
-- Critical evaluation when appropriate
+Using the Feynman technique, create a comprehensive explanation that demonstrates deep understanding by:
 
-Be thorough, accurate, and focus on the most relevant information for answering the question."""
+1. **Simplifying Complex Concepts**: Break down complicated ideas into simple, accessible terms
+2. **Using Analogies and Examples**: Create relatable analogies to explain abstract concepts
+3. **Identifying Core Principles**: Extract and explain the fundamental principles underlying the research
+4. **Teaching Perspective**: Write as if teaching this material to someone intelligent but unfamiliar with the field
+5. **Author's Voice**: Adopt the perspective of the paper's author, explaining your work with confidence and clarity
+
+Your report should include:
+- **Introduction**: Overview of the problem and why it matters (in simple terms)
+- **Core Concepts**: Explanation of the fundamental ideas and principles
+- **Methodology**: Clear description of the approach as if explaining to a colleague
+- **Key Insights**: The main discoveries and why they're important
+- **Implications**: What this work means for the field and practice
+- **Future Directions**: Where this research could lead next
+
+Write in clear, accessible language while maintaining technical accuracy. Use examples and analogies to make complex ideas understandable. Demonstrate mastery by making the complex simple.
+
+Format as a comprehensive markdown report."""
 
 
 def get_section_specific_prompt(section_type: str) -> str:
@@ -417,3 +429,107 @@ Create a final analysis that includes:
 - **Future Implications**: Potential directions and applications
 
 Format as a professional, comprehensive markdown analysis that demonstrates deep understanding of the research."""
+
+
+def remove_citations_section(text: str) -> str:
+    """Remove references/citations section from text to save tokens.
+
+    This function detects the start of common citation/reference sections and removes
+    everything after that point to save tokens while preserving the main content.
+
+    Args:
+        text: The full text of the paper or document
+
+    Returns:
+        Text with citations/references section removed
+    """
+    if not text:
+        return text
+
+    # Common patterns that indicate the start of references/citations section
+    citation_patterns = [
+        r'\n\s*References\s*\n',
+        r'\n\s*REFERENCES\s*\n',
+        r'\n\s*Bibliography\s*\n',
+        r'\n\s*BIBLIOGRAPHY\s*\n',
+        r'\n\s*References\s*\r?\n',
+        r'\n\s*REFERENCES\s*\r?\n',
+        r'\n\s*References\s*$',
+        r'\n\s*REFERENCES\s*$',
+        r'\n\s*Works Cited\s*\n',
+        r'\n\s*WORKS CITED\s*\n',
+        r'\n\s*References and Notes\s*\n',
+        r'\n\s*REFERENCES AND NOTES\s*\n',
+        # More comprehensive patterns
+        r'(?i)\n\s*References\s*[:\-]?\s*\n',
+        r'(?i)\n\s*Bibliography\s*[:\-]?\s*\n',
+        r'(?i)\n\s*Works Cited\s*[:\-]?\s*\n',
+        # Pattern with numbered references
+        r'\n\s*\[?\d+\]?\s*References?\s*\n',
+        r'\n\s*References?\s*\[\d+\]\s*\n',
+    ]
+
+    # Try each pattern to find the earliest citation section start
+    earliest_match = None
+    earliest_position = len(text)
+
+    for pattern in citation_patterns:
+        matches = list(re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE))
+        for match in matches:
+            if match.start() < earliest_position:
+                earliest_position = match.start()
+                earliest_match = match
+
+    # If found, remove everything from that point
+    if earliest_match:
+        truncated_text = text[:earliest_match.start()].strip()
+
+        # Add a note about truncation
+        truncation_note = "\n\n[Note: References and citations section removed to save tokens]"
+
+        return truncated_text + truncation_note
+
+    # If no clear citation section found, try to detect by content patterns
+    # Look for patterns that suggest reference listings
+    reference_content_patterns = [
+        r'\n\s*\[\d+\]\s+[A-Z][a-z]+,?\s+[A-Z][a-z]+.*\d{4}.*',  # [1] Author, Year
+        r'\n\s*[A-Z][a-z]+,\s*[A-Z]\.\s*\(\d{4}\)\..*',           # Author, Initial. (Year)
+        r'\n\s*\d+\.\s+[A-Z][a-z]+.*\d{4}.*',                    # 1. Author Year
+    ]
+
+    # Check for multiple consecutive reference-like entries
+    lines = text.split('\n')
+    consecutive_refs = 0
+    ref_start_line = -1
+
+    for i, line in enumerate(lines):
+        line_stripped = line.strip()
+        if not line_stripped:
+            consecutive_refs = 0  # Reset on empty lines
+            continue
+
+        # Check if this line looks like a reference entry
+        is_ref_line = False
+        for pattern in reference_content_patterns:
+            if re.match(pattern, line_stripped):
+                is_ref_line = True
+                break
+
+        if is_ref_line:
+            if consecutive_refs == 0:
+                ref_start_line = i
+            consecutive_refs += 1
+
+            # If we find 3+ consecutive reference-like lines, assume it's the reference section
+            if consecutive_refs >= 3:
+                # Find the start position of this reference section
+                ref_start_position = text.find('\n' + lines[ref_start_line])
+                if ref_start_position != -1:
+                    truncated_text = text[:ref_start_position].strip()
+                    truncation_note = "\n\n[Note: References and citations section removed to save tokens]"
+                    return truncated_text + truncation_note
+        else:
+            consecutive_refs = 0
+
+    # If no citations section detected, return original text
+    return text

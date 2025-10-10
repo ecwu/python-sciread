@@ -298,6 +298,12 @@ class Document:
         for chunk in self._chunks:
             chunk.mark_unprocessed()
 
+    def get_full_text(self, separator: str = "\n\n") -> str:
+        """Get the full text by joining all chunks with separator."""
+        if not self._chunks:
+            return self._raw_text
+        return separator.join(chunk.content for chunk in self._chunks)
+
     def search(self, query: str, case_sensitive: bool = False) -> list[Chunk]:
         """Search for text in chunks."""
         if not case_sensitive:

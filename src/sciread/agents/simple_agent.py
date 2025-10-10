@@ -8,14 +8,16 @@ from .base import Agent
 from .base import AgentConfig
 from .base import AgentResult
 from .prompts import get_simple_analysis_prompt
+from .prompts import remove_citations_section
 
 
 class SimpleAgent(Agent):
-    """Simple agent that processes the full document with a single LLM call.
+    """Simple agent that processes the full document with a single LLM call using the Feynman technique.
 
     This agent takes the entire document content (or selected chunks) and sends
-    it to the LLM with a user-defined question. It's straightforward and effective
-    for documents that fit within the model's context window.
+    it to the LLM with a user-defined question. It uses the Feynman technique
+    to create detailed explanations as if written by the paper's author.
+    Automatically removes citation sections to save tokens.
     """
 
     def __init__(self, config: Optional[AgentConfig] = None):
@@ -56,6 +58,9 @@ class SimpleAgent(Agent):
             max_length = kwargs.get('max_length')
 
             context = self.prepare_context(document, chunks)
+
+            # Remove citations section to save tokens
+            context = remove_citations_section(context)
 
             # Apply length limit if specified
             if max_length and len(context) > max_length:
