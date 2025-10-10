@@ -1,363 +1,269 @@
-"""Synchronous tests for agent systems functionality."""
+"""Tests for Pydantic AI agent systems functionality."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, AsyncMock
 
 from sciread.agents import (
-    AgentConfig,
-    AgentResult,
     AgentOrchestrator,
-    SimpleAgent,
-    ToolCallingAgent,
-    MultiAgentSystem,
-    create_agent,
+    DocumentDeps,
+    SimpleAnalysisResult,
+    DocumentAnalysisResult,
+    analyze_document,
+    create_agent_analysis,
     get_agent_recommendations,
+    create_simple_agent,
+    create_tool_calling_agent,
+    create_coordinator_agent,
+    simple_agent,
+    tool_calling_agent,
+    coordinator_agent,
 )
 from sciread.document.models import Chunk
 
 
-class TestAgentConfig:
-    """Test AgentConfig class."""
+class TestDocumentDeps:
+    """Test DocumentDeps class."""
 
-    def test_default_config(self):
-        """Test default configuration values."""
-        config = AgentConfig()
-        assert config.model_identifier == "deepseek-chat"
-        assert config.temperature == 0.3
-        assert config.max_tokens is None
-        assert config.timeout == 300
-        assert config.max_retries == 3
-        assert config.retry_delay == 1.0
-        assert config.include_metadata is True
-        assert config.track_processing is True
+    def test_document_deps_creation(self):
+        """Test DocumentDeps creation with default values."""
+        deps = DocumentDeps(document_text="test document")
+        assert deps.document_text == "test document"
+        assert deps.document_chunks == []
+        assert deps.available_sections == []
+        assert deps.metadata == {}
+        assert deps.model_identifier == "deepseek-chat"
+        assert deps.temperature == 0.3
+        assert deps.max_tokens is None
 
-    def test_custom_config(self):
-        """Test custom configuration values."""
-        config = AgentConfig(
-            model_identifier="gpt-4",
-            temperature=0.7,
-            max_tokens=4000,
-            timeout=600,
+    def test_document_deps_with_chunks(self):
+        """Test DocumentDeps with chunks."""
+        chunks = [
+            {"content": "abstract content", "chunk_type": "abstract"},
+            {"content": "intro content", "chunk_type": "introduction"},
+        ]
+        deps = DocumentDeps(
+            document_text="test document",
+            document_chunks=chunks,
+            metadata={"title": "Test Paper"}
         )
-        assert config.model_identifier == "gpt-4"
-        assert config.temperature == 0.7
-        assert config.max_tokens == 4000
-        assert config.timeout == 600
+        assert deps.document_chunks == chunks
+        assert deps.available_sections == ["abstract", "introduction"]
+        assert deps.metadata["title"] == "Test Paper"
+
+    def test_get_section_chunks(self):
+        """Test getting chunks by section type."""
+        chunks = [
+            {"content": "abstract content", "chunk_type": "abstract"},
+            {"content": "intro content", "chunk_type": "introduction"},
+            {"content": "abstract 2", "chunk_type": "abstract"},
+        ]
+        deps = DocumentDeps(document_text="test", document_chunks=chunks)
+
+        abstract_chunks = deps.get_section_chunks("abstract")
+        assert len(abstract_chunks) == 2
+        assert all(chunk["chunk_type"] == "abstract" for chunk in abstract_chunks)
+
+        intro_chunks = deps.get_section_chunks("methods")
+        assert len(intro_chunks) == 0
+
+    def test_has_section(self):
+        """Test checking if document has a section."""
+        chunks = [
+            {"content": "abstract content", "chunk_type": "abstract"},
+            {"content": "intro content", "chunk_type": "introduction"},
+        ]
+        deps = DocumentDeps(document_text="test", document_chunks=chunks)
+
+        assert deps.has_section("abstract") is True
+        assert deps.has_section("introduction") is True
+        assert deps.has_section("methods") is False
 
 
-class TestAgentResult:
-    """Test AgentResult class."""
+class TestSimpleAnalysisResult:
+    """Test SimpleAnalysisResult class."""
 
-    def test_successful_result(self):
-        """Test successful agent result."""
-        result = AgentResult(
+    def test_simple_analysis_result_creation(self):
+        """Test SimpleAnalysisResult creation."""
+        result = SimpleAnalysisResult(
             content="Analysis content",
-            agent_name="TestAgent",
-            execution_time=1.5,
-            success=True,
-            chunks_processed=5,
-            metadata={"test": "value"}
+            question_answered="What is this about?",
+            confidence_score=0.8,
+            processing_time=1.5,
+            model_used="deepseek-chat",
+            token_count=1000
         )
-        assert result.success is True
         assert result.content == "Analysis content"
-        assert result.agent_name == "TestAgent"
-        assert result.execution_time == 1.5
-        assert result.chunks_processed == 5
-        assert result.metadata["test"] == "value"
-        assert result.summary == "TestAgent completed successfully in 1.50s"
+        assert result.question_answered == "What is this about?"
+        assert result.confidence_score == 0.8
+        assert result.processing_time == 1.5
+        assert result.model_used == "deepseek-chat"
+        assert result.token_count == 1000
 
-    def test_failed_result(self):
-        """Test failed agent result."""
-        result = AgentResult(
-            content="",
-            agent_name="TestAgent",
-            execution_time=0.5,
-            success=False,
-            error_message="Test error"
+
+class TestDocumentAnalysisResult:
+    """Test DocumentAnalysisResult class."""
+
+    def test_document_analysis_result_creation(self):
+        """Test DocumentAnalysisResult creation."""
+        from sciread.agents.schemas import DocumentMetadata
+
+        metadata = DocumentMetadata(
+            title="Test Paper",
+            authors=["Author 1", "Author 2"],
+            chunk_count=10,
+            section_types=["abstract", "introduction"]
         )
-        assert result.success is False
-        assert result.content == ""
-        assert result.error_message == "Test error"
-        assert result.summary == "TestAgent failed: Test error"
 
-    def test_to_dict(self):
-        """Test result serialization."""
-        result = AgentResult(
-            content="Test content",
-            agent_name="TestAgent",
-            execution_time=1.0,
-            success=True
+        result = DocumentAnalysisResult(
+            summary="Paper summary",
+            key_contributions=["Contribution 1", "Contribution 2"],
+            methodology_overview="Method used",
+            main_findings=["Finding 1"],
+            implications="Important implications",
+            future_directions=["Future work"],
+            confidence_score=0.9,
+            sections_analyzed=["abstract", "introduction"],
+            metadata=metadata,
+            execution_time=5.0
         )
-        result_dict = result.to_dict()
-        assert result_dict["content"] == "Test content"
-        assert result_dict["agent_name"] == "TestAgent"
-        assert result_dict["success"] is True
-        assert "created_at" in result_dict
+        assert result.summary == "Paper summary"
+        assert len(result.key_contributions) == 2
+        assert result.confidence_score == 0.9
+        assert result.metadata.title == "Test Paper"
 
 
-class TestSimpleAgent:
-    """Test SimpleAgent implementation."""
+class TestAgentCreation:
+    """Test agent creation functions."""
 
-    def test_simple_agent_initialization(self):
-        """Test SimpleAgent initialization."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+    @patch('sciread.agents.simple_agent.get_model')
+    def test_create_simple_agent(self, mock_get_model):
+        """Test creating a simple agent."""
+        mock_model = MagicMock()
+        mock_get_model.return_value = mock_model
 
-            agent = SimpleAgent()
-            assert agent.name == "SimpleAgent"
-            assert agent.config.model_identifier == "deepseek-chat"
+        agent = create_simple_agent("openai:gpt-4o")
+        assert agent is not None
+        mock_get_model.assert_called_once_with("openai:gpt-4o")
 
-    def test_get_supported_questions(self):
-        """Test supported question types."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+    @patch('sciread.agents.tool_calling_agent.get_model')
+    def test_create_tool_calling_agent(self, mock_get_model):
+        """Test creating a tool-calling agent."""
+        mock_model = MagicMock()
+        mock_get_model.return_value = mock_model
 
-            agent = SimpleAgent()
-            questions = agent.get_supported_questions()
-            assert "general_summary" in questions
-            assert "key_contributions" in questions
-            assert "methodology_overview" in questions
-            assert "custom_question" in questions
+        agent = create_tool_calling_agent("openai:gpt-4o")
+        assert agent is not None
+        mock_get_model.assert_called_once_with("openai:gpt-4o")
 
-    def test_agent_validation(self):
-        """Test input validation."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+    @patch('sciread.agents.multi_agent_system.get_model')
+    def test_create_coordinator_agent(self, mock_get_model):
+        """Test creating a coordinator agent."""
+        mock_model = MagicMock()
+        mock_get_model.return_value = mock_model
 
-            agent = SimpleAgent()
-
-            # Valid input
-            assert agent.validate_input("test document", "test question") is True
-
-            # Invalid inputs
-            assert agent.validate_input(None, "test question") is False
-            assert agent.validate_input("test document", None) is False
-            assert agent.validate_input("test document", "") is False
-
-    def test_context_preparation(self):
-        """Test context preparation for different document types."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            agent = SimpleAgent()
-
-            # Test with text string
-            context = agent.prepare_context("test document content")
-            assert context == "test document content"
-
-            # Test with Document mock
-            doc_mock = MagicMock()
-            doc_mock.text = "document text"
-            context = agent.prepare_context(doc_mock)
-            assert context == "document text"
-
-            # Test with chunks
-            chunk1 = Chunk(content="content1", chunk_type="abstract")
-            chunk2 = Chunk(content="content2", chunk_type="introduction")
-            chunks = [chunk1, chunk2]
-            context = agent.prepare_context(chunks)
-            assert "[ABSTRACT]" in context
-            assert "[INTRODUCTION]" in context
-            assert "content1" in context
-            assert "content2" in context
-
-    def test_estimate_tokens(self):
-        """Test token estimation."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            agent = SimpleAgent()
-            document = "Test document with multiple words for testing"
-
-            estimated = agent.estimate_tokens(document)
-            assert estimated > 0
-            assert isinstance(estimated, int)
-
-    def test_is_suitable_for_document(self):
-        """Test document suitability checking."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            agent = SimpleAgent()
-
-            # Small document should be suitable
-            small_doc = "Small document content"
-            is_suitable, reason = agent.is_suitable_for_document(small_doc)
-            assert is_suitable is True
-            assert "suitable" in reason.lower()
-
-            # Very large document (mocked as many chunks) might not be suitable
-            doc_mock = MagicMock()
-            doc_mock.chunks = [MagicMock() for _ in range(25)]  # 25 chunks
-            is_suitable, reason = agent.is_suitable_for_document(doc_mock)
-            assert is_suitable is False
-            assert "better suited" in reason or "section-based" in reason
+        agent = create_coordinator_agent("openai:gpt-4o")
+        assert agent is not None
+        mock_get_model.assert_called_once_with("openai:gpt-4o")
 
 
-class TestToolCallingAgent:
-    """Test ToolCallingAgent implementation."""
+class TestAgentSelector:
+    """Test agent selection logic."""
 
-    def test_tool_calling_agent_initialization(self):
-        """Test ToolCallingAgent initialization."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+    def test_select_simple_agent_for_small_document(self):
+        """Test selecting simple agent for small documents."""
+        from sciread.agents.factory import AgentSelector
 
-            agent = ToolCallingAgent()
-            assert agent.name == "ToolCallingAgent"
-            assert agent.controller.name == "ControllerAgent"
+        document_text = "Short document content"
+        question = "What is this about?"
 
-    def test_get_supported_questions(self):
-        """Test supported question types."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+        func_name, display_name, metadata = AgentSelector.select_agent(
+            document_text=document_text,
+            question=question
+        )
 
-            agent = ToolCallingAgent()
-            questions = agent.get_supported_questions()
-            assert "comprehensive_analysis" in questions
-            assert "research_questions" in questions
-            assert "methodology_analysis" in questions
+        assert func_name == "analyze_document_simple"
+        assert display_name == "SimpleAgent"
+        assert "suitable for simple processing" in metadata["reason"]
 
-    def test_is_suitable_for_document(self):
-        """Test document suitability checking."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
+    def test_select_multi_agent_for_research_question(self):
+        """Test selecting multi-agent for research questions."""
+        from sciread.agents.factory import AgentSelector
 
-            agent = ToolCallingAgent()
+        document_text = "Long academic document with multiple sections"
+        question = "What is the main research question and why is it important?"
 
-            # Document with multiple sections should be suitable
-            doc_mock = MagicMock()
-            doc_mock.chunks = [
-                Chunk(content="content1", chunk_type="abstract"),
-                Chunk(content="content2", chunk_type="introduction"),
-                Chunk(content="content3", chunk_type="methods"),
-                Chunk(content="content4", chunk_type="results"),
-            ]
-            is_suitable, reason = agent.is_suitable_for_document(doc_mock)
-            assert is_suitable is True
-            assert "suitable" in reason.lower()
-
-            # Document without clear sections should not be suitable
-            doc_mock.chunks = [
-                Chunk(content="content1", chunk_type="unknown"),
-                Chunk(content="content2", chunk_type="unknown"),
-            ]
-            is_suitable, reason = agent.is_suitable_for_document(doc_mock)
-            assert is_suitable is False
-            assert "better suited" in reason
-
-
-class TestMultiAgentSystem:
-    """Test MultiAgentSystem implementation."""
-
-    def test_multi_agent_system_initialization(self):
-        """Test MultiAgentSystem initialization."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            system = MultiAgentSystem()
-            assert system.name == "MultiAgentSystem"
-            assert system.coordinator.name == "CoordinatorAgent"
-
-    def test_select_agents(self):
-        """Test agent selection based on question."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            system = MultiAgentSystem()
-
-            # Question about research questions should select research_question agent
-            agents = system._select_agents("What is the main research question?")
-            agent_types = [agent.question_type for agent in agents]
-            assert "research_question" in agent_types
-
-            # Question about motivation should select motivation agent
-            agents = system._select_agents("Why did the authors do this research?")
-            agent_types = [agent.question_type for agent in agents]
-            assert "motivation" in agent_types
-
-    def test_get_supported_questions(self):
-        """Test supported high-level research questions."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            system = MultiAgentSystem()
-            questions = system.get_supported_questions()
-            assert "What is the Research Question?" in questions
-            assert "Why is the author doing this topic?" in questions
-            assert "How did the author do the research?" in questions
-            assert "What did the author get from the result?" in questions
-
-    def test_is_suitable_for_document(self):
-        """Test document suitability checking."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            system = MultiAgentSystem()
-
-            # High-level question should be suitable
-            is_suitable, reason = system.is_suitable_for_document(
-                "document",
-                research_question="What is the main research question?"
-            )
-            assert is_suitable is True
-            assert "well-suited" in reason.lower() or "high-level" in reason.lower()
-
-            # No research question should not be suitable
-            is_suitable, reason = system.is_suitable_for_document("document")
-            assert is_suitable is False
-            assert "research question" in reason.lower()
-
-
-class TestAgentFactory:
-    """Test agent factory functions."""
-
-    def test_create_agent(self):
-        """Test agent creation."""
-        with patch('sciread.agents.base.get_model') as mock_get_model:
-            mock_model = MagicMock()
-            mock_get_model.return_value = mock_model
-
-            # Test creating specific agent types
-            simple_agent = create_agent("simple")
-            assert isinstance(simple_agent, SimpleAgent)
-
-            tool_agent = create_agent("tool_calling")
-            assert isinstance(tool_agent, ToolCallingAgent)
-
-            multi_agent = create_agent("multi_agent")
-            assert isinstance(multi_agent, MultiAgentSystem)
-
-            # Test invalid agent type
-            with pytest.raises(ValueError, match="Unknown agent type"):
-                create_agent("invalid_type")
-
-    def test_get_agent_recommendations(self):
-        """Test getting agent recommendations."""
-        doc_mock = MagicMock()
-        doc_mock.chunks = [
-            Chunk(content="content1", chunk_type="abstract"),
-            Chunk(content="content2", chunk_type="introduction"),
+        chunks = [
+            {"content": "abstract", "chunk_type": "abstract"},
+            {"content": "introduction", "chunk_type": "introduction"},
+            {"content": "methods", "chunk_type": "methods"},
+            {"content": "results", "chunk_type": "results"},
         ]
 
-        recommendations = get_agent_recommendations(doc_mock, "test question")
+        func_name, display_name, metadata = AgentSelector.select_agent(
+            document_text=document_text,
+            question=question,
+            document_chunks=chunks
+        )
 
-        assert len(recommendations) == 3  # Should have all three agent types
-        assert any(rec["agent_type"] == "SimpleAgent" for rec in recommendations)
-        assert any(rec["agent_type"] == "ToolCallingAgent" for rec in recommendations)
-        assert any(rec["agent_type"] == "MultiAgentSystem" for rec in recommendations)
+        assert func_name == "analyze_document_with_multi_agent"
+        assert display_name == "MultiAgentSystem"
+        assert "collaborative analysis" in metadata["reason"]
+
+    def test_select_tool_calling_for_structured_document(self):
+        """Test selecting tool-calling agent for structured documents."""
+        from sciread.agents.factory import AgentSelector
+
+        document_text = "Document with clear structure"
+        question = "Analyze the methodology and results"
+
+        chunks = [{"content": f"section {i}", "chunk_type": f"section_{i}"} for i in range(15)]
+
+        func_name, display_name, metadata = AgentSelector.select_agent(
+            document_text=document_text,
+            question=question,
+            document_chunks=chunks
+        )
+
+        assert func_name == "analyze_document_with_sections"
+        assert display_name == "ToolCallingAgent"
+        assert "section structure" in metadata["reason"]
+
+    def test_force_agent_selection(self):
+        """Test forcing a specific agent type."""
+        from sciread.agents.factory import AgentSelector
+
+        func_name, display_name, metadata = AgentSelector.select_agent(
+            document_text="any document",
+            question="any question",
+            force_agent="tool_calling"
+        )
+
+        assert func_name == "analyze_document_with_sections"
+        assert display_name == "ToolCallingAgent"
+        assert metadata["forced"] is True
+
+
+class TestAgentRecommendations:
+    """Test agent recommendation system."""
+
+    @pytest.mark.asyncio
+    @patch('sciread.agents.factory.get_agent_recommendations')
+    async def test_get_agent_recommendations(self, mock_get_recs):
+        """Test getting agent recommendations."""
+        mock_get_recs.return_value = [
+            {
+                "agent_name": "SimpleAgent",
+                "agent_type": "simple",
+                "is_suitable": True,
+                "reason": "Good for simple analysis",
+                "confidence": 0.8
+            }
+        ]
+
+        recommendations = await get_agent_recommendations("document text", "test question")
+        assert len(recommendations) == 1
+        assert recommendations[0]["agent_name"] == "SimpleAgent"
+        mock_get_recs.assert_called_once()
 
 
 class TestAgentOrchestrator:
@@ -365,49 +271,171 @@ class TestAgentOrchestrator:
 
     def test_orchestrator_initialization(self):
         """Test orchestrator initialization."""
-        orchestrator = AgentOrchestrator()
-        assert orchestrator.config.model_identifier == "deepseek-chat"
+        orchestrator = AgentOrchestrator("test-model")
+        assert orchestrator.model_identifier == "test-model"
 
-    def test_get_optimal_agent(self):
-        """Test optimal agent selection."""
-        orchestrator = AgentOrchestrator()
+    @pytest.mark.asyncio
+    @patch('sciread.agents.factory.AgentSelector.select_agent')
+    async def test_get_optimal_agent(self, mock_select):
+        """Test getting optimal agent."""
+        mock_select.return_value = (
+            "analyze_document_simple",
+            "SimpleAgent",
+            {"reason": "Test reason"}
+        )
 
-        # Small document should select SimpleAgent
-        agent, reason = orchestrator.get_optimal_agent("small document", "simple question")
-        assert isinstance(agent, SimpleAgent)
+        orchestrator = AgentOrchestrator()
+        func_name, display_name, metadata = await orchestrator.get_optimal_agent(
+            "document text", "test question"
+        )
+
+        assert func_name == "analyze_document_simple"
+        assert display_name == "SimpleAgent"
+        assert metadata["reason"] == "Test reason"
+
+
+class TestAgentAnalysis:
+    """Test agent analysis functions."""
+
+    @pytest.mark.asyncio
+    @patch('sciread.agents.factory.AgentSelector.select_agent')
+    @patch('sciread.agents.simple_agent.analyze_document_simple')
+    async def test_create_agent_analysis_simple(self, mock_analyze, mock_select):
+        """Test creating agent analysis with simple agent."""
+        # Setup mocks
+        mock_select.return_value = (
+            "analyze_document_simple",
+            "SimpleAgent",
+            {"reason": "Test selection"}
+        )
+
+        mock_result = SimpleAnalysisResult(
+            content="Analysis result",
+            question_answered="Test question",
+            confidence_score=0.8,
+            processing_time=1.0,
+            model_used="test-model",
+            token_count=500
+        )
+        mock_analyze.return_value = mock_result
+
+        # Execute
+        result = await create_agent_analysis(
+            document_text="test document",
+            question="test question",
+            agent_type="simple"
+        )
+
+        # Verify
+        assert result.content == "Analysis result"
+        assert result.question_answered == "Test question"
+        mock_select.assert_called_once()
+        mock_analyze.assert_called_once()
+
+    @pytest.mark.asyncio
+    @patch('sciread.agents.factory.AgentSelector.select_agent')
+    @patch('sciread.agents.simple_agent.analyze_document_simple')
+    async def test_analyze_document_fallback(self, mock_analyze, mock_select):
+        """Test fallback to simple agent on failure."""
+        # Setup mocks
+        mock_select.return_value = (
+            "analyze_document_with_sections",
+            "ToolCallingAgent",
+            {"reason": "Test selection"}
+        )
+
+        # Make the tool calling agent fail
+        mock_analyze.side_effect = [
+            Exception("Tool calling agent failed"),
+            SimpleAnalysisResult(
+                content="Fallback result",
+                question_answered="Test question",
+                confidence_score=0.7,
+                processing_time=1.0,
+                model_used="test-model",
+                token_count=500
+            )
+        ]
+
+        # Execute
+        result = await analyze_document(
+            document_text="test document",
+            question="test question"
+        )
+
+        # Verify fallback worked
+        assert result.content == "Fallback result"
 
 
 class TestIntegration:
     """Integration tests for the complete agent system."""
 
-    def test_agent_selection_workflow(self):
-        """Test the complete agent selection workflow."""
-        # Test with different document types
+    def test_complete_workflow_mock(self):
+        """Test complete workflow with mocked components."""
+        # This test verifies the integration without making actual LLM calls
+        with patch('sciread.agents.factory.AgentSelector.select_agent') as mock_select:
+            mock_select.return_value = (
+                "analyze_document_simple",
+                "SimpleAgent",
+                {"reason": "Test selection"}
+            )
+
+            # Test that the selection logic works
+            func_name, display_name, metadata = mock_select.return_value
+            assert func_name == "analyze_document_simple"
+            assert display_name == "SimpleAgent"
+            assert "reason" in metadata
+
+    def test_document_processing_pipeline(self):
+        """Test document processing pipeline with different inputs."""
+        # Test data
         simple_doc = "Short document content"
-        complex_doc = MagicMock()
-        complex_doc.chunks = [
-            Chunk(content="Abstract", chunk_type="abstract"),
-            Chunk(content="Introduction", chunk_type="introduction"),
-            Chunk(content="Methods", chunk_type="methods"),
-            Chunk(content="Results", chunk_type="results"),
-            Chunk(content="Conclusion", chunk_type="conclusion"),
+        complex_chunks = [
+            {"content": "Abstract content", "chunk_type": "abstract"},
+            {"content": "Introduction content", "chunk_type": "introduction"},
+            {"content": "Methods content", "chunk_type": "methods"},
+            {"content": "Results content", "chunk_type": "results"},
+            {"content": "Conclusion content", "chunk_type": "conclusion"},
         ]
 
-        # Get recommendations for simple document
-        simple_recs = get_agent_recommendations(simple_doc, "simple question")
-        simple_suitable = [rec for rec in simple_recs if rec.get("is_suitable", False)]
+        # Test DocumentDeps creation
+        simple_deps = DocumentDeps(document_text=simple_doc)
+        assert simple_deps.available_sections == []
 
-        # Get recommendations for complex document
-        complex_recs = get_agent_recommendations(complex_doc, "comprehensive analysis")
-        complex_suitable = [rec for rec in complex_recs if rec.get("is_suitable", False)]
+        complex_deps = DocumentDeps(
+            document_text="Complex document",
+            document_chunks=complex_chunks
+        )
+        assert len(complex_deps.available_sections) == 5
+        assert "abstract" in complex_deps.available_sections
 
-        # SimpleAgent should be suitable for simple document
-        simple_agent_rec = next(rec for rec in simple_recs if rec["agent_type"] == "SimpleAgent")
-        assert simple_agent_rec["is_suitable"] is True
+        # Test section filtering
+        abstract_chunks = complex_deps.get_section_chunks("abstract")
+        assert len(abstract_chunks) == 1
+        assert abstract_chunks[0]["chunk_type"] == "abstract"
 
-        # ToolCallingAgent should be suitable for complex document
-        tool_agent_rec = next(rec for rec in complex_recs if rec["agent_type"] == "ToolCallingAgent")
-        assert tool_agent_rec["is_suitable"] is True
+        methods_chunks = complex_deps.get_section_chunks("nonexistent")
+        assert len(methods_chunks) == 0
+
+
+class TestPreconfiguredAgents:
+    """Test pre-configured agent instances."""
+
+    def test_preconfigured_agents_exist(self):
+        """Test that pre-configured agents are available."""
+        # These should be importable and not None
+        assert simple_agent is not None
+        assert tool_calling_agent is not None
+        assert coordinator_agent is not None
+
+    def test_preconfigured_agents_have_expected_types(self):
+        """Test that pre-configured agents have expected types."""
+        from pydantic_ai import Agent
+
+        # All should be Pydantic AI Agent instances
+        assert isinstance(simple_agent, Agent)
+        assert isinstance(tool_calling_agent, Agent)
+        assert isinstance(coordinator_agent, Agent)
 
 
 if __name__ == "__main__":

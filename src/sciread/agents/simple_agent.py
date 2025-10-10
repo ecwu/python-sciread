@@ -1,261 +1,175 @@
-"""SimpleAgent implementation for direct full document processing."""
+"""SimpleAgent implementation using Pydantic AI's Agent class."""
 
-import time
+from datetime import date
 from typing import Any
-from typing import Optional
 
-from .base import Agent
-from .base import AgentConfig
-from .base import AgentResult
+from pydantic_ai import Agent
+from pydantic_ai import RunContext
+
+from ..llm_provider import get_model
 from .prompts import get_simple_analysis_prompt
 from .prompts import remove_citations_section
+from .schemas import DocumentDeps
+from .schemas import SimpleAnalysisResult
 
 
-class SimpleAgent(Agent):
-    """Simple agent that processes the full document with a single LLM call using the Feynman technique.
+def create_simple_agent(model_identifier: str = "deepseek-chat") -> Agent[DocumentDeps, SimpleAnalysisResult]:
+    """Create a simple document analysis agent using Pydantic AI.
 
-    This agent takes the entire document content (or selected chunks) and sends
-    it to the LLM with a user-defined question. It uses the Feynman technique
-    to create detailed explanations as if written by the paper's author.
-    Automatically removes citation sections to save tokens.
+    This agent uses the Feynman technique to create detailed explanations
+    as if written by the paper's author. It processes the full document
+    with a single LLM call.
+
+    Args:
+        model_identifier: The model identifier to use
+
+    Returns:
+        A configured Pydantic AI Agent
     """
 
-    def __init__(self, config: Optional[AgentConfig] = None):
-        """Initialize the SimpleAgent.
+    agent = Agent[DocumentDeps, SimpleAnalysisResult](
+        model=get_model(model_identifier),
+        deps_type=DocumentDeps,
+        output_type=SimpleAnalysisResult,
+        system_prompt=(
+            "You are an expert academic analyst who excels at explaining complex research papers "
+            "using the Feynman technique. You create detailed, accessible explanations that "
+            "demonstrate deep understanding by making complex ideas simple and relatable."
+        )
+    )
 
-        Args:
-            config: Optional configuration for the agent
-        """
-        super().__init__(config or AgentConfig())
-        self.name = "SimpleAgent"
+    @agent.tool
+    async def get_document_text(ctx: RunContext[DocumentDeps]) -> str:
+        """Get the full document text, with citations removed to save tokens."""
+        text = ctx.deps.document_text
+        return remove_citations_section(text)
 
-    async def analyze(self, document: Any, question: str, **kwargs) -> AgentResult:
-        """Analyze a document with a single LLM call.
+    @agent.tool
+    async def get_document_length(ctx: RunContext[DocumentDeps]) -> int:
+        """Get the length of the document text."""
+        return len(ctx.deps.document_text)
 
-        Args:
-            document: Document instance, text content, or list of chunks
-            question: Analysis question or prompt
-            **kwargs: Additional arguments (chunks, max_length, etc.)
-
-        Returns:
-            AgentResult with analysis content and metadata
-        """
-        start_time = time.time()
-
-        try:
-            # Validate inputs
-            if not self.validate_input(document, question):
-                return AgentResult(
-                    content="",
-                    agent_name=self.name,
-                    execution_time=time.time() - start_time,
-                    success=False,
-                    error_message="Invalid input: document and question must be provided",
-                )
-
-            # Prepare document context
-            chunks = kwargs.get('chunks')
-            max_length = kwargs.get('max_length')
-
-            context = self.prepare_context(document, chunks)
-
-            # Remove citations section to save tokens
-            context = remove_citations_section(context)
-
-            # Apply length limit if specified
-            if max_length and len(context) > max_length:
-                context = context[:max_length] + "...[truncated]"
-
-            # Format the prompt
-            prompt = get_simple_analysis_prompt().format(
-                context=context,
-                question=question
-            )
-
-            # Execute the model
-            response = await self.execute_with_retry(prompt)
-
-            # Count processed chunks
-            chunks_processed = 0
-            if chunks:
-                chunks_processed = len(chunks)
-            elif hasattr(document, 'chunks'):
-                chunks_processed = len(document.chunks)
-            elif isinstance(document, list) and document and hasattr(document[0], 'content'):
-                chunks_processed = len(document)
-
-            # Create result
-            execution_time = time.time() - start_time
-            result = AgentResult(
-                content=response,
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=True,
-                chunks_processed=chunks_processed,
-                metadata={
-                    "question": question,
-                    "context_length": len(context),
-                    "response_length": len(response),
-                    "max_length": max_length,
-                    "model": self.config.model_identifier,
-                    "temperature": self.config.temperature,
-                }
-            )
-
-            # Log execution
-            self.log_execution(result)
-
-            return result
-
-        except Exception as e:
-            execution_time = time.time() - start_time
-            error_message = f"Analysis failed: {str(e)}"
-
-            result = AgentResult(
-                content="",
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=False,
-                error_message=error_message,
-                metadata={
-                    "question": question,
-                    "error_type": type(e).__name__,
-                }
-            )
-
-            self.log_execution(result)
-            return result
-
-    def get_supported_questions(self) -> list[str]:
-        """Get list of supported question types.
-
-        Returns:
-            List of supported question types
-        """
-        return [
-            "general_summary",
-            "key_contributions",
-            "methodology_overview",
-            "main_findings",
-            "research_questions",
-            "limitations",
-            "future_work",
-            "comparison",
-            "evaluation",
-            "custom_question"  # Any custom question
-        ]
-
-    def supports_document_type(self, document: Any) -> bool:
-        """Check if the agent supports the given document type.
-
-        Args:
-            document: Document instance, text, or chunks
-
-        Returns:
-            True if supported, False otherwise
-        """
-        # SimpleAgent supports most document types as long as they can be converted to text
-        return True
-
-    def estimate_tokens(self, document: Any, **kwargs) -> int:
-        """Estimate the number of tokens needed for analysis.
-
-        Args:
-            document: Document instance, text, or chunks
-            **kwargs: Additional arguments
-
-        Returns:
-            Estimated token count
-        """
-        context = self.prepare_context(document, kwargs.get('chunks'))
-
+    @agent.tool
+    async def estimate_tokens(ctx: RunContext[DocumentDeps]) -> int:
+        """Estimate token count for the document."""
+        text = remove_citations_section(ctx.deps.document_text)
         # Rough estimation: ~4 characters per token for English text
-        context_tokens = len(context) // 4
+        return len(text) // 4
 
-        # Add prompt template tokens
-        prompt_template = get_simple_analysis_prompt()
-        template_tokens = len(prompt_template) // 4
+    @agent.tool
+    async def check_document_suitability(ctx: RunContext[DocumentDeps]) -> dict[str, Any]:
+        """Check if the document is suitable for simple analysis."""
+        text = ctx.deps.document_text
+        estimated_tokens = len(text) // 4
+        context_limit = 128000  # Typical model context limit
 
-        # Add question tokens
-        question = kwargs.get('question', '')
-        question_tokens = len(question) // 4
-
-        # Add some buffer for response generation
-        response_buffer = 1000
-
-        total_tokens = context_tokens + template_tokens + question_tokens + response_buffer
-
-        return total_tokens
-
-    def is_suitable_for_document(self, document: Any, **kwargs) -> tuple[bool, str]:
-        """Check if this agent is suitable for the given document.
-
-        Args:
-            document: Document instance, text, or chunks
-            **kwargs: Additional arguments
-
-        Returns:
-            Tuple of (is_suitable, reason)
-        """
-        # Estimate token requirements
-        estimated_tokens = self.estimate_tokens(document, **kwargs)
-
-        # Assume typical model context limit of 128k tokens
-        context_limit = 128000
-
-        if estimated_tokens > context_limit:
-            return (
-                False,
-                f"Document too large for simple processing (estimated {estimated_tokens:,} tokens > {context_limit:,} limit). "
-                "Consider using ToolCallingAgent with section-based processing."
-            )
-
-        # Check if document is already split into appropriate chunks
-        if hasattr(document, 'chunks') and len(document.chunks) > 20:
-            return (
-                False,
-                f"Document has {len(document.chunks)} chunks, which may be better suited for "
-                "section-based processing with ToolCallingAgent."
-            )
-
-        return (
-            True,
+        is_suitable = estimated_tokens < context_limit
+        reason = (
             f"Document suitable for simple processing (estimated {estimated_tokens:,} tokens)."
+            if is_suitable else
+            f"Document too large for simple processing (estimated {estimated_tokens:,} tokens > {context_limit:,} limit)."
         )
 
-    async def batch_analyze(
-        self,
-        documents: list[Any],
-        questions: list[str],
-        **kwargs
-    ) -> list[AgentResult]:
-        """Analyze multiple documents with multiple questions.
+        return {
+            "is_suitable": is_suitable,
+            "reason": reason,
+            "estimated_tokens": estimated_tokens,
+            "context_limit": context_limit
+        }
 
-        Args:
-            documents: List of documents to analyze
-            questions: List of questions to ask
-            **kwargs: Additional arguments
+    @agent.instructions
+    def add_date_context() -> str:
+        """Add current date context to the analysis."""
+        return f"Current date: {date.today()}"
 
-        Returns:
-            List of AgentResult objects
-        """
-        results = []
-
-        for doc in documents:
-            for question in questions:
-                result = await self.analyze(doc, question, **kwargs)
-                results.append(result)
-
-        return results
-
-    def __str__(self) -> str:
-        """String representation of the agent."""
-        return f"SimpleAgent(model={self.config.model_identifier})"
-
-    def __repr__(self) -> str:
-        """Detailed string representation of the agent."""
+    @agent.instructions
+    def add_analysis_instructions() -> str:
+        """Add specific instructions for Feynman technique analysis."""
         return (
-            f"SimpleAgent(model='{self.config.model_identifier}', "
-            f"temperature={self.config.temperature}, "
-            f"max_tokens={self.config.max_tokens})"
+            "When analyzing the document, use the Feynman technique to:\n"
+            "1. Break down complex concepts into simple, accessible terms\n"
+            "2. Use analogies and examples to explain abstract concepts\n"
+            "3. Identify core principles underlying the research\n"
+            "4. Write as if teaching this material to someone intelligent but unfamiliar with the field\n"
+            "5. Adopt the perspective of the paper's author, explaining your work with confidence and clarity\n\n"
+            "Your analysis should include:\n"
+            "- Introduction: Overview of the problem and why it matters (in simple terms)\n"
+            "- Core Concepts: Explanation of the fundamental ideas and principles\n"
+            "- Methodology: Clear description of the approach as if explaining to a colleague\n"
+            "- Key Insights: The main discoveries and why they're important\n"
+            "- Implications: What this work means for the field and practice\n"
+            "- Future Directions: Where this research could lead next\n\n"
+            "Write in clear, accessible language while maintaining technical accuracy. "
+            "Use examples and analogies to make complex ideas understandable. "
+            "Demonstrate mastery by making the complex simple."
         )
+
+    return agent
+
+
+# Pre-configured agent instances for common use cases
+simple_agent = create_simple_agent("deepseek-chat")
+simple_agent_gpt4 = create_simple_agent("openai:gpt-4o")
+simple_agent_claude = create_simple_agent("anthropic:claude-3-5-sonnet-latest")
+
+
+async def analyze_document_simple(
+    document_text: str,
+    question: str,
+    model_identifier: str = "deepseek-chat",
+    document_chunks: list[dict[str, Any]] | None = None,
+    metadata: dict[str, Any] | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+) -> SimpleAnalysisResult:
+    """Analyze a document using the simple agent approach.
+
+    Args:
+        document_text: The full text of the document
+        question: The analysis question or prompt
+        model_identifier: Model to use for analysis
+        document_chunks: Optional list of document chunks
+        metadata: Optional document metadata
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+
+    Returns:
+        SimpleAnalysisResult with the analysis
+    """
+    import time
+    start_time = time.time()
+
+    # Create dependencies
+    deps = DocumentDeps(
+        document_text=document_text,
+        document_chunks=document_chunks or [],
+        available_sections=list(set(chunk.get('chunk_type', 'unknown') for chunk in (document_chunks or []))),
+        metadata=metadata or {},
+        model_identifier=model_identifier,
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+
+    # Create agent
+    agent = create_simple_agent(model_identifier)
+
+    # Format the prompt using the existing template
+    prompt_template = get_simple_analysis_prompt()
+    formatted_question = prompt_template.format(
+        context=document_text,
+        question=question
+    )
+
+    # Run the agent
+    result = await agent.run(
+        formatted_question,
+        deps=deps,
+        model_settings={"temperature": temperature, "max_tokens": max_tokens}
+    )
+
+    # Update processing time
+    processing_time = time.time() - start_time
+    result_data = result.output
+    result_data.processing_time = processing_time
+
+    return result_data

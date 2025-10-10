@@ -1,404 +1,291 @@
-"""ToolCallingAgent implementation with controller-based section analysis."""
+"""ToolCallingAgent implementation using Pydantic AI's Agent class."""
 
-import asyncio
-import time
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Optional
-from typing import Set
 
-from .base import Agent
-from .base import AgentConfig
-from .base import AgentResult
-from .prompts import get_controller_prompt
+from pydantic_ai import Agent
+from pydantic_ai import RunContext
+
+from ..llm_provider import get_model
 from .prompts import get_section_specific_prompt
 from .prompts import get_synthesis_prompt
+from .schemas import DocumentAnalysisResult
+from .schemas import DocumentDeps
+from .schemas import DocumentMetadata
+from .schemas import SectionAnalysis
 
 
-class SectionAgent(Agent):
-    """Specialized agent for analyzing specific document sections."""
+def create_tool_calling_agent(model_identifier: str = "deepseek-chat") -> Agent[DocumentDeps, DocumentAnalysisResult]:
+    """Create a tool-calling document analysis agent using Pydantic AI.
 
-    def __init__(self, section_type: str, config: Optional[AgentConfig] = None):
-        """Initialize a section-specific agent.
+    This agent uses a controller approach with specialized tools for analyzing
+    different sections of a document, then synthesizes the results.
 
-        Args:
-            section_type: Type of section this agent handles
-            config: Optional configuration for the agent
-        """
-        super().__init__(config or AgentConfig())
-        self.section_type = section_type
-        self.name = f"{section_type.title()}Agent"
+    Args:
+        model_identifier: The model identifier to use
 
-    async def analyze(self, document: Any, question: str, **kwargs) -> AgentResult:
-        """Analyze a specific section of the document.
+    Returns:
+        A configured Pydantic AI Agent
+    """
 
-        Args:
-            document: Document instance or chunks
-            question: Analysis question or task
-            **kwargs: Additional arguments (section_chunks, etc.)
+    agent = Agent[DocumentDeps, DocumentAnalysisResult](
+        model=get_model(model_identifier),
+        deps_type=DocumentDeps,
+        output_type=DocumentAnalysisResult,
+        system_prompt=(
+            "You are a research analysis coordinator responsible for orchestrating the analysis "
+            "of academic papers. You use specialized tools to analyze different sections of the document, "
+            "then synthesize the results into a comprehensive analysis. "
+            "Your role is to coordinate multiple analyses and integrate insights effectively."
+        )
+    )
 
-        Returns:
-            AgentResult with section-specific analysis
-        """
+    @agent.tool
+    async def get_available_sections(ctx: RunContext[DocumentDeps]) -> List[str]:
+        """Get list of available sections in the document."""
+        return ctx.deps.available_sections
+
+    @agent.tool
+    async def get_section_chunks(ctx: RunContext[DocumentDeps], section_type: str) -> List[Dict[str, Any]]:
+        """Get chunks of a specific section type."""
+        return ctx.deps.get_section_chunks(section_type)
+
+    @agent.tool
+    async def analyze_section(
+        ctx: RunContext[DocumentDeps],
+        section_type: str,
+        analysis_task: str
+    ) -> SectionAnalysis:
+        """Analyze a specific section of the document."""
+        import time
         start_time = time.time()
 
-        try:
-            # Get section-specific chunks or context
-            section_chunks = kwargs.get('section_chunks', [])
-            context = self.prepare_context(document, section_chunks)
-
-            # Get section-specific prompt
-            prompt_template = get_section_specific_prompt(self.section_type)
-            prompt = prompt_template.format(
-                context=context,
-                task=question,
-                section_type=self.section_type
+        # Get section chunks
+        section_chunks = ctx.deps.get_section_chunks(section_type)
+        if not section_chunks:
+            return SectionAnalysis(
+                section_type=section_type,
+                content_summary=f"No {section_type} section found in the document.",
+                relevance_score=0.0,
+                processing_time=time.time() - start_time
             )
 
-            # Execute the model
-            response = await self.execute_with_retry(prompt)
+        # Combine section content
+        section_content = "\n\n".join([
+            chunk.get('content', '') for chunk in section_chunks
+        ])
 
-            execution_time = time.time() - start_time
+        # Get section-specific prompt
+        prompt_template = get_section_specific_prompt(section_type)
+        prompt = prompt_template.format(
+            context=section_content,
+            task=analysis_task
+        )
 
-            return AgentResult(
-                content=response,
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=True,
-                chunks_processed=len(section_chunks),
-                metadata={
-                    "section_type": self.section_type,
-                    "question": question,
-                    "context_length": len(context),
-                    "response_length": len(response),
-                    "model": self.config.model_identifier,
-                }
+        # Create a simple analysis agent for this section
+        from .simple_agent import create_simple_agent
+        section_agent = create_simple_agent(ctx.deps.model_identifier)
+
+        # Analyze the section
+        try:
+            # Use the agent to analyze the section content
+            result = await section_agent.run(prompt, deps=ctx.deps)
+
+            # Extract key insights from the analysis
+            content = result.output.content
+            # Simple heuristic to extract insights - look for bullet points, numbered lists, etc.
+            insights = []
+            lines = content.split('\n')
+            for line in lines:
+                line = line.strip()
+                if line.startswith(('-', '*', '•')) or (line and line[0].isdigit() and '.' in line[:5]):
+                    insights.append(line.lstrip('-*•0123456789. ').strip())
+
+            processing_time = time.time() - start_time
+            return SectionAnalysis(
+                section_type=section_type,
+                content_summary=content,
+                key_insights=insights[:10],  # Limit to top 10 insights
+                relevance_score=0.8,  # Default relevance score
+                processing_time=processing_time
             )
 
         except Exception as e:
-            execution_time = time.time() - start_time
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=False,
-                error_message=f"Section analysis failed: {str(e)}",
-                metadata={
-                    "section_type": self.section_type,
-                    "error_type": type(e).__name__,
-                }
+            processing_time = time.time() - start_time
+            return SectionAnalysis(
+                section_type=section_type,
+                content_summary=f"Error analyzing {section_type} section: {str(e)}",
+                relevance_score=0.0,
+                processing_time=processing_time
             )
 
-    def get_supported_questions(self) -> list[str]:
-        """Get list of supported question types for this section."""
-        return ["section_analysis", "content_extraction", "key_insights"]
+    @agent.tool
+    async def analyze_multiple_sections(
+        ctx: RunContext[DocumentDeps],
+        section_types: List[str],
+        analysis_task: str
+    ) -> List[SectionAnalysis]:
+        """Analyze multiple sections in parallel."""
+        import asyncio
 
+        # Create analysis tasks for each section
+        tasks = []
+        for section_type in section_types:
+            if ctx.deps.has_section(section_type):
+                task = analyze_section(ctx, section_type, analysis_task)
+                tasks.append(task)
 
-class ControllerAgent(Agent):
-    """Controller agent that coordinates section-specific analyses."""
+        # Run analyses in parallel
+        if tasks:
+            results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    def __init__(self, config: Optional[AgentConfig] = None):
-        """Initialize the controller agent.
-
-        Args:
-            config: Optional configuration for the agent
-        """
-        super().__init__(config or AgentConfig())
-        self.name = "ControllerAgent"
-
-    async def analyze(self, document: Any, question: str, **kwargs) -> AgentResult:
-        """Coordinate the analysis of multiple document sections.
-
-        Args:
-            document: Document instance
-            question: Overall analysis question
-            **kwargs: Additional arguments
-
-        Returns:
-            AgentResult with coordinated analysis
-        """
-        start_time = time.time()
-
-        try:
-            # Get abstract for initial understanding
-            abstract_chunks = []
-            if hasattr(document, 'get_chunks'):
-                abstract_chunks = document.get_chunks(chunk_type="abstract")
-            elif isinstance(document, list):
-                abstract_chunks = [c for c in document if getattr(c, 'chunk_type', '') == 'abstract']
-
-            abstract_text = ""
-            if abstract_chunks:
-                abstract_text = abstract_chunks[0].content
-
-            # Get available sections from document
-            available_sections = self._get_available_sections(document)
-
-            # Create analysis plan
-            prompt = get_controller_prompt(available_sections)
-            prompt = prompt.format(abstract=abstract_text, task=question)
-
-            plan_response = await self.execute_with_retry(prompt)
-
-            # Determine which sections to analyze based on the plan
-            sections_to_analyze = self._extract_sections_from_plan(plan_response, available_sections)
-
-            # Execute section analyses in parallel
-            section_tasks = []
-            for section_type in sections_to_analyze:
-                task = self._analyze_section(document, section_type, question)
-                section_tasks.append(task)
-
-            section_results = await asyncio.gather(*section_tasks, return_exceptions=True)
-
-            # Process section results
-            section_analyses = {}
-            for i, result in enumerate(section_results):
-                if isinstance(result, Exception):
-                    section_type = sections_to_analyze[i]
-                    section_analyses[section_type] = f"Analysis failed: {str(result)}"
-                elif isinstance(result, AgentResult):
-                    section_type = sections_to_analyze[i]
-                    section_analyses[section_type] = result.content if result.success else result.error_message
-
-            # Synthesize results
-            synthesis_prompt = get_synthesis_prompt(section_analyses)
-            synthesis_prompt = synthesis_prompt.format(task=question)
-
-            final_response = await self.execute_with_retry(synthesis_prompt)
-
-            execution_time = time.time() - start_time
-
-            return AgentResult(
-                content=final_response,
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=True,
-                chunks_processed=len([c for c in getattr(document, 'chunks', []) if c.chunk_type in sections_to_analyze]),
-                metadata={
-                    "question": question,
-                    "analysis_plan": plan_response,
-                    "sections_analyzed": sections_to_analyze,
-                    "section_analyses": section_analyses,
-                    "model": self.config.model_identifier,
-                }
-            )
-
-        except Exception as e:
-            execution_time = time.time() - start_time
-            return AgentResult(
-                content="",
-                agent_name=self.name,
-                execution_time=execution_time,
-                success=False,
-                error_message=f"Controller analysis failed: {str(e)}",
-                metadata={
-                    "error_type": type(e).__name__,
-                }
-            )
-
-    def _get_available_sections(self, document: Any) -> List[str]:
-        """Get list of available sections in the document.
-
-        Args:
-            document: Document instance
-
-        Returns:
-            List of available section types
-        """
-        sections = set()
-
-        if hasattr(document, 'get_chunks'):
-            chunks = document.chunks
-        elif isinstance(document, list):
-            chunks = document
+            # Filter out exceptions and return successful analyses
+            successful_results = []
+            for result in results:
+                if isinstance(result, SectionAnalysis):
+                    successful_results.append(result)
+                else:
+                    # Create error analysis for failed sections
+                    successful_results.append(SectionAnalysis(
+                        section_type="error",
+                        content_summary=f"Analysis failed: {str(result)}",
+                        relevance_score=0.0,
+                        processing_time=0.0
+                    ))
+            return successful_results
         else:
             return []
 
-        for chunk in chunks:
-            if hasattr(chunk, 'chunk_type'):
-                sections.add(chunk.chunk_type)
+    @agent.tool
+    async def synthesize_analyses(
+        ctx: RunContext[DocumentDeps],
+        section_analyses: List[SectionAnalysis],
+        original_task: str
+    ) -> str:
+        """Synthesize multiple section analyses into a comprehensive result."""
+        # Create analyses text for synthesis
+        analyses_text = ""
+        for analysis in section_analyses:
+            analyses_text += f"\n\n## {analysis.section_type.upper()} ANALYSIS:\n{analysis.content_summary}"
 
-        # Filter to known section types
-        known_sections = {
-            'abstract', 'introduction', 'methods', 'methodology',
-            'experiments', 'results', 'conclusion', 'related_work',
-            'discussion', 'references', 'acknowledgments'
-        }
+        # Get synthesis prompt
+        synthesis_prompt = get_synthesis_prompt({
+            analysis.section_type: analysis.content_summary
+            for analysis in section_analyses
+        })
+        synthesis_prompt = synthesis_prompt.format(task=original_task)
 
-        return list(sections.intersection(known_sections))
+        # Create simple agent for synthesis
+        from .simple_agent import create_simple_agent
+        synthesis_agent = create_simple_agent(ctx.deps.model_identifier)
 
-    def _extract_sections_from_plan(self, plan_response: str, available_sections: List[str]) -> List[str]:
-        """Extract sections to analyze from the controller's plan.
+        # Perform synthesis
+        result = await synthesis_agent.run(synthesis_prompt, deps=ctx.deps)
+        return result.output.content
 
-        Args:
-            plan_response: The controller's analysis plan
-            available_sections: List of available sections in document
-
-        Returns:
-            List of sections to analyze
-        """
-        sections_to_analyze = []
-
-        # Simple heuristic: include sections mentioned in the plan
-        plan_lower = plan_response.lower()
-        for section in available_sections:
-            if section.lower() in plan_lower:
-                sections_to_analyze.append(section)
-
-        # If no sections were specifically mentioned, use default priority order
-        if not sections_to_analyze:
-            priority_order = ['abstract', 'introduction', 'methods', 'results', 'conclusion']
-            for section in priority_order:
-                if section in available_sections:
-                    sections_to_analyze.append(section)
-
-        # Limit to reasonable number of sections to avoid excessive processing
-        max_sections = 5
-        return sections_to_analyze[:max_sections]
-
-    async def _analyze_section(self, document: Any, section_type: str, question: str) -> AgentResult:
-        """Analyze a specific section.
-
-        Args:
-            document: Document instance
-            section_type: Type of section to analyze
-            question: Overall analysis question
-
-        Returns:
-            AgentResult for the section
-        """
-        # Create section-specific agent
-        section_agent = SectionAgent(section_type, self.config)
-
-        # Get section chunks
-        section_chunks = []
-        if hasattr(document, 'get_chunks'):
-            section_chunks = document.get_chunks(chunk_type=section_type)
-        elif isinstance(document, list):
-            section_chunks = [c for c in document if getattr(c, 'chunk_type', '') == section_type]
-
-        # Create section-specific task
-        section_task = f"Analyze this {section_type} section to help answer: {question}"
-
-        # Execute section analysis
-        return await section_agent.analyze(
-            document,
-            section_task,
-            section_chunks=section_chunks
+    @agent.tool
+    async def create_document_metadata(ctx: RunContext[DocumentDeps]) -> DocumentMetadata:
+        """Create metadata about the document."""
+        return DocumentMetadata(
+            title=ctx.deps.metadata.get('title', 'Unknown'),
+            authors=ctx.deps.metadata.get('authors', []),
+            chunk_count=len(ctx.deps.document_chunks),
+            section_types=ctx.deps.available_sections
         )
 
-    def get_supported_questions(self) -> list[str]:
-        """Get list of supported question types."""
-        return [
-            "comprehensive_analysis",
-            "research_questions",
-            "methodology_analysis",
-            "findings_synthesis",
-            "contribution_evaluation",
-            "comparative_analysis",
-        ]
+    @agent.tool
+    async def check_suitability_for_section_analysis(ctx: RunContext[DocumentDeps]) -> Dict[str, Any]:
+        """Check if the document is suitable for section-based analysis."""
+        available_sections = ctx.deps.available_sections
+        chunk_count = len(ctx.deps.document_chunks)
+        chunk_types = set(chunk.get('chunk_type', 'unknown') for chunk in ctx.deps.document_chunks)
 
+        # Document is suitable if it has multiple sections or diverse chunk types
+        has_multiple_sections = len(available_sections) > 2
+        has_diverse_types = len(chunk_types) > 2
+        has_many_chunks = chunk_count > 5
 
-class ToolCallingAgent:
-    """Tool-calling agent system with controller and section-specific sub-agents.
+        is_suitable = has_multiple_sections or (has_diverse_types and has_many_chunks)
 
-    This agent uses a controller to analyze the abstract and determine which
-    sections need detailed analysis, then coordinates multiple specialized
-    sub-agents to analyze different parts of the document.
-    """
-
-    def __init__(self, config: Optional[AgentConfig] = None):
-        """Initialize the tool-calling agent system.
-
-        Args:
-            config: Optional configuration for the agents
-        """
-        self.config = config or AgentConfig()
-        self.controller = ControllerAgent(self.config)
-        self.name = "ToolCallingAgent"
-
-    async def analyze(self, document: Any, question: str, **kwargs) -> AgentResult:
-        """Analyze a document using coordinated section analysis.
-
-        Args:
-            document: Document instance
-            question: Analysis question
-            **kwargs: Additional arguments
-
-        Returns:
-            AgentResult with comprehensive analysis
-        """
-        return await self.controller.analyze(document, question, **kwargs)
-
-    def get_supported_questions(self) -> list[str]:
-        """Get list of supported question types."""
-        return self.controller.get_supported_questions()
-
-    def is_suitable_for_document(self, document: Any, **kwargs) -> tuple[bool, str]:
-        """Check if this agent system is suitable for the document.
-
-        Args:
-            document: Document instance
-            **kwargs: Additional arguments
-
-        Returns:
-            Tuple of (is_suitable, reason)
-        """
-        # Check if document is split into sections
-        if hasattr(document, 'chunks') and len(document.chunks) > 5:
-            # Check if chunks have different types
-            chunk_types = set(chunk.chunk_type for chunk in document.chunks)
-            if len(chunk_types) > 2:  # More than just 'unknown' and one other type
-                return (
-                    True,
-                    f"Document has {len(document.chunks)} chunks across {len(chunk_types)} sections, "
-                    "well-suited for section-based analysis."
-                )
-
-        # Check if document has identifiable sections
-        available_sections = self.controller._get_available_sections(document)
-        if len(available_sections) >= 3:
-            return (
-                True,
-                f"Document has {len(available_sections)} identifiable sections, suitable for section-based analysis."
+        if is_suitable:
+            reason = (
+                f"Document has {len(available_sections)} identifiable sections "
+                f"and {len(chunk_types)} chunk types, suitable for section-based analysis."
+            )
+        else:
+            reason = (
+                f"Document lacks clear section structure (only {len(available_sections)} sections, "
+                f"{len(chunk_types)} types), better suited for simple analysis."
             )
 
-        return (
-            False,
-            "Document lacks clear section structure, better suited for SimpleAgent."
-        )
+        return {
+            "is_suitable": is_suitable,
+            "reason": reason,
+            "available_sections": available_sections,
+            "chunk_types": list(chunk_types),
+            "chunk_count": chunk_count
+        }
 
-    def get_analysis_plan(self, document: Any, question: str) -> str:
-        """Get the planned analysis approach without executing it.
+    return agent
 
-        Args:
-            document: Document instance
-            question: Analysis question
 
-        Returns:
-            Description of the planned analysis approach
-        """
-        available_sections = self.controller._get_available_sections(document)
+# Pre-configured agent instances
+tool_calling_agent = create_tool_calling_agent("deepseek-chat")
+tool_calling_agent_gpt4 = create_tool_calling_agent("openai:gpt-4o")
+tool_calling_agent_claude = create_tool_calling_agent("anthropic:claude-3-5-sonnet-latest")
 
-        if not available_sections:
-            return "No identifiable sections found. Document may need SimpleAgent instead."
 
-        return (
-            f"ToolCallingAgent will analyze {len(available_sections)} sections: "
-            f"{', '.join(available_sections)}. "
-            "Controller will coordinate section-specific analyses and synthesize results."
-        )
+async def analyze_document_with_sections(
+    document_text: str,
+    question: str,
+    model_identifier: str = "deepseek-chat",
+    document_chunks: list[dict[str, Any]] | None = None,
+    metadata: dict[str, Any] | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+) -> DocumentAnalysisResult:
+    """Analyze a document using the tool-calling agent approach.
 
-    def __str__(self) -> str:
-        """String representation of the agent."""
-        return f"ToolCallingAgent(model={self.config.model_identifier})"
+    Args:
+        document_text: The full text of the document
+        question: The analysis question or prompt
+        model_identifier: Model to use for analysis
+        document_chunks: Optional list of document chunks
+        metadata: Optional document metadata
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
 
-    def __repr__(self) -> str:
-        """Detailed string representation of the agent."""
-        return (
-            f"ToolCallingAgent(model='{self.config.model_identifier}', "
-            f"temperature={self.config.temperature}, "
-            f"max_tokens={self.config.max_tokens})"
-        )
+    Returns:
+        DocumentAnalysisResult with the comprehensive analysis
+    """
+    import time
+    start_time = time.time()
+
+    # Create dependencies
+    deps = DocumentDeps(
+        document_text=document_text,
+        document_chunks=document_chunks or [],
+        available_sections=list(set(chunk.get('chunk_type', 'unknown') for chunk in (document_chunks or []))),
+        metadata=metadata or {},
+        model_identifier=model_identifier,
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+
+    # Create agent
+    agent = create_tool_calling_agent(model_identifier)
+
+    # Run the agent
+    result = await agent.run(
+        question,
+        deps=deps,
+        model_settings={"temperature": temperature, "max_tokens": max_tokens}
+    )
+
+    # Update processing time
+    processing_time = time.time() - start_time
+    result_data = result.output
+    result_data.execution_time = processing_time
+
+    return result_data

@@ -1,14 +1,16 @@
-"""Factory functions for creating and selecting appropriate agents."""
+"""Factory functions for creating and selecting appropriate Pydantic AI agents."""
 
 from typing import Any
+from typing import Dict
 from typing import List
-from typing import Optional
 from typing import Tuple
 
-from .base import AgentConfig
-from .multi_agent_system import MultiAgentSystem
-from .simple_agent import SimpleAgent
-from .tool_calling_agent import ToolCallingAgent
+from .multi_agent_system import analyze_document_with_multi_agent
+from .multi_agent_system import analyze_with_agent_details
+from .schemas import DocumentAnalysisResult
+from .schemas import SimpleAnalysisResult
+from .simple_agent import analyze_document_simple
+from .tool_calling_agent import analyze_document_with_sections
 
 
 class AgentSelector:
@@ -16,197 +18,339 @@ class AgentSelector:
 
     @staticmethod
     def select_agent(
-        document: Any,
+        document_text: str,
         question: str,
-        config: Optional[AgentConfig] = None,
-        force_agent: Optional[str] = None
-    ) -> Tuple[Any, str]:
+        document_chunks: List[Dict[str, Any]] | None = None,
+        model_identifier: str = "deepseek-chat",
+        force_agent: str | None = None
+    ) -> Tuple[str, str, Dict[str, Any]]:
         """Select the most appropriate agent for the given document and question.
 
         Args:
-            document: Document instance or text content
+            document_text: The full text of the document
             question: Analysis question or prompt
-            config: Optional configuration for agents
+            document_chunks: Optional list of document chunks
+            model_identifier: Model to use for analysis
             force_agent: Force a specific agent type ('simple', 'tool_calling', 'multi_agent')
 
         Returns:
-            Tuple of (agent_instance, selection_reason)
+            Tuple of (agent_function_name, agent_display_name, selection_metadata)
         """
         if force_agent:
-            return AgentSelector._create_forced_agent(force_agent, config)
+            return AgentSelector._create_forced_agent(force_agent)
 
-        # Try agents in order of complexity, checking suitability
-        agents = [
-            (SimpleAgent(config), "SimpleAgent"),
-            (ToolCallingAgent(config), "ToolCallingAgent"),
-            (MultiAgentSystem(config), "MultiAgentSystem")
+        # Analyze document characteristics
+        doc_length = len(document_text)
+        estimated_tokens = doc_length // 4  # Rough estimation
+
+        # Analyze document structure
+        chunk_count = len(document_chunks) if document_chunks else 0
+        available_sections = list(set(chunk.get('chunk_type', 'unknown') for chunk in (document_chunks or []))) if document_chunks else []
+        section_types = set(available_sections)
+
+        # Analyze question complexity
+        question_lower = question.lower()
+        research_indicators = [
+            "research question", "why", "how", "what is the", "motivation",
+            "contribution", "findings", "methodology", "approach"
         ]
+        is_research_question = any(indicator in question_lower for indicator in research_indicators)
 
-        for agent, agent_name in agents:
-            if hasattr(agent, 'is_suitable_for_document'):
-                is_suitable, reason = agent.is_suitable_for_document(
-                    document,
-                    research_question=question
-                )
-                if is_suitable:
-                    return agent, f"{agent_name}: {reason}"
+        # Decision logic
+        if estimated_tokens > 100000:  # Very large document
+            return (
+                "analyze_document_simple",
+                "SimpleAgent",
+                {
+                    "reason": f"Document too large for complex processing ({estimated_tokens:,} tokens). Using simple approach.",
+                    "estimated_tokens": estimated_tokens,
+                    "document_length": doc_length,
+                    "recommended_approach": "simple"
+                }
+            )
 
-        # Fallback to SimpleAgent if none are suitable
-        simple_agent = SimpleAgent(config)
-        return simple_agent, "SimpleAgent: Fallback option - no specific requirements matched"
+        elif is_research_question and len(section_types) > 2:
+            return (
+                "analyze_document_with_multi_agent",
+                "MultiAgentSystem",
+                {
+                    "reason": f"High-level research question with structured document ({len(section_types)} sections). Ideal for collaborative analysis.",
+                    "estimated_tokens": estimated_tokens,
+                    "document_length": doc_length,
+                    "section_types": list(section_types),
+                    "recommended_approach": "multi_agent"
+                }
+            )
+
+        elif chunk_count > 10 and len(section_types) > 2:
+            return (
+                "analyze_document_with_sections",
+                "ToolCallingAgent",
+                {
+                    "reason": f"Document has clear section structure ({chunk_count} chunks, {len(section_types)} sections). Suitable for section-based analysis.",
+                    "estimated_tokens": estimated_tokens,
+                    "document_length": doc_length,
+                    "chunk_count": chunk_count,
+                    "section_types": list(section_types),
+                    "recommended_approach": "tool_calling"
+                }
+            )
+
+        else:
+            return (
+                "analyze_document_simple",
+                "SimpleAgent",
+                {
+                    "reason": f"Document suitable for simple processing ({estimated_tokens:,} tokens, {len(section_types)} sections).",
+                    "estimated_tokens": estimated_tokens,
+                    "document_length": doc_length,
+                    "section_types": list(section_types),
+                    "recommended_approach": "simple"
+                }
+            )
 
     @staticmethod
-    def _create_forced_agent(agent_type: str, config: Optional[AgentConfig] = None) -> Tuple[Any, str]:
+    def _create_forced_agent(agent_type: str) -> Tuple[str, str, Dict[str, Any]]:
         """Create a specific agent type.
 
         Args:
             agent_type: Type of agent to create
-            config: Optional configuration
 
         Returns:
-            Tuple of (agent_instance, selection_reason)
+            Tuple of (agent_function_name, agent_display_name, selection_metadata)
         """
-        config = config or AgentConfig()
-
-        agent_map = {
-            "simple": SimpleAgent(config),
-            "tool_calling": ToolCallingAgent(config),
-            "multi_agent": MultiAgentSystem(config),
+        agent_mapping = {
+            "simple": ("analyze_document_simple", "SimpleAgent", {"forced": True}),
+            "tool_calling": ("analyze_document_with_sections", "ToolCallingAgent", {"forced": True}),
+            "multi_agent": ("analyze_document_with_multi_agent", "MultiAgentSystem", {"forced": True}),
         }
 
-        if agent_type not in agent_map:
-            raise ValueError(f"Unknown agent type: {agent_type}. Available: {list(agent_map.keys())}")
+        if agent_type not in agent_mapping:
+            raise ValueError(f"Unknown agent type: {agent_type}. Available: {list(agent_mapping.keys())}")
 
-        agent = agent_map[agent_type]
-        reason = f"Forced selection of {agent_type.title().replace('_', '')}Agent"
-        return agent, reason
+        func_name, display_name, metadata = agent_mapping[agent_type]
+        metadata["reason"] = f"Forced selection of {display_name}"
 
-
-def create_agent(
-    agent_type: str = "auto",
-    config: Optional[AgentConfig] = None,
-    **kwargs
-) -> Any:
-    """Create an agent instance.
-
-    Args:
-        agent_type: Type of agent ('simple', 'tool_calling', 'multi_agent', 'auto')
-        config: Optional configuration for the agent
-        **kwargs: Additional arguments for agent creation
-
-    Returns:
-        Agent instance
-    """
-    config = config or AgentConfig()
-
-    if agent_type == "auto":
-        # Return a selector function that will choose the appropriate agent
-        def auto_analyzer(document: Any, question: str, **analyze_kwargs):
-            agent, reason = AgentSelector.select_agent(document, question, config)
-            from ..logging_config import get_logger
-            logger = get_logger(__name__)
-            logger.info(f"Auto-selected agent: {reason}")
-            return agent.analyze(document, question, **analyze_kwargs)
-
-        return auto_analyzer
-
-    return AgentSelector._create_forced_agent(agent_type, config)[0]
+        return func_name, display_name, metadata
 
 
-def analyze_document(
-    document: Any,
+async def create_agent_analysis(
+    document_text: str,
     question: str,
     agent_type: str = "auto",
-    config: Optional[AgentConfig] = None,
-    **kwargs
-) -> Any:
+    model_identifier: str = "deepseek-chat",
+    document_chunks: List[Dict[str, Any]] | None = None,
+    metadata: Dict[str, Any] | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+) -> SimpleAnalysisResult | DocumentAnalysisResult:
+    """Create and run an agent analysis.
+
+    Args:
+        document_text: The full text of the document
+        question: Analysis question or prompt
+        agent_type: Type of agent ('simple', 'tool_calling', 'multi_agent', 'auto')
+        model_identifier: Model to use for analysis
+        document_chunks: Optional list of document chunks
+        metadata: Optional document metadata
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
+
+    Returns:
+        Analysis result from the selected agent
+    """
+    # Select the appropriate agent
+    func_name, display_name, selection_info = AgentSelector.select_agent(
+        document_text=document_text,
+        question=question,
+        document_chunks=document_chunks,
+        model_identifier=model_identifier,
+        force_agent=agent_type if agent_type != "auto" else None
+    )
+
+    # Log the selection
+    from ..logging_config import get_logger
+    logger = get_logger(__name__)
+    logger.info(f"Selected agent: {display_name} - {selection_info['reason']}")
+
+    # Map function names to actual functions
+    agent_functions = {
+        "analyze_document_simple": analyze_document_simple,
+        "analyze_document_with_sections": analyze_document_with_sections,
+        "analyze_document_with_multi_agent": analyze_document_with_multi_agent,
+    }
+
+    if func_name not in agent_functions:
+        raise ValueError(f"Unknown agent function: {func_name}")
+
+    # Execute the selected agent
+    agent_function = agent_functions[func_name]
+
+    try:
+        result = await agent_function(
+            document_text=document_text,
+            question=question,
+            model_identifier=model_identifier,
+            document_chunks=document_chunks,
+            metadata=metadata,
+            temperature=temperature,
+            max_tokens=max_tokens
+        )
+
+        # Add selection metadata to the result if possible
+        if hasattr(result, 'metadata'):
+            result.metadata['agent_selection'] = selection_info
+            result.metadata['agent_type'] = display_name
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Agent execution failed for {display_name}: {str(e)}")
+        # Fallback to simple agent
+        if func_name != "analyze_document_simple":
+            logger.info("Falling back to SimpleAgent")
+            return await analyze_document_simple(
+                document_text=document_text,
+                question=question,
+                model_identifier=model_identifier,
+                document_chunks=document_chunks,
+                metadata=metadata,
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+        else:
+            raise
+
+
+async def analyze_document(
+    document_text: str,
+    question: str,
+    agent_type: str = "auto",
+    model_identifier: str = "deepseek-chat",
+    document_chunks: List[Dict[str, Any]] | None = None,
+    metadata: Dict[str, Any] | None = None,
+    temperature: float = 0.3,
+    max_tokens: int | None = None,
+) -> SimpleAnalysisResult | DocumentAnalysisResult:
     """Convenience function to analyze a document with automatic agent selection.
 
     Args:
-        document: Document instance or text content
+        document_text: The full text of the document
         question: Analysis question or prompt
         agent_type: Type of agent to use ('simple', 'tool_calling', 'multi_agent', 'auto')
-        config: Optional configuration for the agent
-        **kwargs: Additional arguments passed to the agent
+        model_identifier: Model to use for analysis
+        document_chunks: Optional list of document chunks
+        metadata: Optional document metadata
+        temperature: Sampling temperature
+        max_tokens: Maximum tokens to generate
 
     Returns:
-        AgentResult from the analysis
+        Analysis result from the selected agent
     """
-    if agent_type == "auto":
-        agent, reason = AgentSelector.select_agent(document, question, config)
-        from ..logging_config import get_logger
-        logger = get_logger(__name__)
-        logger.info(f"Auto-selected agent: {reason}")
-        return agent.analyze(document, question, **kwargs)
-    else:
-        agent = create_agent(agent_type, config)
-        return agent.analyze(document, question, **kwargs)
+    return await create_agent_analysis(
+        document_text=document_text,
+        question=question,
+        agent_type=agent_type,
+        model_identifier=model_identifier,
+        document_chunks=document_chunks,
+        metadata=metadata,
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
 
 
-def get_agent_recommendations(
-    document: Any,
+async def get_agent_recommendations(
+    document_text: str,
     question: str,
-    config: Optional[AgentConfig] = None
-) -> List[dict]:
+    document_chunks: List[Dict[str, Any]] | None = None,
+    model_identifier: str = "deepseek-chat"
+) -> List[Dict[str, Any]]:
     """Get recommendations for all available agents with their suitability.
 
     Args:
-        document: Document instance or text content
+        document_text: The full text of the document
         question: Analysis question or prompt
-        config: Optional configuration for agents
+        document_chunks: Optional list of document chunks
+        model_identifier: Model to use for analysis
 
     Returns:
         List of agent recommendations with suitability ratings
     """
-    config = config or AgentConfig()
     recommendations = []
 
-    agents = [
-        SimpleAgent(config),
-        ToolCallingAgent(config),
-        MultiAgentSystem(config)
+    # Analyze document characteristics
+    doc_length = len(document_text)
+    estimated_tokens = doc_length // 4
+    chunk_count = len(document_chunks) if document_chunks else 0
+    available_sections = list(set(chunk.get('chunk_type', 'unknown') for chunk in (document_chunks or []))) if document_chunks else []
+    section_types = set(available_sections)
+
+    # Analyze question complexity
+    question_lower = question.lower()
+    research_indicators = [
+        "research question", "why", "how", "what is the", "motivation",
+        "contribution", "findings", "methodology", "approach"
     ]
+    is_research_question = any(indicator in question_lower for indicator in research_indicators)
 
-    for agent in agents:
-        recommendation = {
-            "agent_name": agent.name,
-            "agent_type": agent.__class__.__name__,
-            "supported_questions": agent.get_supported_questions(),
-        }
+    # SimpleAgent recommendation
+    simple_suitable = estimated_tokens < 128000
+    simple_reason = (
+        f"SimpleAgent: Document suitable for simple processing ({estimated_tokens:,} tokens)."
+        if simple_suitable else
+        f"SimpleAgent: Document large but simple agent can handle it ({estimated_tokens:,} tokens)."
+    )
 
-        if hasattr(agent, 'is_suitable_for_document'):
-            # For MultiAgentSystem, pass the research_question
-            is_suitable_kwargs = {}
-            if isinstance(agent, MultiAgentSystem):
-                is_suitable_kwargs["research_question"] = question
+    recommendations.append({
+        "agent_name": "SimpleAgent",
+        "agent_type": "simple",
+        "is_suitable": True,  # Always suitable as fallback
+        "reason": simple_reason,
+        "estimated_tokens": estimated_tokens,
+        "confidence": 0.8 if simple_suitable else 0.6,
+        "best_for": ["General analysis", "Simple questions", "Large documents"]
+    })
 
-            is_suitable, reason = agent.is_suitable_for_document(
-                document,
-                **is_suitable_kwargs
-            )
-            recommendation["is_suitable"] = is_suitable
-            recommendation["reason"] = reason
-        else:
-            # For SimpleAgent, always suitable unless document is invalid
-            recommendation["is_suitable"] = True
-            recommendation["reason"] = "SimpleAgent is suitable for most document types"
+    # ToolCallingAgent recommendation
+    tool_suitable = chunk_count > 5 and len(section_types) > 2
+    tool_reason = (
+        f"ToolCallingAgent: Document has clear section structure ({chunk_count} chunks, {len(section_types)} sections)."
+        if tool_suitable else
+        f"ToolCallingAgent: Document lacks clear section structure for effective section-based analysis."
+    )
 
-        # Add additional information if available
-        if hasattr(agent, 'estimate_tokens'):
-            try:
-                estimated_tokens = agent.estimate_tokens(document, question=question)
-                recommendation["estimated_tokens"] = estimated_tokens
-            except:
-                pass
+    recommendations.append({
+        "agent_name": "ToolCallingAgent",
+        "agent_type": "tool_calling",
+        "is_suitable": tool_suitable,
+        "reason": tool_reason,
+        "section_count": len(section_types),
+        "chunk_count": chunk_count,
+        "confidence": 0.9 if tool_suitable else 0.3,
+        "best_for": ["Structured documents", "Section-by-section analysis", "Methodical breakdown"]
+    })
 
-        if hasattr(agent, 'get_analysis_plan'):
-            try:
-                analysis_plan = agent.get_analysis_plan(document, question)
-                recommendation["analysis_plan"] = analysis_plan
-            except:
-                pass
+    # MultiAgentSystem recommendation
+    multi_suitable = is_research_question and len(section_types) > 2
+    multi_reason = (
+        f"MultiAgentSystem: High-level research question with structured document, ideal for collaborative analysis."
+        if multi_suitable else
+        f"MultiAgentSystem: Question appears specific rather than high-level, better suited for simpler analysis."
+    )
 
-        recommendations.append(recommendation)
+    recommendations.append({
+        "agent_name": "MultiAgentSystem",
+        "agent_type": "multi_agent",
+        "is_suitable": multi_suitable,
+        "reason": multi_reason,
+        "is_research_question": is_research_question,
+        "section_count": len(section_types),
+        "confidence": 0.9 if multi_suitable else 0.4,
+        "best_for": ["Research questions", "Comprehensive analysis", "Multiple perspectives"]
+    })
+
+    # Sort by confidence
+    recommendations.sort(key=lambda x: x["confidence"], reverse=True)
 
     return recommendations
 
@@ -214,28 +358,34 @@ def get_agent_recommendations(
 class AgentOrchestrator:
     """High-level orchestrator for managing multiple agent analyses."""
 
-    def __init__(self, config: Optional[AgentConfig] = None):
+    def __init__(self, model_identifier: str = "deepseek-chat"):
         """Initialize the orchestrator.
 
         Args:
-            config: Optional configuration for agents
+            model_identifier: Default model to use for agents
         """
-        self.config = config or AgentConfig()
+        self.model_identifier = model_identifier
 
     async def comprehensive_analysis(
         self,
-        document: Any,
+        document_text: str,
         question: str,
-        agent_types: Optional[List[str]] = None,
-        **kwargs
-    ) -> dict:
+        agent_types: List[str] | None = None,
+        document_chunks: List[Dict[str, Any]] | None = None,
+        metadata: Dict[str, Any] | None = None,
+        temperature: float = 0.3,
+        max_tokens: int | None = None,
+    ) -> Dict[str, Any]:
         """Perform comprehensive analysis using multiple agent types.
 
         Args:
-            document: Document instance or text content
+            document_text: The full text of the document
             question: Analysis question or prompt
             agent_types: List of agent types to use (default: all suitable agents)
-            **kwargs: Additional arguments for agents
+            document_chunks: Optional list of document chunks
+            metadata: Optional document metadata
+            temperature: Sampling temperature
+            max_tokens: Maximum tokens to generate
 
         Returns:
             Dictionary with results from all agents and a synthesis
@@ -251,71 +401,119 @@ class AgentOrchestrator:
         if not agent_types:
             raise ValueError("No valid agent types specified")
 
-        # Create agents
-        agents = []
+        # Get recommendations to see which agents are suitable
+        recommendations = await get_agent_recommendations(
+            document_text=document_text,
+            question=question,
+            document_chunks=document_chunks,
+            model_identifier=self.model_identifier
+        )
+
+        # Filter agent types based on recommendations
+        suitable_agents = []
         for agent_type in agent_types:
-            agent = create_agent(agent_type, self.config)
-            agents.append(agent)
+            rec = next((r for r in recommendations if r["agent_type"] == agent_type), None)
+            if rec and rec["is_suitable"]:
+                suitable_agents.append(agent_type)
 
-        # Execute all agents
-        import asyncio
-        results = []
+        # If no agents are suitable, use simple agent as fallback
+        if not suitable_agents:
+            suitable_agents = ["simple"]
 
-        for agent in agents:
+        # Execute all suitable agents
+        results = {}
+        execution_times = {}
+
+        for agent_type in suitable_agents:
             try:
-                result = await agent.analyze(document, question, **kwargs)
-                results.append(result)
-            except Exception as e:
-                # Create error result
-                from .base import AgentResult
-                error_result = AgentResult(
-                    content="",
-                    agent_name=agent.name,
-                    execution_time=0.0,
-                    success=False,
-                    error_message=str(e)
+                import time
+                start_time = time.time()
+
+                result = await create_agent_analysis(
+                    document_text=document_text,
+                    question=question,
+                    agent_type=agent_type,
+                    model_identifier=self.model_identifier,
+                    document_chunks=document_chunks,
+                    metadata=metadata,
+                    temperature=temperature,
+                    max_tokens=max_tokens
                 )
-                results.append(error_result)
+
+                execution_time = time.time() - start_time
+                results[agent_type] = result
+                execution_times[agent_type] = execution_time
+
+            except Exception as e:
+                from ..logging_config import get_logger
+                logger = get_logger(__name__)
+                logger.error(f"Agent {agent_type} failed: {str(e)}")
+                results[agent_type] = {"error": str(e), "success": False}
+                execution_times[agent_type] = 0
 
         # Prepare results summary
         analysis_summary = {
             "question": question,
-            "agents_used": [result.agent_name for result in results],
-            "successful_analyses": [r for r in results if r.success],
-            "failed_analyses": [r for r in results if not r.success],
+            "agents_used": list(results.keys()),
+            "successful_analyses": {k: v for k, v in results.items() if not isinstance(v, dict) or v.get("success", True)},
+            "failed_analyses": {k: v for k, v in results.items() if isinstance(v, dict) and not v.get("success", True)},
             "results": {},
-            "recommendations": {}
+            "execution_times": execution_times,
+            "recommendations": recommendations,
+            "metadata": metadata or {}
         }
 
         # Add individual results
-        for result in results:
-            analysis_summary["results"][result.agent_name] = {
-                "success": result.success,
-                "content": result.content,
-                "execution_time": result.execution_time,
-                "error_message": result.error_message,
-                "metadata": result.metadata,
-            }
+        for agent_type, result in results.items():
+            if isinstance(result, dict) and "error" in result:
+                analysis_summary["results"][agent_type] = {
+                    "success": False,
+                    "error": result["error"],
+                    "execution_time": execution_times[agent_type]
+                }
+            else:
+                analysis_summary["results"][agent_type] = {
+                    "success": True,
+                    "content": result.content if hasattr(result, 'content') else str(result),
+                    "execution_time": execution_times[agent_type],
+                    "metadata": getattr(result, 'metadata', {}),
+                }
 
         # Generate recommendations
-        if analysis_summary["successful_analyses"]:
-            analysis_summary["recommendations"]["best_agent"] = (
-                min(analysis_summary["successful_analyses"], key=lambda x: x.execution_time).agent_name
+        successful_analyses = [k for k, v in results.items() if not isinstance(v, dict) or v.get("success", True)]
+        if successful_analyses:
+            # Best agent = fastest successful
+            best_agent = min(successful_analyses, key=lambda x: execution_times[x])
+            analysis_summary["recommendations"]["best_agent"] = best_agent
+
+            # Most detailed = agent with longest content
+            most_detailed = max(
+                successful_analyses,
+                key=lambda x: len(results[x].content) if hasattr(results[x], 'content') else 0
             )
-            analysis_summary["recommendations"]["most_detailed"] = (
-                max(analysis_summary["successful_analyses"], key=lambda x: len(x.content)).agent_name
-            )
+            analysis_summary["recommendations"]["most_detailed"] = most_detailed
 
         return analysis_summary
 
-    def get_optimal_agent(self, document: Any, question: str) -> Tuple[Any, str]:
+    async def get_optimal_agent(
+        self,
+        document_text: str,
+        question: str,
+        document_chunks: List[Dict[str, Any]] | None = None
+    ) -> Tuple[str, str, Dict[str, Any]]:
         """Get the optimal agent for the given document and question.
 
         Args:
-            document: Document instance or text content
+            document_text: The full text of the document
             question: Analysis question or prompt
+            document_chunks: Optional list of document chunks
 
         Returns:
-            Tuple of (agent_instance, reason)
+            Tuple of (agent_function_name, agent_display_name, selection_metadata)
         """
-        return AgentSelector.select_agent(document, question, self.config)
+        return AgentSelector.select_agent(
+            document_text=document_text,
+            question=question,
+            document_chunks=document_chunks,
+            model_identifier=self.model_identifier
+        )
