@@ -42,11 +42,9 @@ async def main(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
         raise FileNotFoundError(f"Txt file not found: {txt_file_path}")
 
     # Create an agent
-    logger.info(f"Creating agent with model: {model}")
     agent = create_agent(model)
 
     # Load the txt file
-    logger.info(f"Loading document from: {txt_file_path}")
     sample_text = Path(txt_file_path).read_text(encoding="latin-1")
     doc = Document.from_text(sample_text)
     logger.info(f"Document created: {len(doc.text)} characters")
@@ -58,10 +56,11 @@ async def main(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
     # Define the task prompt (same as in test_agent.py)
     task_prompt = """Your task is to write a detailed report using the Feynman technique to explain a given paper. When creating this report, you should approach it as if you were the author of the paper.
 Here are some important constraints:
-- Content Format: When writing the content of the report, use multiple levels of titles and vivid markdown formats such as bold & italic text, code block, table, and lists. This will make the report easy to read.
+- Title and basic info first: Start the report with the paper title, authors, and publication details.
+- Content Format: When writing the content of the report, use multiple levels of titles and subtitles to organize the information clearly, using markdown formats such as bold & italic text, code block, table, and lists. This will make the report easier to read and understand.
 - Serious Work Requirement: This report is a serious piece of work, so avoid using emojis when writing the report.
-- Content Don'ts: Do not start the content with the paper title, it already displayed in the page title; No need to mention/introduce the faynman technique in the content.
-    """
+- Content Don'ts: Do not start the content with the paper title, it already displayed in the page title; Do not mention/introduce the faynman technique in the content.
+"""
 
     logger.info("Starting document analysis...")
     try:
