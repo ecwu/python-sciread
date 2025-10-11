@@ -1287,55 +1287,89 @@ Provide a comprehensive analysis plan with clear reasoning."""
         """
         self.logger.info("Synthesizing final report from sub-agent results")
 
-        # Build synthesis prompt
+        # Extract paper title for structured reporting
+        paper_title = "Unknown Paper"
+        if document.metadata and document.metadata.title:
+            paper_title = document.metadata.title
+        else:
+            # Try to extract from metadata results
+            if sub_agent_results.get("metadata", {}).get("success"):
+                metadata_result = sub_agent_results["metadata"]["result"]
+                if hasattr(metadata_result, 'title') and metadata_result.title:
+                    paper_title = metadata_result.title
+
+        # Build synthesis prompt with structured format requirements
         prompt_parts = [
             "You are an expert academic research analyst tasked with creating a comprehensive, coherent report from multiple expert analyses of an academic paper.",
             "",
-            "ANALYSIS PLAN:",
-            f"Reasoning: {analysis_plan.reasoning}",
-            f"Selected analyses: {[name for name, enabled in [('metadata', analysis_plan.analyze_metadata), ('previous_methods', analysis_plan.analyze_previous_methods), ('research_questions', analysis_plan.analyze_research_questions), ('methodology', analysis_plan.analyze_methodology), ('experiments', analysis_plan.analyze_experiments), ('future_directions', analysis_plan.analyze_future_directions)] if enabled]}",
+            "REPORT STRUCTURE REQUIREMENTS:",
+            f"1. Title: Always start with the exact paper title followed by ' - Comprehensive Report'",
+            "2. Metadata Section: Include a clear metadata section with article information in list or table format",
+            "3. Content Sections: Create well-organized content sections based on the available analyses",
+            "4. Focus: Write directly about the paper content without mentioning agents, tools, or analysis processes",
             "",
-            "SUB-AGENT RESULTS:",
+            "PAPER INFORMATION:",
+            f"Paper Title: {paper_title}",
+            f"Source: {document.source_path or 'text document'}",
         ]
-
-        # Add results from successful agents
-        for agent_name, result_data in sub_agent_results.items():
-            if result_data.get("success", False):
-                result = result_data["result"]
-                prompt_parts.extend([f"{agent_name.upper()} RESULTS:", str(result), ""])
-            else:
-                prompt_parts.extend([f"{agent_name.upper()} RESULTS:", f"Analysis failed: {result_data.get('error', 'Unknown error')}", ""])
-
-        # Add document context
-        prompt_parts.extend(
-            [
-                "DOCUMENT CONTEXT:",
-                f"Source: {document.source_path or 'text document'}",
-            ]
-        )
-
-        if document.metadata and document.metadata.title:
-            prompt_parts.append(f"Title: {document.metadata.title}")
 
         abstract = self.extract_abstract(document)
         if abstract:
             prompt_parts.append(f"Abstract: {abstract[:500]}...")
 
-        prompt_parts.extend(
-            [
-                "",
-                "SYNTHESIS INSTRUCTIONS:",
-                "Create a comprehensive, well-structured report that integrates all available analyses. The report should:",
-                "1. Have a clear, logical structure appropriate for an academic paper analysis",
-                "2. Integrate insights from multiple expert perspectives",
-                "3. Be comprehensive but concise and readable",
-                "4. Highlight key findings, contributions, and implications",
-                "5. Note any limitations or missing information where analyses failed",
-                "6. Be suitable for researchers and academics who want to understand this paper",
-                "",
-                "Please provide a thorough synthesized report based on all the available information.",
-            ]
-        )
+        prompt_parts.extend([
+            "",
+            "AVAILABLE ANALYSES:",
+        ])
+
+        # Add results from successful agents
+        for agent_name, result_data in sub_agent_results.items():
+            if result_data.get("success", False):
+                result = result_data["result"]
+                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
+            else:
+                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", f"Analysis failed: {result_data.get('error', 'Unknown error')}", ""])
+
+        prompt_parts.extend([
+            "",
+            "SYNTHESIS INSTRUCTIONS:",
+            "Create a comprehensive academic paper analysis report with the following structure:",
+            "",
+            "REPORT FORMAT:",
+            f"[Exact Paper Title] - Comprehensive Report",
+            "",
+            "## Paper Information",
+            "- **Title:** [Paper title]",
+            "- **Authors:** [List of authors]",
+            "- **Affiliations:** [Author affiliations]",
+            "- **Venue:** [Journal/Conference/ArXiv]",
+            "- **Year:** [Publication year]",
+            "",
+            "## Main Content Sections",
+            "After the metadata section, start with appropriate, natural section titles such as:",
+            "## Introduction and Research Context",
+            "## Research Questions and Contributions",
+            "## Methodology",
+            "## Experiments and Results",
+            "## Discussion and Analysis",
+            "## Limitations and Future Work",
+            "## Conclusions and Implications",
+            "",
+            "Choose and order sections based on what's most relevant to the paper. Use only the sections that have meaningful content.",
+            "",
+            "WRITING GUIDELINES:",
+            "1. Use the exact paper title followed by ' - Comprehensive Report' as the main title",
+            "2. Include a comprehensive metadata section with all available bibliographic information",
+            "3. Focus exclusively on the paper's content, findings, and contributions",
+            "4. DO NOT mention agents, tools, sub-agents, analysis processes, or methodologies used to create the report",
+            "5. Write in a professional academic tone suitable for researchers",
+            "6. Integrate insights from all available analyses into coherent sections",
+            "7. Be comprehensive but maintain readability and logical flow",
+            "8. If certain analyses failed, focus on the available information without noting the gaps",
+            "9. Use natural, descriptive section titles that readers would expect in an academic paper",
+            "",
+            "Please provide a thorough, well-structured academic analysis report based on all available information.",
+        ])
 
         prompt = "\n".join(prompt_parts)
 
