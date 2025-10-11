@@ -1,7 +1,8 @@
 import asyncio
 from pathlib import Path
+from typing import Optional
 
-from .agent import create_agent, remove_references_section
+from .agent import create_agent, remove_references_section, ToolAgent
 from .document import Document
 from .logging_config import get_logger
 
@@ -92,3 +93,138 @@ def run_main(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
         Analysis result as a string
     """
     return asyncio.run(main(txt_file_path, model))
+
+
+async def comprehensive_analysis(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
+    """Comprehensive document analysis using the multi-agent ToolAgent system.
+
+    This function uses the ToolAgent with multiple expert sub-agents to provide
+    a detailed analysis of academic papers, including metadata extraction,
+    methodology analysis, experiments evaluation, and future directions.
+
+    Args:
+        txt_file_path: Path to the txt file to process
+        model: Model identifier for the LLM provider (default: "deepseek/deepseek-chat")
+
+    Returns:
+        ComprehensiveAnalysisResult object containing all sub-agent analyses
+        and a synthesized final report
+
+    Raises:
+        FileNotFoundError: If the txt file is not found
+        Exception: If the analysis fails
+    """
+    logger.info(f"Starting comprehensive analysis with ToolAgent for file: {txt_file_path}")
+
+    # Check if file exists
+    if not Path(txt_file_path).exists():
+        raise FileNotFoundError(f"Txt file not found: {txt_file_path}")
+
+    # Create the multi-agent system
+    tool_agent = ToolAgent(model)
+
+    # Load the txt file
+    sample_text = Path(txt_file_path).read_text(encoding="latin-1")
+    doc = Document.from_text(sample_text)
+    logger.info(f"Document created: {len(doc.text)} characters")
+
+    # Run comprehensive analysis
+    logger.info("Starting comprehensive document analysis with ToolAgent...")
+    try:
+        result = await tool_agent.analyze_document(doc)
+
+        logger.info("Comprehensive analysis completed successfully!")
+        logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
+        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
+        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Comprehensive analysis failed: {e}")
+        raise
+
+
+def run_comprehensive_analysis(txt_file_path: str, model: str = "deepseek/deepseek-chat", debug_output: Optional[str] = None):
+    """Run comprehensive analysis synchronously.
+
+    This is a wrapper around the async comprehensive_analysis function for use in synchronous contexts.
+
+    Args:
+        txt_file_path: Path to the txt file to process
+        model: Model identifier for the LLM provider
+        debug_output: Optional path to save interaction log for debugging
+
+    Returns:
+        ComprehensiveAnalysisResult object containing all sub-agent analyses
+        and a synthesized final report
+    """
+    result = asyncio.run(comprehensive_analysis(txt_file_path, model))
+
+    # Save debug output if requested
+    if debug_output:
+        # Create a new ToolAgent to access the interaction log
+        tool_agent = ToolAgent(model)
+        tool_agent.interaction_log = result.interaction_log if hasattr(result, "interaction_log") else []
+        tool_agent.save_interaction_log(debug_output)
+        logger.info(f"Debug interaction log saved to: {debug_output}")
+
+    return result
+
+
+async def comprehensive_analysis_with_debug(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
+    """Comprehensive analysis with ToolAgent that captures all interactions.
+
+    Args:
+        txt_file_path: Path to the txt file to process
+        model: Model identifier for the LLM provider
+
+    Returns:
+        ComprehensiveAnalysisResult with interaction log attached
+    """
+    logger.info(f"Starting comprehensive analysis with ToolAgent for file: {txt_file_path}")
+
+    # Check if file exists
+    if not Path(txt_file_path).exists():
+        raise FileNotFoundError(f"Txt file not found: {txt_file_path}")
+
+    # Create the multi-agent system
+    tool_agent = ToolAgent(model)
+
+    # Load the txt file
+    sample_text = Path(txt_file_path).read_text(encoding="latin-1")
+    doc = Document.from_text(sample_text)
+    logger.info(f"Document created: {len(doc.text)} characters")
+
+    # Run comprehensive analysis
+    logger.info("Starting comprehensive document analysis with ToolAgent...")
+    try:
+        result = await tool_agent.analyze_document(doc)
+
+        # Attach interaction log to result
+        result.interaction_log = tool_agent.get_interaction_log()
+
+        logger.info("Comprehensive analysis completed successfully!")
+        logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
+        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
+        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
+        logger.info(f"Total interactions logged: {len(result.interaction_log)}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Comprehensive analysis failed: {e}")
+        raise
+
+
+def run_comprehensive_analysis_with_debug(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
+    """Run comprehensive analysis with debug logging synchronously.
+
+    Args:
+        txt_file_path: Path to the txt file to process
+        model: Model identifier for the LLM provider
+
+    Returns:
+        ComprehensiveAnalysisResult with interaction log attached
+    """
+    return asyncio.run(comprehensive_analysis_with_debug(txt_file_path, model))
