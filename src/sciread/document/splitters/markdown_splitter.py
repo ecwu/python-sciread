@@ -1,6 +1,7 @@
 """Markdown-specific text splitter that leverages markdown structure for accurate chunking."""
 
 import re
+from typing import Optional
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -154,8 +155,34 @@ class MarkdownSplitter(BaseSplitter):
 
         return text, code_blocks
 
-    def _find_markdown_split_points(self, text: str) -> list[tuple[int, str, float]]:
-        """Find split points based on markdown structure."""
+    def _clean_section_name(self, title: str) -> str:
+        """Clean section name: lowercase, remove symbols, trim spaces.
+
+        Args:
+            title: Raw section title from markdown header.
+
+        Returns:
+            Cleaned section name suitable for identification.
+        """
+        # Convert to lowercase
+        cleaned = title.lower()
+
+        # Remove markdown symbols, brackets, and special characters
+        # Keep letters, numbers, spaces, and hyphens only
+        cleaned = re.sub(r'[^\w\s-]', '', cleaned)
+
+        # Replace multiple spaces with single space and trim
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+
+        # Return "untitled" if empty after cleaning
+        return cleaned if cleaned else "untitled"
+
+    def _find_markdown_split_points(self, text: str) -> list[tuple[int, str, float, str]]:
+        """Find split points based on markdown structure.
+
+        Returns:
+            List of (position, element_type, confidence, section_name) tuples.
+        """
         split_points = []
 
         if self.split_on_headers:
@@ -165,22 +192,25 @@ class MarkdownSplitter(BaseSplitter):
                 confidence = self.confidence_scores[f"h{level}"]
 
                 for match in pattern.finditer(text):
-                    split_points.append((match.start(), f"h{level}", confidence))
+                    # Extract the header title and clean it for section name
+                    raw_title = match.group(2).strip()
+                    section_name = self._clean_section_name(raw_title)
+                    split_points.append((match.start(), f"h{level}", confidence, section_name))
 
         # Sort split points by position
         split_points.sort(key=lambda x: x[0])
 
         # Remove duplicates and keep highest confidence for same position
         filtered_points = []
-        for pos, name, conf in split_points:
+        for pos, name, conf, section_name in split_points:
             if not filtered_points or pos != filtered_points[-1][0]:
-                filtered_points.append((pos, name, conf))
+                filtered_points.append((pos, name, conf, section_name))
             elif conf > filtered_points[-1][2]:
-                filtered_points[-1] = (pos, name, conf)
+                filtered_points[-1] = (pos, name, conf, section_name)
 
         return filtered_points
 
-    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float]]) -> list[Chunk]:
+    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float, str]]) -> list[Chunk]:
         """Create chunks based on markdown split points."""
         if not split_points:
             # No markdown structure found, treat as single chunk
@@ -189,11 +219,11 @@ class MarkdownSplitter(BaseSplitter):
         chunks = []
         prev_pos = 0
 
-        for _i, (pos, element_type, confidence) in enumerate(split_points):
+        for _i, (pos, element_type, confidence, section_name) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
-                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence)
+                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence, section_name)
                     chunks.append(chunk)
             prev_pos = pos
 
@@ -201,7 +231,9 @@ class MarkdownSplitter(BaseSplitter):
         if prev_pos < len(text):
             chunk_text = text[prev_pos:].strip()
             if chunk_text:
-                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5)
+                # Use section_name from the last split point if available
+                last_section_name = split_points[-1][3] if split_points else None
+                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5, last_section_name)
                 chunks.append(chunk)
 
         return chunks
@@ -213,18 +245,41 @@ class MarkdownSplitter(BaseSplitter):
         end_pos: int,
         split_reason: str,
         default_confidence: float,
+        section_name: Optional[str] = None,
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
         chunk_type, confidence = self._analyze_chunk_content(content, default_confidence)
 
-        return Chunk(
+        # If content starts with a header, extract section info
+        if section_name is None:
+            section_name = self._extract_section_from_content(content)
+
+        chunk = Chunk(
             content=content,
             chunk_type=chunk_type,
             position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
             confidence=confidence,
         )
+
+        # Store section name in chunk metadata if available
+        if section_name:
+            chunk.metadata['section_name'] = section_name
+
+        return chunk
+
+    def _extract_section_from_content(self, content: str) -> Optional[str]:
+        """Extract section name from content if it starts with a header."""
+        first_line = content.split('\n')[0].strip()
+
+        # Check if first line is a markdown header
+        header_match = re.match(r'^(#{1,6})\s+(.+)$', first_line)
+        if header_match:
+            raw_title = header_match.group(2).strip()
+            return self._clean_section_name(raw_title)
+
+        return None
 
     def _analyze_chunk_content(self, content: str, default_confidence: float) -> tuple[str, float]:
         """Analyze chunk content to determine type and confidence."""

@@ -21,6 +21,7 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
 from ..document.document import Document
+from ..document.models import Chunk
 from ..llm_provider import get_model
 from ..logging_config import get_logger
 from .text_processor import clean_academic_text
@@ -35,8 +36,13 @@ class MetadataExtractionResult(BaseModel):
 
     title: Optional[str] = Field(None, description="Paper title")
     authors: list[str] = Field(default_factory=list, description="List of authors")
-    affiliations: list[str] = Field(default_factory=list, description="Author affiliations (company, university, or lab)")
-    venue: Optional[str] = Field(None, description="Publication venue (journal, conference, or arxiv)")
+    affiliations: list[str] = Field(
+        default_factory=list,
+        description="Author affiliations (company, university, or lab)",
+    )
+    venue: Optional[str] = Field(
+        None, description="Publication venue (journal, conference, or arxiv)"
+    )
     year: Optional[int] = Field(None, description="Publication year")
     confidence: float = Field(1.0, description="Confidence in extracted metadata")
 
@@ -44,22 +50,40 @@ class MetadataExtractionResult(BaseModel):
 class PreviousMethodsResult(BaseModel):
     """Result of previous work and methods analysis."""
 
-    related_work: list[str] = Field(default_factory=list, description="Key related work papers and approaches")
-    key_methods: list[str] = Field(default_factory=list, description="Important methodologies from prior work")
-    limitations: list[str] = Field(default_factory=list, description="Limitations of existing approaches")
-    research_gaps: list[str] = Field(default_factory=list, description="Identified research gaps")
-    novelty_aspects: list[str] = Field(default_factory=list, description="Novel aspects compared to prior work")
+    related_work: list[str] = Field(
+        default_factory=list, description="Key related work papers and approaches"
+    )
+    key_methods: list[str] = Field(
+        default_factory=list, description="Important methodologies from prior work"
+    )
+    limitations: list[str] = Field(
+        default_factory=list, description="Limitations of existing approaches"
+    )
+    research_gaps: list[str] = Field(
+        default_factory=list, description="Identified research gaps"
+    )
+    novelty_aspects: list[str] = Field(
+        default_factory=list, description="Novel aspects compared to prior work"
+    )
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
 class ResearchQuestionsResult(BaseModel):
     """Result of research questions and contributions analysis."""
 
-    main_questions: list[str] = Field(default_factory=list, description="Primary research questions")
-    hypotheses: list[str] = Field(default_factory=list, description="Research hypotheses")
-    contributions: list[str] = Field(default_factory=list, description="Main contributions")
+    main_questions: list[str] = Field(
+        default_factory=list, description="Primary research questions"
+    )
+    hypotheses: list[str] = Field(
+        default_factory=list, description="Research hypotheses"
+    )
+    contributions: list[str] = Field(
+        default_factory=list, description="Main contributions"
+    )
     research_significance: str = Field("", description="Significance of the research")
-    target_audience: list[str] = Field(default_factory=list, description="Target audience for this work")
+    target_audience: list[str] = Field(
+        default_factory=list, description="Target audience for this work"
+    )
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
@@ -67,11 +91,21 @@ class MethodologyResult(BaseModel):
     """Result of methodology and technical approach analysis."""
 
     approach: str = Field("", description="Overall methodological approach")
-    techniques: list[str] = Field(default_factory=list, description="Specific techniques used")
-    assumptions: list[str] = Field(default_factory=list, description="Key assumptions made")
-    data_sources: list[str] = Field(default_factory=list, description="Data sources or datasets used")
-    evaluation_metrics: list[str] = Field(default_factory=list, description="Metrics used for evaluation")
-    limitations: list[str] = Field(default_factory=list, description="Methodological limitations")
+    techniques: list[str] = Field(
+        default_factory=list, description="Specific techniques used"
+    )
+    assumptions: list[str] = Field(
+        default_factory=list, description="Key assumptions made"
+    )
+    data_sources: list[str] = Field(
+        default_factory=list, description="Data sources or datasets used"
+    )
+    evaluation_metrics: list[str] = Field(
+        default_factory=list, description="Metrics used for evaluation"
+    )
+    limitations: list[str] = Field(
+        default_factory=list, description="Methodological limitations"
+    )
     reproducibility_notes: str = Field("", description="Notes on reproducibility")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
@@ -80,39 +114,95 @@ class ExperimentResult(BaseModel):
     """Result of experiments and results analysis."""
 
     setup: str = Field("", description="Experimental setup description")
-    datasets: list[str] = Field(default_factory=list, description="Datasets used in experiments")
-    baselines: list[str] = Field(default_factory=list, description="Baseline methods compared against")
-    results: list[str] = Field(default_factory=list, description="Key experimental results")
-    quantitative_results: dict[str, float] = Field(default_factory=dict, description="Quantitative metrics")
-    qualitative_findings: list[str] = Field(default_factory=list, description="Qualitative findings")
-    statistical_significance: list[str] = Field(default_factory=list, description="Statistical significance observations")
-    error_analysis: list[str] = Field(default_factory=list, description="Error analysis and failure cases")
+    datasets: list[str] = Field(
+        default_factory=list, description="Datasets used in experiments"
+    )
+    baselines: list[str] = Field(
+        default_factory=list, description="Baseline methods compared against"
+    )
+    results: list[str] = Field(
+        default_factory=list, description="Key experimental results"
+    )
+    quantitative_results: dict[str, float] = Field(
+        default_factory=dict, description="Quantitative metrics"
+    )
+    qualitative_findings: list[str] = Field(
+        default_factory=list, description="Qualitative findings"
+    )
+    statistical_significance: list[str] = Field(
+        default_factory=list, description="Statistical significance observations"
+    )
+    error_analysis: list[str] = Field(
+        default_factory=list, description="Error analysis and failure cases"
+    )
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
 class FutureDirectionsResult(BaseModel):
     """Result of future work and implications analysis."""
 
-    future_work: list[str] = Field(default_factory=list, description="Suggested future research directions")
-    limitations: list[str] = Field(default_factory=list, description="Current limitations of the work")
-    practical_implications: list[str] = Field(default_factory=list, description="Practical applications and implications")
-    theoretical_implications: list[str] = Field(default_factory=list, description="Theoretical contributions")
-    open_questions: list[str] = Field(default_factory=list, description="Open questions raised by the work")
-    societal_impact: list[str] = Field(default_factory=list, description="Societal impact considerations")
+    future_work: list[str] = Field(
+        default_factory=list, description="Suggested future research directions"
+    )
+    limitations: list[str] = Field(
+        default_factory=list, description="Current limitations of the work"
+    )
+    practical_implications: list[str] = Field(
+        default_factory=list, description="Practical applications and implications"
+    )
+    theoretical_implications: list[str] = Field(
+        default_factory=list, description="Theoretical contributions"
+    )
+    open_questions: list[str] = Field(
+        default_factory=list, description="Open questions raised by the work"
+    )
+    societal_impact: list[str] = Field(
+        default_factory=list, description="Societal impact considerations"
+    )
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
 class AnalysisPlan(BaseModel):
     """Plan for which sub-agents to use for analysis."""
 
-    analyze_metadata: bool = Field(True, description="Whether to analyze metadata")
-    analyze_previous_methods: bool = Field(True, description="Whether to analyze previous methods")
-    analyze_research_questions: bool = Field(True, description="Whether to analyze research questions")
-    analyze_methodology: bool = Field(True, description="Whether to analyze methodology")
-    analyze_experiments: bool = Field(True, description="Whether to analyze experiments")
-    analyze_future_directions: bool = Field(True, description="Whether to analyze future directions")
-    reasoning: str = Field("", description="Reasoning behind the analysis plan")
-    estimated_relevance_scores: dict[str, float] = Field(default_factory=dict, description="Relevance scores for each analysis type")
+    analyze_metadata: bool = Field(description="Whether to analyze metadata")
+    analyze_previous_methods: bool = Field(
+        description="Whether to analyze previous methods"
+    )
+    analyze_research_questions: bool = Field(
+        description="Whether to analyze research questions"
+    )
+    analyze_methodology: bool = Field(description="Whether to analyze methodology")
+    analyze_experiments: bool = Field(description="Whether to analyze experiments")
+    analyze_future_directions: bool = Field(
+        description="Whether to analyze future directions"
+    )
+
+    # Section selection fields for all agents EXCEPT metadata
+    # Metadata uses hardcoded first 3 chunks approach
+    previous_methods_sections: list[str] = Field(
+        description="Sections for previous work analysis. MUST be a list of specific section names from the available sections, NOT 'All sections'."
+    )
+    research_questions_sections: list[str] = Field(
+        description="Sections for research questions. MUST be a list of specific section names from the available sections, NOT 'All sections'."
+    )
+    methodology_sections: list[str] = Field(
+        description="Sections for methodology analysis. MUST be a list of specific section names from the available sections, NOT 'All sections'."
+    )
+    experiments_sections: list[str] = Field(
+        description="Sections for experiments. MUST be a list of specific section names from the available sections, NOT 'All sections'."
+    )
+    future_directions_sections: list[str] = Field(
+        description="Sections for future directions. MUST be a list of specific section names from the available sections, NOT 'All sections'."
+    )
+
+    reasoning: str = Field(
+        description="Detailed reasoning behind the analysis plan, including WHY specific sections were selected for each analysis type."
+    )
+    estimated_relevance_scores: dict[str, float] = Field(
+        default_factory=dict,
+        description="Relevance scores (0.0 to 1.0) for each analysis type indicating how valuable that analysis would be for this paper.",
+    )
 
 
 class ComprehensiveAnalysisResult(BaseModel):
@@ -126,10 +216,19 @@ class ComprehensiveAnalysisResult(BaseModel):
     experiment_result: Optional[ExperimentResult] = None
     future_directions_result: Optional[FutureDirectionsResult] = None
 
-    execution_summary: dict[str, Any] = Field(default_factory=dict, description="Summary of execution details")
+    execution_summary: dict[str, Any] = Field(
+        default_factory=dict, description="Summary of execution details"
+    )
     final_report: str = Field("", description="Synthesized final report")
-    total_execution_time: float = Field(0.0, description="Total execution time in seconds")
-    interaction_log: list[dict[str, Any]] = Field(default_factory=list, description="Interaction log with prompts and outputs")
+    total_execution_time: float = Field(
+        0.0, description="Total execution time in seconds"
+    )
+    interaction_log: list[dict[str, Any]] = Field(
+        default_factory=list, description="Interaction log with prompts and outputs"
+    )
+    sections_analyzed: dict[str, list[str]] = Field(
+        default_factory=dict, description="Which sections were analyzed by each agent"
+    )
 
 
 # Expert sub-agent classes
@@ -259,9 +358,13 @@ Focus on extracting accurate information for these five fields. Only include ven
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Metadata extraction timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Metadata extraction timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Metadata extraction timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Metadata extraction timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Metadata extraction failed: {e}")
@@ -386,9 +489,13 @@ Provide a comprehensive analysis of how this work relates to and builds upon pre
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Previous methods analysis timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Previous methods analysis timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Previous methods analysis timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Previous methods analysis timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Previous methods analysis failed: {e}")
@@ -513,9 +620,13 @@ Provide a comprehensive analysis of what research questions this work addresses 
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Research questions analysis timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Research questions analysis timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Research questions analysis timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Research questions analysis timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Research questions analysis failed: {e}")
@@ -644,9 +755,13 @@ Provide a comprehensive analysis of the technical methodology and experimental a
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Methodology analysis timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Methodology analysis timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Methodology analysis timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Methodology analysis timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Methodology analysis failed: {e}")
@@ -777,9 +892,13 @@ Provide a comprehensive analysis of the experimental setup, results, and finding
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Experiments analysis timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Experiments analysis timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Experiments analysis timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Experiments analysis timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Experiments analysis failed: {e}")
@@ -906,9 +1025,13 @@ Provide a comprehensive analysis of the implications, limitations, and future di
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Future directions analysis timed out after {self.timeout} seconds")
+            self.logger.error(
+                f"Future directions analysis timed out after {self.timeout} seconds"
+            )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(f"Future directions analysis timed out after {self.timeout} seconds") from None
+            raise TimeoutError(
+                f"Future directions analysis timed out after {self.timeout} seconds"
+            ) from None
 
         except Exception as e:
             self.logger.error(f"Future directions analysis failed: {e}")
@@ -953,7 +1076,9 @@ class ToolAgent:
             self.model = model
             self.model_identifier = getattr(model, "model_name", "unknown")
 
-        self.logger.info(f"Initialized ToolAgent controller with model: {self.model_identifier}")
+        self.logger.info(
+            f"Initialized ToolAgent controller with model: {self.model_identifier}"
+        )
 
         # Initialize expert sub-agents
         self.metadata_agent = MetadataExtractorAgent(
@@ -994,13 +1119,28 @@ class ToolAgent:
         )
 
         # Controller agent for planning and synthesis
-        system_prompt = """You are an expert academic research coordinator specializing in analyzing academic papers and determining the most effective analysis strategy. Your role is to understand the paper's content and domain to create an optimal analysis plan.
+        # Using 'instructions' instead of 'system_prompt' as recommended by pydantic-ai
+        controller_instructions = """You are an expert academic research coordinator specializing in analyzing academic papers and determining the most effective analysis strategy. Your role is to understand the paper's content and domain to create an optimal analysis plan.
 
 Key responsibilities:
 1. Analyze the abstract to understand the paper's domain and type
-2. Determine which expert analyses would be most valuable
-3. Plan the sequence and priority of different analyses
-4. Synthesize results from multiple expert analyses into a coherent report
+2. Examine the available section names and think about what content each section likely contains
+3. Determine which expert analyses would be most valuable
+4. For each analysis type, carefully select the most relevant sections based on their likely content
+5. Plan the sequence and priority of different analyses
+6. Synthesize results from multiple expert analyses into a coherent report
+
+CRITICAL: Think carefully about what each section contains based on its name:
+- "Introduction" typically contains research questions, contributions, and motivation
+- "Related Work" or "Background" contains previous methods and research gaps
+- "Methodology" or "Approach" contains technical details and methods
+- "Experiments" or "Evaluation" contains experimental setup and results
+- "Conclusion" or "Discussion" contains limitations and future work
+
+For section selection, ALWAYS analyze the section names and think:
+"What content would this section likely contain based on its name?"
+"Would this content be useful for this specific analysis type?"
+"Avoid selecting 'All sections' - be specific and selective"
 
 Analysis types available:
 - Metadata extraction: Bibliographic information and paper identification
@@ -1016,19 +1156,22 @@ Guidelines for planning:
 - Prioritize analyses that will provide the most valuable insights
 - Consider which analyses are most relevant for the paper type
 - Plan for comprehensive but focused analysis
+- Select 1-3 most relevant sections for each analysis type, not "All sections"
 
 Provide clear reasoning for your analysis plan and relevance assessments."""
 
         self.controller_agent = Agent(
             model=self.model,
-            system_prompt=system_prompt,
+            instructions=controller_instructions,
             output_type=AnalysisPlan,
             retries=self.max_retries,
         )
 
         self.logger.info("ToolAgent controller initialized successfully")
 
-    def _log_interaction(self, agent_name: str, prompt: str, output: str, error: Optional[str] = None):
+    def _log_interaction(
+        self, agent_name: str, prompt: str, output: str, error: Optional[str] = None
+    ):
         """Log interaction information for agent prompts and outputs."""
         import datetime
 
@@ -1053,7 +1196,9 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         from pathlib import Path
 
         try:
-            Path(file_path).write_text(json.dumps(self.interaction_log, indent=2), encoding="utf-8")
+            Path(file_path).write_text(
+                json.dumps(self.interaction_log, indent=2), encoding="utf-8"
+            )
             self.logger.info(f"Interaction log saved to: {file_path}")
         except Exception as e:
             self.logger.error(f"Failed to save interaction log: {e}")
@@ -1065,8 +1210,12 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
     def get_interaction_summary(self) -> dict[str, Any]:
         """Get a summary of interaction information."""
         total_interactions = len(self.interaction_log)
-        total_prompt_chars = sum(entry["prompt_length"] for entry in self.interaction_log)
-        total_output_chars = sum(entry["output_length"] for entry in self.interaction_log)
+        total_prompt_chars = sum(
+            entry["prompt_length"] for entry in self.interaction_log
+        )
+        total_output_chars = sum(
+            entry["output_length"] for entry in self.interaction_log
+        )
         agents_used = list(set(entry["agent"] for entry in self.interaction_log))
         errors = sum(1 for entry in self.interaction_log if entry["error"])
 
@@ -1087,6 +1236,197 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         """Clear the interaction log."""
         self.interaction_log.clear()
         self.logger.info("Interaction log cleared")
+
+    def display_analysis_plan(
+        self, analysis_plan: AnalysisPlan, section_names: list[str]
+    ) -> str:
+        """Create a clear, readable display of the analysis plan.
+
+        Args:
+            analysis_plan: The analysis plan to display
+            section_names: List of available sections in the document
+
+        Returns:
+            Formatted string displaying the analysis plan
+        """
+        plan_display = [
+            "ANALYSIS PLAN",
+            "=============",
+            f"Available Sections: {', '.join(section_names) if section_names else 'No sections found'}",
+            "",
+            "PLANNED ANALYSES:",
+        ]
+
+        if analysis_plan.analyze_metadata:
+            plan_display.extend(
+                [
+                    "✓ Metadata Extraction Agent",
+                    "  Sections: First 3 chunks (title, authors, abstract)",
+                    "",
+                ]
+            )
+
+        if analysis_plan.analyze_previous_methods:
+            sections = analysis_plan.previous_methods_sections or ["All sections"]
+            if sections == ["All sections"]:
+                sections_display = (
+                    "All sections ⚠️  (fallback - consider improving section selection)"
+                )
+            else:
+                sections_display = f"{', '.join(sections)}"
+            plan_display.extend(
+                ["✓ Previous Methods Agent", f"  Sections: {sections_display}", ""]
+            )
+
+        if analysis_plan.analyze_research_questions:
+            sections = analysis_plan.research_questions_sections or ["All sections"]
+            if sections == ["All sections"]:
+                sections_display = (
+                    "All sections ⚠️  (fallback - consider improving section selection)"
+                )
+            else:
+                sections_display = f"{', '.join(sections)}"
+            plan_display.extend(
+                ["✓ Research Questions Agent", f"  Sections: {sections_display}", ""]
+            )
+
+        if analysis_plan.analyze_methodology:
+            sections = analysis_plan.methodology_sections or ["All sections"]
+            if sections == ["All sections"]:
+                sections_display = (
+                    "All sections ⚠️  (fallback - consider improving section selection)"
+                )
+            else:
+                sections_display = f"{', '.join(sections)}"
+            plan_display.extend(
+                ["✓ Methodology Agent", f"  Sections: {sections_display}", ""]
+            )
+
+        if analysis_plan.analyze_experiments:
+            sections = analysis_plan.experiments_sections or ["All sections"]
+            if sections == ["All sections"]:
+                sections_display = (
+                    "All sections ⚠️  (fallback - consider improving section selection)"
+                )
+            else:
+                sections_display = f"{', '.join(sections)}"
+            plan_display.extend(
+                ["✓ Experiments Agent", f"  Sections: {sections_display}", ""]
+            )
+
+        if analysis_plan.analyze_future_directions:
+            sections = analysis_plan.future_directions_sections or ["All sections"]
+            if sections == ["All sections"]:
+                sections_display = (
+                    "All sections ⚠️  (fallback - consider improving section selection)"
+                )
+            else:
+                sections_display = f"{', '.join(sections)}"
+            plan_display.extend(
+                ["✓ Future Directions Agent", f"  Sections: {sections_display}", ""]
+            )
+
+        plan_display.extend([f"Reasoning: {analysis_plan.reasoning}", ""])
+
+        # Add section selection quality assessment
+        total_sections_selected = sum(
+            [
+                len(analysis_plan.previous_methods_sections or []),
+                len(analysis_plan.research_questions_sections or []),
+                len(analysis_plan.methodology_sections or []),
+                len(analysis_plan.experiments_sections or []),
+                len(analysis_plan.future_directions_sections or []),
+            ]
+        )
+
+        if total_sections_selected == 0:
+            plan_display.extend(
+                [
+                    "⚠️  WARNING: No specific sections selected. All agents will use 'All sections'.",
+                    "   This may result in longer processing times and less focused analysis.",
+                    "",
+                ]
+            )
+        elif total_sections_selected > 15:
+            plan_display.extend(
+                [
+                    "ℹ️  INFO: Many sections selected. Consider being more selective for better focus.",
+                    "",
+                ]
+            )
+        else:
+            plan_display.extend(
+                ["✅ Good: Specific sections selected for focused analysis.", ""]
+            )
+
+        if analysis_plan.estimated_relevance_scores:
+            scores_text = ", ".join(
+                [
+                    f"{k}: {v:.2f}"
+                    for k, v in analysis_plan.estimated_relevance_scores.items()
+                ]
+            )
+            plan_display.append(f"Relevance Scores: {scores_text}")
+
+        return "\n".join(plan_display)
+
+    def _create_filtered_document(
+        self, original_document: Document, chunks: list[Chunk]
+    ) -> Document:
+        """Create a new Document object containing only specified chunks.
+
+        Args:
+            original_document: Original document to copy
+            chunks: Chunks to include in the filtered document
+
+        Returns:
+            New Document object with filtered chunks
+        """
+        # Create new document with same metadata but filtered chunks
+        # Note: We avoid deepcopy to prevent issues with file handles and loggers
+        new_doc = Document(
+            source_path=original_document.source_path,
+            text=original_document.text,
+            metadata=original_document.metadata,
+            processing_state=original_document.processing_state,
+            to_markdown=getattr(original_document, "to_markdown", False),
+        )
+        new_doc._chunks = chunks
+        new_doc._loaded = original_document._loaded
+        new_doc._split = original_document._split
+        return new_doc
+
+    def _validate_pdf_document(self, document: Document) -> None:
+        """Validate that document is a PDF file loaded with to_markdown=True.
+
+        Args:
+            document: Document to validate
+
+        Raises:
+            ValueError: If document is not a PDF or not loaded with to_markdown=True
+        """
+        if not document.source_path or document.source_path.suffix.lower() != ".pdf":
+            raise ValueError(
+                "ToolAgent only supports PDF files. "
+                f"Got: {document.source_path.suffix if document.source_path else 'unknown file type'}. "
+                "Please provide a PDF document."
+            )
+
+        if not getattr(document, "to_markdown", False):
+            raise ValueError(
+                "ToolAgent requires PDF documents to be loaded with to_markdown=True. "
+                "Please use: Document.from_file('paper.pdf', to_markdown=True)"
+            )
+
+    def _log_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]):
+        """Log the analysis plan for debugging.
+
+        Args:
+            analysis_plan: The analysis plan to log
+            section_names: Available sections in the document
+        """
+        plan_display = self.display_analysis_plan(analysis_plan, section_names)
+        self.logger.info(f"Analysis Plan:\n{plan_display}")
 
     def extract_abstract(self, document: Document) -> str:
         """Extract abstract from document.
@@ -1131,7 +1471,9 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
                 continue
 
             if abstract_started:
-                if line_stripped and not line_stripped.startswith(("introduction", "keywords", "1.", "i.", "©")):
+                if line_stripped and not line_stripped.startswith(
+                    ("introduction", "keywords", "1.", "i.", "©")
+                ):
                     abstract_lines.append(line.strip())
                 elif line_stripped and len(abstract_lines) > 0:
                     # End of abstract
@@ -1139,71 +1481,235 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
 
         if abstract_lines:
             abstract = " ".join(abstract_lines)
-            self.logger.info(f"Abstract extracted from text: {len(abstract)} characters")
+            self.logger.info(
+                f"Abstract extracted from text: {len(abstract)} characters"
+            )
             return abstract
 
-        self.logger.warning("No abstract found in document")
+        # Fallback: Use first two chunks as "abstract" for planning purposes
+        if document.chunks and len(document.chunks) >= 2:
+            first_two_chunks = document.chunks[:2]
+            fallback_text = " ".join([chunk.content for chunk in first_two_chunks])
+            # Limit to reasonable length (first ~2000 chars)
+            fallback_text = fallback_text[:2000]
+            self.logger.warning(
+                f"No abstract found in document, using first 2 chunks ({len(fallback_text)} chars) as fallback for analysis planning"
+            )
+            return fallback_text
+        elif document.chunks and len(document.chunks) == 1:
+            # Use the single chunk
+            fallback_text = document.chunks[0].content[:2000]
+            self.logger.warning(
+                f"No abstract found in document, using first chunk ({len(fallback_text)} chars) as fallback for analysis planning"
+            )
+            return fallback_text
+
+        # Last resort: use beginning of full text
+        if text:
+            fallback_text = text[:2000]
+            self.logger.warning(
+                f"No abstract found in document, using first 2000 chars of document as fallback for analysis planning"
+            )
+            return fallback_text
+
+        self.logger.error("No abstract found and no text available in document")
         return ""
 
-    async def plan_analysis(self, abstract: str) -> AnalysisPlan:
-        """Plan which sub-agents to use based on abstract analysis.
+    async def plan_analysis(
+        self, abstract: str, section_names: list[str]
+    ) -> AnalysisPlan:
+        """Plan which sub-agents to use based on abstract analysis and available sections.
 
         Args:
-            abstract: Abstract text to analyze
+            abstract: Abstract text to analyze (may be actual abstract or first chunks of document)
+            section_names: List of available sections in the document
 
         Returns:
-            AnalysisPlan with selected sub-agents and reasoning
+            AnalysisPlan with selected sub-agents, sections, and reasoning
         """
-        self.logger.info("Planning analysis based on abstract")
+        self.logger.info(
+            f"Planning analysis based on abstract ({len(abstract) if abstract else 0} chars) "
+            f"and {len(section_names)} available sections"
+        )
 
         if not abstract or not abstract.strip():
-            self.logger.warning("No abstract provided, using default analysis plan")
-            return AnalysisPlan(reasoning="No abstract available, using comprehensive analysis plan")
+            self.logger.warning(
+                "Empty abstract provided, using default comprehensive analysis plan"
+            )
+            return AnalysisPlan(
+                analyze_metadata=True,
+                analyze_previous_methods=True,
+                analyze_research_questions=True,
+                analyze_methodology=True,
+                analyze_experiments=True,
+                analyze_future_directions=True,
+                previous_methods_sections=[],
+                research_questions_sections=[],
+                methodology_sections=[],
+                experiments_sections=[],
+                future_directions_sections=[],
+                reasoning="No abstract available, using comprehensive analysis plan with all sections",
+            )
 
-        prompt = f"""Based on the following abstract, create an optimal analysis plan for this academic paper. Determine which expert analyses would be most valuable and provide relevance scores (0.0-1.0) for each analysis type.
+        prompt = f"""Based on the following abstract and available sections, create an optimal analysis plan for this academic paper.
 
 Abstract:
 {abstract}
 
+Available Sections in Document:
+{section_names}
+
+IMPORTANT: For each analysis type, you must carefully analyze the section names and think about what content each section likely contains. Then select the most relevant sections.
+
+THINKING PROCESS FOR SECTION SELECTION:
+1. Look at each section name and ask: "What content would this section contain?"
+2. For each analysis type, ask: "Which sections would have the most relevant content?"
+3. Avoid selecting "All sections" - be specific and selective
+4. If section names are unclear, make your best guess based on academic paper structure
+
+ANALYSIS TYPES AND SECTION SELECTION STRATEGY:
+
+**Previous Methods Analysis**:
+- Look for sections like "Introduction", "Related Work", "Background", "Literature Review"
+- These sections typically discuss prior research and limitations
+- Select sections that would contain discussion of existing approaches
+
+**Research Questions Analysis**:
+- Look for sections like "Introduction", "Abstract", "Conclusion"
+- These sections typically state the main research questions and contributions
+- Select sections that would contain the core research objectives
+
+**Methodology Analysis**:
+- Look for sections like "Methodology", "Methods", "Approach", "Technical Details"
+- These sections describe the technical approach and implementation
+- Select sections that would contain technical methods and design choices
+
+**Experiments Analysis**:
+- Look for sections like "Experiments", "Evaluation", "Results", "Experiments and Results"
+- These sections contain experimental setup, datasets, and results
+- Select sections that would contain empirical evaluation
+
+**Future Directions Analysis**:
+- Look for sections like "Conclusion", "Discussion", "Future Work", "Limitations"
+- These sections typically discuss limitations and future research directions
+- Select sections that would contain forward-looking content
+
+EXAMPLES:
+If sections are: ["1. Introduction", "2. Background", "3. Our Approach", "4. Experiments", "5. Conclusion"]
+
+Good selection with reasoning:
+- Previous Methods: ["Introduction", "Background"]
+  Reasoning: "Introduction typically contains research context and Background discusses related work"
+- Research Questions: ["Introduction", "Conclusion"]
+  Reasoning: "Introduction states research goals and Conclusion summarizes contributions"
+- Methodology: ["Our Approach"]
+  Reasoning: "Our Approach section contains technical methods and design"
+- Experiments: ["Experiments"]
+  Reasoning: "Experiments section contains evaluation setup and results"
+- Future Directions: ["Conclusion"]
+  Reasoning: "Conclusion typically discusses limitations and future work"
+
+Bad selection:
+- Previous Methods: ["All sections"]
+  Problem: "Too broad, wastes processing time on irrelevant content"
+- Methodology: ["Introduction", "Background"]
+  Problem: "These sections unlikely to contain detailed technical methods"
+
+YOUR TASK:
+1. Analyze the available section names and think about their likely content
+2. For each analysis type, select 1-3 most relevant sections
+3. Provide specific reasoning for your section choices
+4. Return both which analyses to perform AND which specific sections to use
+
+For metadata extraction, I will always use the first 3 chunks since they typically contain title, authors, and abstract.
+
 Consider:
 1. What type of paper this appears to be (theoretical, empirical, survey, etc.)
 2. What domain/field the paper is in
-3. What information is likely to be present based on the abstract
+3. What information is likely to be present based on the abstract and available sections
 4. Which analyses would provide the most valuable insights
+5. Which sections are most relevant for each analysis type based on their likely content
 
-Provide a comprehensive analysis plan with clear reasoning."""
+Provide a comprehensive analysis plan with clear reasoning and specific section selection."""
 
         try:
+            self.logger.debug(
+                f"Calling controller agent with prompt length: {len(prompt)} chars"
+            )
+            self.logger.debug(f"Controller agent model: {self.model_identifier}")
+
+            # Run the controller agent to generate analysis plan
             result = await asyncio.wait_for(
                 self.controller_agent.run(prompt),
                 timeout=self.timeout,
             )
+
             self.logger.info("Analysis plan created successfully")
+            self.logger.debug(
+                f"Result type: {type(result)}, Output type: {type(result.output)}"
+            )
             self._log_interaction("controller_agent", prompt, str(result.output))
+
+            # Validate that we got an actual plan, not empty defaults
+            if not result.output.reasoning or not result.output.reasoning.strip():
+                self.logger.warning(
+                    "Controller agent returned plan with empty reasoning - may indicate generation issue"
+                )
+
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Analysis planning timed out after {self.timeout} seconds")
-            self._log_interaction("controller_agent", prompt, "", f"TimeoutError: {self.timeout} seconds")
+            self.logger.error(
+                f"Analysis planning timed out after {self.timeout} seconds"
+            )
+            self._log_interaction(
+                "controller_agent", prompt, "", f"TimeoutError: {self.timeout} seconds"
+            )
             # Return default plan
-            return AnalysisPlan(reasoning="Planning timed out, using default comprehensive analysis")
+            return AnalysisPlan(
+                analyze_metadata=True,
+                analyze_previous_methods=True,
+                analyze_research_questions=True,
+                analyze_methodology=True,
+                analyze_experiments=True,
+                analyze_future_directions=True,
+                previous_methods_sections=[],
+                research_questions_sections=[],
+                methodology_sections=[],
+                experiments_sections=[],
+                future_directions_sections=[],
+                reasoning="Planning timed out, using default comprehensive analysis with all sections",
+            )
 
         except Exception as e:
             self.logger.error(f"Analysis planning failed: {e}")
             self._log_interaction("controller_agent", prompt, "", str(e))
             # Return default plan
-            return AnalysisPlan(reasoning=f"Planning failed ({e}), using default comprehensive analysis")
+            return AnalysisPlan(
+                analyze_metadata=True,
+                analyze_previous_methods=True,
+                analyze_research_questions=True,
+                analyze_methodology=True,
+                analyze_experiments=True,
+                analyze_future_directions=True,
+                previous_methods_sections=[],
+                research_questions_sections=[],
+                methodology_sections=[],
+                experiments_sections=[],
+                future_directions_sections=[],
+                reasoning=f"Planning failed ({e}), using default comprehensive analysis with all sections",
+            )
 
     async def execute_sub_agents(
         self,
         document: Document,
         analysis_plan: AnalysisPlan,
     ) -> dict[str, Any]:
-        """Execute selected sub-agents based on analysis plan.
+        """Execute selected sub-agents based on analysis plan with section filtering.
 
         Args:
             document: Document object to analyze
-            analysis_plan: Plan determining which agents to execute
+            analysis_plan: Plan determining which agents to execute and which sections to use
 
         Returns:
             Dictionary containing results from executed sub-agents
@@ -1213,30 +1719,168 @@ Provide a comprehensive analysis plan with clear reasoning."""
 
         results = {}
         tasks = []
+        sections_analyzed = {}
 
-        # Create tasks for selected agents
+        # Metadata agent - always use first 3 chunks
         if analysis_plan.analyze_metadata:
-            task = asyncio.create_task(self._safe_execute_agent(self.metadata_agent.analyze(document), "metadata_extraction"))
+            metadata_chunks = (
+                document.chunks[:3] if len(document.chunks) >= 3 else document.chunks
+            )
+            metadata_document = self._create_filtered_document(
+                document, metadata_chunks
+            )
+            sections_analyzed["metadata"] = [f"First {len(metadata_chunks)} chunks"]
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.metadata_agent.analyze(metadata_document),
+                    "metadata_extraction",
+                )
+            )
             tasks.append(("metadata", task))
 
+        # Previous methods agent - use planned sections or full document
         if analysis_plan.analyze_previous_methods:
-            task = asyncio.create_task(self._safe_execute_agent(self.previous_methods_agent.analyze(document), "previous_methods"))
+            if analysis_plan.previous_methods_sections:
+                filtered_chunks = document.get_sections_by_name(
+                    analysis_plan.previous_methods_sections
+                )
+                filtered_document = self._create_filtered_document(
+                    document, filtered_chunks
+                )
+                sections_analyzed["previous_methods"] = (
+                    analysis_plan.previous_methods_sections
+                )
+                self.logger.debug(
+                    f"Previous methods agent using specific sections: {analysis_plan.previous_methods_sections}"
+                )
+            else:
+                filtered_document = document
+                sections_analyzed["previous_methods"] = ["All sections"]
+                self.logger.warning(
+                    "Previous methods agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                )
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.previous_methods_agent.analyze(filtered_document),
+                    "previous_methods",
+                )
+            )
             tasks.append(("previous_methods", task))
 
+        # Research questions agent - use planned sections or full document
         if analysis_plan.analyze_research_questions:
-            task = asyncio.create_task(self._safe_execute_agent(self.research_questions_agent.analyze(document), "research_questions"))
+            if analysis_plan.research_questions_sections:
+                filtered_chunks = document.get_sections_by_name(
+                    analysis_plan.research_questions_sections
+                )
+                filtered_document = self._create_filtered_document(
+                    document, filtered_chunks
+                )
+                sections_analyzed["research_questions"] = (
+                    analysis_plan.research_questions_sections
+                )
+                self.logger.debug(
+                    f"Research questions agent using specific sections: {analysis_plan.research_questions_sections}"
+                )
+            else:
+                filtered_document = document
+                sections_analyzed["research_questions"] = ["All sections"]
+                self.logger.warning(
+                    "Research questions agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                )
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.research_questions_agent.analyze(filtered_document),
+                    "research_questions",
+                )
+            )
             tasks.append(("research_questions", task))
 
+        # Methodology agent - use planned sections or full document
         if analysis_plan.analyze_methodology:
-            task = asyncio.create_task(self._safe_execute_agent(self.methodology_agent.analyze(document), "methodology"))
+            if analysis_plan.methodology_sections:
+                filtered_chunks = document.get_sections_by_name(
+                    analysis_plan.methodology_sections
+                )
+                filtered_document = self._create_filtered_document(
+                    document, filtered_chunks
+                )
+                sections_analyzed["methodology"] = analysis_plan.methodology_sections
+                self.logger.debug(
+                    f"Methodology agent using specific sections: {analysis_plan.methodology_sections}"
+                )
+            else:
+                filtered_document = document
+                sections_analyzed["methodology"] = ["All sections"]
+                self.logger.warning(
+                    "Methodology agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                )
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.methodology_agent.analyze(filtered_document), "methodology"
+                )
+            )
             tasks.append(("methodology", task))
 
+        # Experiments agent - use planned sections or full document
         if analysis_plan.analyze_experiments:
-            task = asyncio.create_task(self._safe_execute_agent(self.experiments_agent.analyze(document), "experiments"))
+            if analysis_plan.experiments_sections:
+                filtered_chunks = document.get_sections_by_name(
+                    analysis_plan.experiments_sections
+                )
+                filtered_document = self._create_filtered_document(
+                    document, filtered_chunks
+                )
+                sections_analyzed["experiments"] = analysis_plan.experiments_sections
+                self.logger.debug(
+                    f"Experiments agent using specific sections: {analysis_plan.experiments_sections}"
+                )
+            else:
+                filtered_document = document
+                sections_analyzed["experiments"] = ["All sections"]
+                self.logger.warning(
+                    "Experiments agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                )
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.experiments_agent.analyze(filtered_document), "experiments"
+                )
+            )
             tasks.append(("experiments", task))
 
+        # Future directions agent - use planned sections or full document
         if analysis_plan.analyze_future_directions:
-            task = asyncio.create_task(self._safe_execute_agent(self.future_directions_agent.analyze(document), "future_directions"))
+            if analysis_plan.future_directions_sections:
+                filtered_chunks = document.get_sections_by_name(
+                    analysis_plan.future_directions_sections
+                )
+                filtered_document = self._create_filtered_document(
+                    document, filtered_chunks
+                )
+                sections_analyzed["future_directions"] = (
+                    analysis_plan.future_directions_sections
+                )
+                self.logger.debug(
+                    f"Future directions agent using specific sections: {analysis_plan.future_directions_sections}"
+                )
+            else:
+                filtered_document = document
+                sections_analyzed["future_directions"] = ["All sections"]
+                self.logger.warning(
+                    "Future directions agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                )
+
+            task = asyncio.create_task(
+                self._safe_execute_agent(
+                    self.future_directions_agent.analyze(filtered_document),
+                    "future_directions",
+                )
+            )
             tasks.append(("future_directions", task))
 
         if not tasks:
@@ -1245,7 +1889,9 @@ Provide a comprehensive analysis plan with clear reasoning."""
 
         # Execute tasks in parallel
         self.logger.info(f"Executing {len(tasks)} sub-agents in parallel")
-        completed_tasks = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
+        completed_tasks = await asyncio.gather(
+            *[task for _, task in tasks], return_exceptions=True
+        )
 
         # Process results
         for (agent_name, _), result in zip(tasks, completed_tasks):
@@ -1257,7 +1903,12 @@ Provide a comprehensive analysis plan with clear reasoning."""
                 results[agent_name] = {"result": result, "success": True}
 
         execution_time = asyncio.get_event_loop().time() - start_time
-        self.logger.info(f"Sub-agent execution completed in {execution_time:.2f} seconds")
+        self.logger.info(
+            f"Sub-agent execution completed in {execution_time:.2f} seconds"
+        )
+
+        # Add sections analyzed information to results
+        results["_sections_analyzed"] = sections_analyzed
 
         return results
 
@@ -1295,7 +1946,7 @@ Provide a comprehensive analysis plan with clear reasoning."""
             # Try to extract from metadata results
             if sub_agent_results.get("metadata", {}).get("success"):
                 metadata_result = sub_agent_results["metadata"]["result"]
-                if hasattr(metadata_result, 'title') and metadata_result.title:
+                if hasattr(metadata_result, "title") and metadata_result.title:
                     paper_title = metadata_result.title
 
         # Build synthesis prompt with structured format requirements
@@ -1317,59 +1968,71 @@ Provide a comprehensive analysis plan with clear reasoning."""
         if abstract:
             prompt_parts.append(f"Abstract: {abstract[:500]}...")
 
-        prompt_parts.extend([
-            "",
-            "AVAILABLE ANALYSES:",
-        ])
+        prompt_parts.extend(
+            [
+                "",
+                "AVAILABLE ANALYSES:",
+            ]
+        )
 
         # Add results from successful agents
         for agent_name, result_data in sub_agent_results.items():
             if result_data.get("success", False):
                 result = result_data["result"]
-                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
+                prompt_parts.extend(
+                    [f"{agent_name.upper()} ANALYSIS:", str(result), ""]
+                )
             else:
-                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", f"Analysis failed: {result_data.get('error', 'Unknown error')}", ""])
+                prompt_parts.extend(
+                    [
+                        f"{agent_name.upper()} ANALYSIS:",
+                        f"Analysis failed: {result_data.get('error', 'Unknown error')}",
+                        "",
+                    ]
+                )
 
-        prompt_parts.extend([
-            "",
-            "SYNTHESIS INSTRUCTIONS:",
-            "Create a comprehensive academic paper analysis report with the following structure:",
-            "",
-            "REPORT FORMAT:",
-            f"[Exact Paper Title] - Comprehensive Report",
-            "",
-            "## Paper Information",
-            "- **Title:** [Paper title]",
-            "- **Authors:** [List of authors]",
-            "- **Affiliations:** [Author affiliations]",
-            "- **Venue:** [Journal/Conference/ArXiv]",
-            "- **Year:** [Publication year]",
-            "",
-            "## Main Content Sections",
-            "After the metadata section, start with appropriate, natural section titles such as:",
-            "## Introduction and Research Context",
-            "## Research Questions and Contributions",
-            "## Methodology",
-            "## Experiments and Results",
-            "## Discussion and Analysis",
-            "## Limitations and Future Work",
-            "## Conclusions and Implications",
-            "",
-            "Choose and order sections based on what's most relevant to the paper. Use only the sections that have meaningful content.",
-            "",
-            "WRITING GUIDELINES:",
-            "1. Use the exact paper title followed by ' - Comprehensive Report' as the main title",
-            "2. Include a comprehensive metadata section with all available bibliographic information",
-            "3. Focus exclusively on the paper's content, findings, and contributions",
-            "4. DO NOT mention agents, tools, sub-agents, analysis processes, or methodologies used to create the report",
-            "5. Write in a professional academic tone suitable for researchers",
-            "6. Integrate insights from all available analyses into coherent sections",
-            "7. Be comprehensive but maintain readability and logical flow",
-            "8. If certain analyses failed, focus on the available information without noting the gaps",
-            "9. Use natural, descriptive section titles that readers would expect in an academic paper",
-            "",
-            "Please provide a thorough, well-structured academic analysis report based on all available information.",
-        ])
+        prompt_parts.extend(
+            [
+                "",
+                "SYNTHESIS INSTRUCTIONS:",
+                "Create a comprehensive academic paper analysis report with the following structure:",
+                "",
+                "REPORT FORMAT:",
+                f"[Exact Paper Title] - Comprehensive Report",
+                "",
+                "## Paper Information",
+                "- **Title:** [Paper title]",
+                "- **Authors:** [List of authors]",
+                "- **Affiliations:** [Author affiliations]",
+                "- **Venue:** [Journal/Conference/ArXiv]",
+                "- **Year:** [Publication year]",
+                "",
+                "## Main Content Sections",
+                "After the metadata section, start with appropriate, natural section titles such as:",
+                "## Introduction and Research Context",
+                "## Research Questions and Contributions",
+                "## Methodology",
+                "## Experiments and Results",
+                "## Discussion and Analysis",
+                "## Limitations and Future Work",
+                "## Conclusions and Implications",
+                "",
+                "Choose and order sections based on what's most relevant to the paper. Use only the sections that have meaningful content.",
+                "",
+                "WRITING GUIDELINES:",
+                "1. Use the exact paper title followed by ' - Comprehensive Report' as the main title",
+                "2. Include a comprehensive metadata section with all available bibliographic information",
+                "3. Focus exclusively on the paper's content, findings, and contributions",
+                "4. DO NOT mention agents, tools, sub-agents, analysis processes, or methodologies used to create the report",
+                "5. Write in a professional academic tone suitable for researchers",
+                "6. Integrate insights from all available analyses into coherent sections",
+                "7. Be comprehensive but maintain readability and logical flow",
+                "8. If certain analyses failed, focus on the available information without noting the gaps",
+                "9. Use natural, descriptive section titles that readers would expect in an academic paper",
+                "",
+                "Please provide a thorough, well-structured academic analysis report based on all available information.",
+            ]
+        )
 
         prompt = "\n".join(prompt_parts)
 
@@ -1390,8 +2053,12 @@ Provide a comprehensive analysis plan with clear reasoning."""
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(f"Report synthesis timed out after {self.timeout} seconds")
-            self._log_interaction("synthesis_agent", prompt, "", f"TimeoutError: {self.timeout} seconds")
+            self.logger.error(
+                f"Report synthesis timed out after {self.timeout} seconds"
+            )
+            self._log_interaction(
+                "synthesis_agent", prompt, "", f"TimeoutError: {self.timeout} seconds"
+            )
             return f"Report synthesis timed out after {self.timeout} seconds. Please try again or use a shorter document."
 
         except Exception as e:
@@ -1408,69 +2075,118 @@ Provide a comprehensive analysis plan with clear reasoning."""
         """Perform comprehensive document analysis using expert sub-agents.
 
         Args:
-            document: Document object to analyze
+            document: Document object to analyze (must be PDF with to_markdown=True)
             custom_plan: Optional custom analysis plan (if None, will auto-generate)
             **kwargs: Additional arguments (currently unused but kept for compatibility)
 
         Returns:
             ComprehensiveAnalysisResult with all sub-analyses and final report
         """
-        self.logger.info(f"Starting comprehensive document analysis: {document.source_path or 'text document'}")
+        # Step 0: Validate PDF document
+        self._validate_pdf_document(document)
+
+        self.logger.info(
+            f"Starting comprehensive document analysis: {document.source_path}"
+        )
         start_time = asyncio.get_event_loop().time()
 
         try:
-            # Step 1: Extract abstract
+            # Step 1: Extract section names
+            section_names = document.get_section_names()
+            self.logger.info(f"Found {len(section_names)} sections: {section_names}")
+
+            # Step 2: Extract abstract
             abstract = self.extract_abstract(document)
 
-            # Step 2: Plan analysis (use custom plan if provided)
+            # Step 3: Plan analysis (use custom plan if provided)
             if custom_plan:
                 analysis_plan = custom_plan
                 self.logger.info("Using custom analysis plan")
             else:
-                analysis_plan = await self.plan_analysis(abstract)
+                analysis_plan = await self.plan_analysis(abstract, section_names)
                 self.logger.info("Generated automatic analysis plan")
 
-            # Step 3: Execute sub-agents
+            # Step 4: Display and log the plan
+            plan_display = self.display_analysis_plan(analysis_plan, section_names)
+            print(plan_display)  # Show user the plan
+            self._log_analysis_plan(analysis_plan, section_names)
+
+            # Step 5: Execute sub-agents
             sub_agent_results = await self.execute_sub_agents(document, analysis_plan)
 
-            # Step 4: Synthesize final report
-            final_report = await self.synthesize_report(analysis_plan, sub_agent_results, document)
+            # Step 6: Synthesize final report
+            final_report = await self.synthesize_report(
+                analysis_plan, sub_agent_results, document
+            )
 
-            # Step 5: Build comprehensive result
+            # Step 7: Build comprehensive result
             total_execution_time = asyncio.get_event_loop().time() - start_time
 
             comprehensive_result = ComprehensiveAnalysisResult(
                 analysis_plan=analysis_plan,
-                metadata_result=sub_agent_results.get("metadata", {}).get("result")
-                if sub_agent_results.get("metadata", {}).get("success")
-                else None,
-                previous_methods_result=sub_agent_results.get("previous_methods", {}).get("result")
-                if sub_agent_results.get("previous_methods", {}).get("success")
-                else None,
-                research_questions_result=sub_agent_results.get("research_questions", {}).get("result")
-                if sub_agent_results.get("research_questions", {}).get("success")
-                else None,
-                methodology_result=sub_agent_results.get("methodology", {}).get("result")
-                if sub_agent_results.get("methodology", {}).get("success")
-                else None,
-                experiment_result=sub_agent_results.get("experiments", {}).get("result")
-                if sub_agent_results.get("experiments", {}).get("success")
-                else None,
-                future_directions_result=sub_agent_results.get("future_directions", {}).get("result")
-                if sub_agent_results.get("future_directions", {}).get("success")
-                else None,
+                metadata_result=(
+                    sub_agent_results.get("metadata", {}).get("result")
+                    if sub_agent_results.get("metadata", {}).get("success")
+                    else None
+                ),
+                previous_methods_result=(
+                    sub_agent_results.get("previous_methods", {}).get("result")
+                    if sub_agent_results.get("previous_methods", {}).get("success")
+                    else None
+                ),
+                research_questions_result=(
+                    sub_agent_results.get("research_questions", {}).get("result")
+                    if sub_agent_results.get("research_questions", {}).get("success")
+                    else None
+                ),
+                methodology_result=(
+                    sub_agent_results.get("methodology", {}).get("result")
+                    if sub_agent_results.get("methodology", {}).get("success")
+                    else None
+                ),
+                experiment_result=(
+                    sub_agent_results.get("experiments", {}).get("result")
+                    if sub_agent_results.get("experiments", {}).get("success")
+                    else None
+                ),
+                future_directions_result=(
+                    sub_agent_results.get("future_directions", {}).get("result")
+                    if sub_agent_results.get("future_directions", {}).get("success")
+                    else None
+                ),
                 execution_summary={
-                    "total_agents_executed": len(sub_agent_results),
-                    "successful_agents": len([r for r in sub_agent_results.values() if r.get("success", False)]),
-                    "failed_agents": len([r for r in sub_agent_results.values() if not r.get("success", False)]),
-                    "agent_results": {name: {"success": data.get("success", False)} for name, data in sub_agent_results.items()},
+                    "total_agents_executed": len(sub_agent_results)
+                    - 1,  # Exclude _sections_analyzed
+                    "successful_agents": len(
+                        [
+                            r
+                            for name, r in sub_agent_results.items()
+                            if name != "_sections_analyzed" and r.get("success", False)
+                        ]
+                    ),
+                    "failed_agents": len(
+                        [
+                            r
+                            for name, r in sub_agent_results.items()
+                            if name != "_sections_analyzed"
+                            and not r.get("success", False)
+                        ]
+                    ),
+                    "agent_results": {
+                        name: {"success": data.get("success", False)}
+                        for name, data in sub_agent_results.items()
+                        if name != "_sections_analyzed"
+                    },
                 },
                 final_report=final_report,
                 total_execution_time=total_execution_time,
                 interaction_log=self.get_interaction_log(),
+                sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
             )
 
-            self.logger.info(f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds")
+            self.logger.info(
+                f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds"
+            )
             return comprehensive_result
 
         except Exception as e:

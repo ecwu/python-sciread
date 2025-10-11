@@ -17,6 +17,7 @@ Why does this file exist, and why not put this in __main__?
 
 import argparse
 import sys
+import logfire
 
 from .core import (
     compute,
@@ -25,6 +26,9 @@ from .core import (
     run_comprehensive_analysis_with_debug,
 )
 from .logging_config import logger
+
+logfire.configure()
+logfire.instrument_pydantic_ai()
 
 
 def run(argv=sys.argv):
@@ -49,9 +53,9 @@ MODES:
          (metadata, methodology, experiments, future directions)
 
 EXAMPLES:
-  python -msciread tool paper.txt
-  python -msciread tool paper.txt deepseek/reasoner
-  python -msciread tool paper.txt deepseek/reasoner --debug-output debug.json
+  python -msciread tool paper.pdf
+  python -msciread tool paper.pdf deepseek/reasoner
+  python -msciread tool paper.pdf deepseek/reasoner --debug-output debug.json
   python -msciread agent paper.txt
 
 MODELS:
@@ -69,39 +73,33 @@ MODELS:
     agent_parser = subparsers.add_parser(
         "agent",
         help="Single agent analysis",
-        description="Use a single DocumentAgent for basic analysis"
+        description="Use a single DocumentAgent for basic analysis",
     )
-    agent_parser.add_argument(
-        "txt_file",
-        help="Path to the text file to analyze"
-    )
+    agent_parser.add_argument("txt_file", help="Path to the text file to analyze")
     agent_parser.add_argument(
         "model",
         nargs="?",
         default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)"
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
 
     # Tool mode parser
     tool_parser = subparsers.add_parser(
         "tool",
         help="Multi-agent comprehensive analysis",
-        description="Use multiple expert agents for comprehensive analysis"
+        description="Use multiple expert agents for comprehensive analysis",
     )
-    tool_parser.add_argument(
-        "txt_file",
-        help="Path to the text file to analyze"
-    )
+    tool_parser.add_argument("pdf_file", help="Path to the PDF file to analyze")
     tool_parser.add_argument(
         "model",
         nargs="?",
         default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)"
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
     tool_parser.add_argument(
         "--debug-output",
         metavar="FILE",
-        help="Save interaction log to the specified JSON file for debugging"
+        help="Save interaction log to the specified JSON file for debugging",
     )
 
     # Parse arguments (skip the script name)
@@ -111,28 +109,35 @@ MODELS:
 
     # Handle different commands
     if args.command == "tool":
-        logger.info(f"Running tool mode with file: {args.txt_file}, model: {args.model}, debug_output: {args.debug_output}")
+        logger.info(
+            f"Running tool mode with file: {args.pdf_file}, model: {args.model}, debug_output: {args.debug_output}"
+        )
 
         try:
             # Use debug version if debug output is requested
             if args.debug_output:
-                result = run_comprehensive_analysis_with_debug(args.txt_file, args.model)
+                result = run_comprehensive_analysis_with_debug(
+                    args.pdf_file, args.model
+                )
                 # Save the interaction log
                 from .agent import ToolAgent
+
                 tool_agent = ToolAgent(args.model)
                 tool_agent.interaction_log = result.interaction_log
                 tool_agent.save_interaction_log(args.debug_output)
                 print(f"Debug interaction log saved to: {args.debug_output}")
                 print(f"Total interactions logged: {len(result.interaction_log)}")
             else:
-                result = run_comprehensive_analysis(args.txt_file, args.model)
+                result = run_comprehensive_analysis(args.pdf_file, args.model)
 
             print("=" * 60)
             print("COMPREHENSIVE ANALYSIS RESULT:")
             print("=" * 60)
             print(f"Analysis Plan: {result.analysis_plan.reasoning}")
             print(f"Total Execution Time: {result.total_execution_time:.2f} seconds")
-            print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
+            print(
+                f"Agents Executed: {result.execution_summary['total_agents_executed']}"
+            )
             print(f"Successful Agents: {result.execution_summary['successful_agents']}")
             print(f"Failed Agents: {result.execution_summary['failed_agents']}")
 
@@ -156,7 +161,9 @@ MODELS:
             if result.methodology_result:
                 print("\nMETHODOLOGY SUMMARY:")
                 print(f"Approach: {result.methodology_result.approach[:200]}...")
-                print(f"Techniques: {', '.join(result.methodology_result.techniques[:3])}")
+                print(
+                    f"Techniques: {', '.join(result.methodology_result.techniques[:3])}"
+                )
                 print(f"Confidence: {result.methodology_result.confidence:.2f}")
 
             print("=" * 60)
@@ -167,7 +174,9 @@ MODELS:
             return 1
 
     elif args.command == "agent":
-        logger.info(f"Running agent mode with file: {args.txt_file}, model: {args.model}")
+        logger.info(
+            f"Running agent mode with file: {args.txt_file}, model: {args.model}"
+        )
 
         try:
             result = run_main(args.txt_file, args.model)

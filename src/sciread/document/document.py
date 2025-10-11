@@ -27,8 +27,17 @@ class Document:
         text: Optional[str] = None,
         metadata: Optional[DocumentMetadata] = None,
         processing_state: Optional[ProcessingState] = None,
+        to_markdown: bool = False,
     ):
-        """Initialize a Document instance."""
+        """Initialize a Document instance.
+
+        Args:
+            source_path: Path to the source file.
+            text: Raw text content.
+            metadata: Document metadata.
+            processing_state: Processing state information.
+            to_markdown: If True, convert PDF to markdown using Mineru API.
+        """
         self.logger = get_logger(__name__)
         self.source_path = source_path
         self._raw_text = text or ""
@@ -37,20 +46,29 @@ class Document:
         self._chunks: list[Chunk] = []
         self._loaded = False
         self._split = False
+        self.to_markdown = to_markdown
 
         # Initialize default loaders
-        self._loaders: list[BaseLoader] = [PdfLoader(), TxtLoader()]
+        self._loaders: list[BaseLoader] = [PdfLoader(to_markdown=to_markdown), TxtLoader()]
 
         # Initialize default splitter
         self._splitter: BaseSplitter = RegexSectionSplitter()
 
     @classmethod
-    def from_file(cls, file_path: Union[str, Path]) -> "Document":
-        """Create a Document from a file path."""
+    def from_file(cls, file_path: Union[str, Path], to_markdown: bool = False) -> "Document":
+        """Create a Document from a file path.
+
+        Args:
+            file_path: Path to the file.
+            to_markdown: If True, convert PDF to markdown using Mineru API.
+
+        Returns:
+            Document instance.
+        """
         path = Path(file_path)
         logger = get_logger(__name__)
-        logger.debug(f"Creating document from file: {path}")
-        return cls(source_path=path)
+        logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
+        return cls(source_path=path, to_markdown=to_markdown)
 
     @classmethod
     def from_text(cls, text: str, metadata: Optional[DocumentMetadata] = None) -> "Document":
@@ -123,7 +141,19 @@ class Document:
             raise ValueError("Cannot split empty document")
 
         # Use provided splitter or default
-        active_splitter = splitter or self._splitter
+        if splitter is not None:
+            active_splitter = splitter
+        else:
+            # Auto-select MarkdownSplitter for PDF with to_markdown=True
+            if (self.source_path and
+                self.source_path.suffix.lower() == ".pdf" and
+                self.to_markdown):
+                from .splitters.markdown_splitter import MarkdownSplitter
+                active_splitter = MarkdownSplitter()
+                self.logger.debug("Auto-selected MarkdownSplitter for PDF with to_markdown=True")
+            else:
+                active_splitter = self._splitter
+
         self.logger.info(f"Splitting document using {active_splitter.splitter_name}")
 
         # Split the text
@@ -316,6 +346,52 @@ class Document:
                 matching_chunks.append(chunk)
 
         return matching_chunks
+
+    def get_section_names(self) -> list[str]:
+        """Return ordered list of section names from all chunks.
+
+        Section names are extracted from chunk metadata if available.
+        Chunks without section names are skipped.
+
+        Returns:
+            List of section names in document order.
+        """
+        section_names = []
+        for chunk in self._chunks:
+            if (chunk.metadata and
+                'section_name' in chunk.metadata and
+                chunk.metadata['section_name']):
+                section_name = chunk.metadata['section_name']
+                if section_name not in section_names:  # Avoid duplicates
+                    section_names.append(section_name)
+        return section_names
+
+    def get_sections_by_name(self, section_names: list[str]) -> list[Chunk]:
+        """Get chunks matching specific section names.
+
+        Args:
+            section_names: List of section names to filter by.
+
+        Returns:
+            List of chunks matching the specified section names.
+        """
+        matching_chunks = []
+        for chunk in self._chunks:
+            if (chunk.metadata and
+                'section_name' in chunk.metadata and
+                chunk.metadata['section_name'] in section_names):
+                matching_chunks.append(chunk)
+        return matching_chunks
+
+    def get_section_list(self) -> list[str]:
+        """Return ordered list of section names from all chunks.
+
+        This is an alias for get_section_names().
+
+        Returns:
+            List of section names in document order.
+        """
+        return self.get_section_names()
 
     def __iter__(self) -> Iterator[Chunk]:
         """Iterate over chunks."""
