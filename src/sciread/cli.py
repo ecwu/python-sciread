@@ -146,25 +146,7 @@ MODELS:
 
             print()
             print("FINAL REPORT:")
-            print("-" * 40)
             print(result.final_report)
-            print("-" * 40)
-
-            # Optional: Display individual agent results
-            if result.metadata_result:
-                print("\nMETADATA EXTRACTION:")
-                print(f"Title: {result.metadata_result.title}")
-                print(f"Authors: {', '.join(result.metadata_result.authors)}")
-                print(f"Venue: {result.metadata_result.venue}")
-                print(f"Confidence: {result.metadata_result.confidence:.2f}")
-
-            if result.methodology_result:
-                print("\nMETHODOLOGY SUMMARY:")
-                print(f"Approach: {result.methodology_result.approach[:200]}...")
-                print(
-                    f"Techniques: {', '.join(result.methodology_result.techniques[:3])}"
-                )
-                print(f"Confidence: {result.methodology_result.confidence:.2f}")
 
             print("=" * 60)
             return 0

@@ -223,7 +223,12 @@ class MarkdownSplitter(BaseSplitter):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
-                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence, section_name)
+                    # For content before first header, use "preamble" as section name
+                    # For content between headers, don't assign the next header's section name
+                    content_section_name = None
+                    if _i == 0:
+                        content_section_name = "preamble"
+                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence, content_section_name)
                     chunks.append(chunk)
             prev_pos = pos
 
