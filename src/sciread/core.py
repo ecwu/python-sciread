@@ -22,36 +22,53 @@ def compute(args):
     return result
 
 
-async def main(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
-    """Main function that processes a txt file using the document agent.
+async def main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
+    """Main function that processes a document file using the document agent.
 
     Args:
-        txt_file_path: Path to the txt file to process
+        document_file_path: Path to the document file to process (PDF or TXT)
         model: Model identifier for the LLM provider (default: "deepseek/deepseek-chat")
 
     Returns:
         Analysis result as a string
 
     Raises:
-        FileNotFoundError: If the txt file is not found
+        FileNotFoundError: If the document file is not found
         Exception: If the analysis fails
     """
-    logger.info(f"Starting main function with txt file: {txt_file_path}")
+    logger.info(f"Starting main function with document file: {document_file_path}")
 
     # Check if file exists
-    if not Path(txt_file_path).exists():
-        raise FileNotFoundError(f"Txt file not found: {txt_file_path}")
+    if not Path(document_file_path).exists():
+        raise FileNotFoundError(f"Document file not found: {document_file_path}")
 
     # Create an agent
     agent = create_agent(model)
 
-    # Load the txt file
-    sample_text = Path(txt_file_path).read_text(encoding="latin-1")
-    doc = Document.from_text(sample_text)
-    logger.info(f"Document created: {len(doc.text)} characters")
+    # Load the document file using the document loading system
+    # Use to_markdown=False for agent mode to keep traditional text extraction
+    doc = Document.from_file(document_file_path, to_markdown=False)
+
+    # Load the document content
+    load_result = doc.load()
+    if not load_result.success:
+        error_msg = f"Failed to load document: {load_result.errors}"
+        logger.error(error_msg)
+        # Also log any warnings that might provide context
+        if load_result.warnings:
+            logger.warning(f"Document loading warnings: {load_result.warnings}")
+        raise ValueError(error_msg)
+
+    logger.info(f"Document loaded successfully: {len(doc.text)} characters")
+    logger.info(f"Document loaded using: {load_result.extraction_info.get('extraction_method', 'unknown')}")
+
+    # Log any warnings from the loading process
+    if load_result.warnings:
+        for warning in load_result.warnings:
+            logger.warning(f"Document loading warning: {warning}")
 
     # Test the reference removal function
-    cleaned_text = remove_references_section(sample_text)
+    cleaned_text = remove_references_section(doc.text)
     logger.info(f"Text after reference removal: {len(cleaned_text)} characters")
 
     # Define the task prompt (same as in test_agent.py)
@@ -80,19 +97,19 @@ Here are some important constraints:
         raise
 
 
-def run_main(txt_file_path: str, model: str = "deepseek/deepseek-chat"):
+def run_main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
     """Run the main function synchronously.
 
     This is a wrapper around the async main function for use in synchronous contexts.
 
     Args:
-        txt_file_path: Path to the txt file to process
+        document_file_path: Path to the document file to process (PDF or TXT)
         model: Model identifier for the LLM provider
 
     Returns:
         Analysis result as a string
     """
-    return asyncio.run(main(txt_file_path, model))
+    return asyncio.run(main(document_file_path, model))
 
 
 async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):

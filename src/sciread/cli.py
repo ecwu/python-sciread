@@ -56,6 +56,7 @@ EXAMPLES:
   python -msciread tool paper.pdf
   python -msciread tool paper.pdf deepseek/reasoner
   python -msciread tool paper.pdf deepseek/reasoner --debug-output debug.json
+  python -msciread agent paper.pdf
   python -msciread agent paper.txt
 
 MODELS:
@@ -75,7 +76,7 @@ MODELS:
         help="Single agent analysis",
         description="Use a single DocumentAgent for basic analysis",
     )
-    agent_parser.add_argument("txt_file", help="Path to the text file to analyze")
+    agent_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     agent_parser.add_argument(
         "model",
         nargs="?",
@@ -157,11 +158,11 @@ MODELS:
 
     elif args.command == "agent":
         logger.info(
-            f"Running agent mode with file: {args.txt_file}, model: {args.model}"
+            f"Running agent mode with file: {args.document_file}, model: {args.model}"
         )
 
         try:
-            result = run_main(args.txt_file, args.model)
+            result = run_main(args.document_file, args.model)
             print("=" * 50)
             print("ANALYSIS RESULT:")
             print("=" * 50)
