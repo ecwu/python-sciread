@@ -1126,7 +1126,7 @@ Key responsibilities:
 1. Analyze the abstract to understand the paper's domain and type
 2. Examine the available section names and think about what content each section likely contains
 3. Determine which expert analyses would be most valuable
-4. For each analysis type, carefully select the most relevant sections based on their likely content
+4. For each analysis type, carefully select all relevant sections based on their likely content (include all necessary sections, but avoid irrelevant ones)
 5. Plan the sequence and priority of different analyses
 6. Synthesize results from multiple expert analyses into a coherent report
 
@@ -1140,7 +1140,7 @@ CRITICAL: Think carefully about what each section contains based on its name:
 For section selection, ALWAYS analyze the section names and think:
 "What content would this section likely contain based on its name?"
 "Would this content be useful for this specific analysis type?"
-"Avoid selecting 'All sections' - be specific and selective"
+"Include ALL relevant sections that would contribute meaningful content, but exclude irrelevant ones"
 
 Analysis types available:
 - Metadata extraction: Bibliographic information and paper identification
@@ -1156,7 +1156,8 @@ Guidelines for planning:
 - Prioritize analyses that will provide the most valuable insights
 - Consider which analyses are most relevant for the paper type
 - Plan for comprehensive but focused analysis
-- Select 1-3 most relevant sections for each analysis type, not "All sections"
+- Select all relevant sections for each analysis type, but only those that contain necessary content
+- If a section would not contribute meaningful information to a specific analysis, exclude it
 
 Provide clear reasoning for your analysis plan and relevance assessments."""
 
@@ -1347,16 +1348,16 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
                     "",
                 ]
             )
-        elif total_sections_selected > 15:
+        elif total_sections_selected > 25:
             plan_display.extend(
                 [
-                    "ℹ️  INFO: Many sections selected. Consider being more selective for better focus.",
+                    "ℹ️  INFO: Many sections selected. Ensure all selected sections are relevant to avoid unfocused analysis.",
                     "",
                 ]
             )
         else:
             plan_display.extend(
-                ["✅ Good: Specific sections selected for focused analysis.", ""]
+                ["✅ Good: Comprehensive section selection with relevant sections included.", ""]
             )
 
         if analysis_plan.estimated_relevance_scores:
@@ -1559,12 +1560,12 @@ Abstract:
 Available Sections in Document:
 {section_names}
 
-IMPORTANT: For each analysis type, you must carefully analyze the section names and think about what content each section likely contains. Then select the most relevant sections.
+IMPORTANT: For each analysis type, you must carefully analyze the section names and think about what content each section likely contains. Then select ALL relevant sections that would contribute meaningful content to that analysis.
 
 THINKING PROCESS FOR SECTION SELECTION:
 1. Look at each section name and ask: "What content would this section contain?"
-2. For each analysis type, ask: "Which sections would have the most relevant content?"
-3. Avoid selecting "All sections" - be specific and selective
+2. For each analysis type, ask: "Which sections would have relevant content that would contribute to this analysis?"
+3. Include ALL sections that would be useful, but exclude those that wouldn't contribute meaningful information
 4. If section names are unclear, make your best guess based on academic paper structure
 
 ANALYSIS TYPES AND SECTION SELECTION STRATEGY:
@@ -1572,52 +1573,52 @@ ANALYSIS TYPES AND SECTION SELECTION STRATEGY:
 **Previous Methods Analysis**:
 - Look for sections like "Introduction", "Related Work", "Background", "Literature Review"
 - These sections typically discuss prior research and limitations
-- Select sections that would contain discussion of existing approaches
+- Include all sections that would contain discussion of existing approaches or research context
 
 **Research Questions Analysis**:
-- Look for sections like "Introduction", "Abstract", "Conclusion"
+- Look for sections like "Introduction", "Abstract", "Conclusion", "Discussion"
 - These sections typically state the main research questions and contributions
-- Select sections that would contain the core research objectives
+- Include all sections that would contain the core research objectives, goals, or contributions
 
 **Methodology Analysis**:
-- Look for sections like "Methodology", "Methods", "Approach", "Technical Details"
+- Look for sections like "Methodology", "Methods", "Approach", "Technical Details", "System Design"
 - These sections describe the technical approach and implementation
-- Select sections that would contain technical methods and design choices
+- Include all sections that would contain technical methods, design choices, or implementation details
 
 **Experiments Analysis**:
-- Look for sections like "Experiments", "Evaluation", "Results", "Experiments and Results"
+- Look for sections like "Experiments", "Evaluation", "Results", "Experiments and Results", "Setup"
 - These sections contain experimental setup, datasets, and results
-- Select sections that would contain empirical evaluation
+- Include all sections that would contain empirical evaluation, experimental design, or results
 
 **Future Directions Analysis**:
-- Look for sections like "Conclusion", "Discussion", "Future Work", "Limitations"
+- Look for sections like "Conclusion", "Discussion", "Future Work", "Limitations", "Implications"
 - These sections typically discuss limitations and future research directions
-- Select sections that would contain forward-looking content
+- Include all sections that would contain forward-looking content, limitations, or implications
 
 EXAMPLES:
 If sections are: ["1. Introduction", "2. Background", "3. Our Approach", "4. Experiments", "5. Conclusion"]
 
 Good selection with reasoning:
 - Previous Methods: ["Introduction", "Background"]
-  Reasoning: "Introduction typically contains research context and Background discusses related work"
+  Reasoning: "Introduction contains research context and Background discusses related work - both provide necessary context for understanding previous methods"
 - Research Questions: ["Introduction", "Conclusion"]
-  Reasoning: "Introduction states research goals and Conclusion summarizes contributions"
-- Methodology: ["Our Approach"]
-  Reasoning: "Our Approach section contains technical methods and design"
-- Experiments: ["Experiments"]
-  Reasoning: "Experiments section contains evaluation setup and results"
-- Future Directions: ["Conclusion"]
-  Reasoning: "Conclusion typically discusses limitations and future work"
+  Reasoning: "Introduction states research goals and Conclusion summarizes contributions - both sections contain core research objectives"
+- Methodology: ["Our Approach", "Introduction" (if it describes approach)]
+  Reasoning: "Our Approach section contains technical methods and Introduction may describe the overall approach - both provide methodological information"
+- Experiments: ["Experiments", "Setup", "Results"] (if all present)
+  Reasoning: "All these sections contain different aspects of experimental evaluation - setup, methodology, and results"
+- Future Directions: ["Conclusion", "Discussion", "Limitations"] (if all present)
+  Reasoning: "All these sections provide different perspectives on limitations and future directions"
 
 Bad selection:
 - Previous Methods: ["All sections"]
-  Problem: "Too broad, wastes processing time on irrelevant content"
-- Methodology: ["Introduction", "Background"]
-  Problem: "These sections unlikely to contain detailed technical methods"
+  Problem: "Includes sections that wouldn't contribute to understanding previous methods (e.g., detailed technical implementation)"
+- Research Questions: ["Technical Implementation", "Appendix"]
+  Problem: "These sections unlikely to contain core research questions or contributions"
 
 YOUR TASK:
 1. Analyze the available section names and think about their likely content
-2. For each analysis type, select 1-3 most relevant sections
+2. For each analysis type, select ALL relevant sections that would contribute meaningful content
 3. Provide specific reasoning for your section choices
 4. Return both which analyses to perform AND which specific sections to use
 
