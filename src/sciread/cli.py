@@ -48,7 +48,7 @@ def run(argv=sys.argv):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 MODES:
-  agent  - Uses a single DocumentAgent for basic analysis
+  simple - Uses a single DocumentAgent for basic analysis
   tool   - Uses multiple expert agents for comprehensive analysis
          (metadata, methodology, experiments, future directions)
 
@@ -56,8 +56,8 @@ EXAMPLES:
   python -msciread tool paper.pdf
   python -msciread tool paper.pdf deepseek/reasoner
   python -msciread tool paper.pdf deepseek/reasoner --debug-output debug.json
-  python -msciread agent paper.pdf
-  python -msciread agent paper.txt
+  python -msciread simple paper.pdf
+  python -msciread simple paper.txt
 
 MODELS:
   deepseek/deepseek-chat     (default)
@@ -70,14 +70,14 @@ MODELS:
     # Create subparsers for different modes
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
-    # Agent mode parser
-    agent_parser = subparsers.add_parser(
-        "agent",
+    # Simple mode parser
+    simple_parser = subparsers.add_parser(
+        "simple",
         help="Single agent analysis",
         description="Use a single DocumentAgent for basic analysis",
     )
-    agent_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
-    agent_parser.add_argument(
+    simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    simple_parser.add_argument(
         "model",
         nargs="?",
         default="deepseek/deepseek-chat",
@@ -156,9 +156,9 @@ MODELS:
             print(f"Error: {e}")
             return 1
 
-    elif args.command == "agent":
+    elif args.command == "simple":
         logger.info(
-            f"Running agent mode with file: {args.document_file}, model: {args.model}"
+            f"Running simple mode with file: {args.document_file}, model: {args.model}"
         )
 
         try:
@@ -170,7 +170,7 @@ MODELS:
             print("=" * 50)
             return 0
         except Exception as e:
-            logger.error(f"Agent analysis failed: {e}")
+            logger.error(f"Simple analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 
