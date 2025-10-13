@@ -1397,6 +1397,17 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         new_doc._split = original_document._split
         return new_doc
 
+    def _deduplicate_sections(self, sections: list[str]) -> list[str]:
+        """Remove duplicate section names while preserving order.
+
+        Args:
+            sections: List of section names that may contain duplicates
+
+        Returns:
+            List of unique section names in original order
+        """
+        return list(dict.fromkeys(sections))
+
     def _validate_pdf_document(self, document: Document) -> None:
         """Validate that document is a PDF file loaded with to_markdown=True.
 
@@ -1743,17 +1754,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         # Previous methods agent - use planned sections or full document
         if analysis_plan.analyze_previous_methods:
             if analysis_plan.previous_methods_sections:
-                filtered_chunks = document.get_sections_by_name(
+                # Deduplicate sections within this agent
+                deduplicated_sections = self._deduplicate_sections(
                     analysis_plan.previous_methods_sections
                 )
+                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                 filtered_document = self._create_filtered_document(
                     document, filtered_chunks
                 )
-                sections_analyzed["previous_methods"] = (
-                    analysis_plan.previous_methods_sections
-                )
+                sections_analyzed["previous_methods"] = deduplicated_sections
                 self.logger.debug(
-                    f"Previous methods agent using specific sections: {analysis_plan.previous_methods_sections}"
+                    f"Previous methods agent using specific sections: {deduplicated_sections}"
                 )
             else:
                 filtered_document = document
@@ -1773,17 +1784,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         # Research questions agent - use planned sections or full document
         if analysis_plan.analyze_research_questions:
             if analysis_plan.research_questions_sections:
-                filtered_chunks = document.get_sections_by_name(
+                # Deduplicate sections within this agent
+                deduplicated_sections = self._deduplicate_sections(
                     analysis_plan.research_questions_sections
                 )
+                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                 filtered_document = self._create_filtered_document(
                     document, filtered_chunks
                 )
-                sections_analyzed["research_questions"] = (
-                    analysis_plan.research_questions_sections
-                )
+                sections_analyzed["research_questions"] = deduplicated_sections
                 self.logger.debug(
-                    f"Research questions agent using specific sections: {analysis_plan.research_questions_sections}"
+                    f"Research questions agent using specific sections: {deduplicated_sections}"
                 )
             else:
                 filtered_document = document
@@ -1803,15 +1814,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         # Methodology agent - use planned sections or full document
         if analysis_plan.analyze_methodology:
             if analysis_plan.methodology_sections:
-                filtered_chunks = document.get_sections_by_name(
+                # Deduplicate sections within this agent
+                deduplicated_sections = self._deduplicate_sections(
                     analysis_plan.methodology_sections
                 )
+                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                 filtered_document = self._create_filtered_document(
                     document, filtered_chunks
                 )
-                sections_analyzed["methodology"] = analysis_plan.methodology_sections
+                sections_analyzed["methodology"] = deduplicated_sections
                 self.logger.debug(
-                    f"Methodology agent using specific sections: {analysis_plan.methodology_sections}"
+                    f"Methodology agent using specific sections: {deduplicated_sections}"
                 )
             else:
                 filtered_document = document
@@ -1830,15 +1843,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         # Experiments agent - use planned sections or full document
         if analysis_plan.analyze_experiments:
             if analysis_plan.experiments_sections:
-                filtered_chunks = document.get_sections_by_name(
+                # Deduplicate sections within this agent
+                deduplicated_sections = self._deduplicate_sections(
                     analysis_plan.experiments_sections
                 )
+                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                 filtered_document = self._create_filtered_document(
                     document, filtered_chunks
                 )
-                sections_analyzed["experiments"] = analysis_plan.experiments_sections
+                sections_analyzed["experiments"] = deduplicated_sections
                 self.logger.debug(
-                    f"Experiments agent using specific sections: {analysis_plan.experiments_sections}"
+                    f"Experiments agent using specific sections: {deduplicated_sections}"
                 )
             else:
                 filtered_document = document
@@ -1857,17 +1872,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         # Future directions agent - use planned sections or full document
         if analysis_plan.analyze_future_directions:
             if analysis_plan.future_directions_sections:
-                filtered_chunks = document.get_sections_by_name(
+                # Deduplicate sections within this agent
+                deduplicated_sections = self._deduplicate_sections(
                     analysis_plan.future_directions_sections
                 )
+                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                 filtered_document = self._create_filtered_document(
                     document, filtered_chunks
                 )
-                sections_analyzed["future_directions"] = (
-                    analysis_plan.future_directions_sections
-                )
+                sections_analyzed["future_directions"] = deduplicated_sections
                 self.logger.debug(
-                    f"Future directions agent using specific sections: {analysis_plan.future_directions_sections}"
+                    f"Future directions agent using specific sections: {deduplicated_sections}"
                 )
             else:
                 filtered_document = document
