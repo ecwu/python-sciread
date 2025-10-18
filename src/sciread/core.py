@@ -104,7 +104,9 @@ def run_main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
     return asyncio.run(main(document_file_path, model))
 
 
-async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
+async def comprehensive_analysis(
+    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
+):
     """Comprehensive document analysis using the multi-agent ToolAgent system.
 
     This function uses the ToolAgent with multiple expert sub-agents to provide
@@ -123,7 +125,9 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
         FileNotFoundError: If the PDF file is not found
         Exception: If the analysis fails
     """
-    logger.info(f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}")
+    logger.info(
+        f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}"
+    )
 
     # Check if file exists
     if not Path(pdf_file_path).exists():
@@ -134,13 +138,13 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
 
     # Load the PDF file with to_markdown=True for ToolAgent
     doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
-    logger.info(f"Document created from PDF: {pdf_file_path}")
-    logger.info(f"PDF loaded successfully: {len(doc.text)} characters")
-    logger.info(f"Document split into {len(doc.chunks)} chunks")
+    logger.debug(f"Document created from PDF: {pdf_file_path}")
+    logger.debug(f"PDF loaded successfully: {len(doc.text)} characters")
+    logger.debug(f"Document split into {len(doc.chunks)} chunks")
 
     # Extract and log section information
     section_names = doc.get_section_names()
-    logger.info(f"Discovered {len(section_names)} sections: {section_names}")
+    logger.debug(f"Discovered {len(section_names)} sections: {section_names}")
 
     # Display section information to user
     if section_names:
@@ -148,8 +152,12 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
         print(f"Found {len(section_names)} main sections:")
         for i, section_name in enumerate(section_names, 1):
             section_chunks = doc.get_sections_by_name([section_name])
-            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
-            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
+            section_word_count = sum(
+                len(chunk.content.split()) for chunk in section_chunks
+            )
+            print(
+                f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)"
+            )
         print()
 
         # Log section chunk distribution
@@ -162,7 +170,9 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
         print("\n📋 Document Structure Analysis")
         print("No named sections found - document will be analyzed as continuous text")
         print()
-        logger.info("No named sections found - document will be analyzed as continuous text")
+        logger.info(
+            "No named sections found - document will be analyzed as continuous text"
+        )
 
     # Check if document was loaded successfully
     if not doc.text.strip():
@@ -175,23 +185,33 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
 
         logger.info("Comprehensive analysis completed successfully!")
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
-        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
-        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
+        logger.info(
+            f"Agents executed: {result.execution_summary['total_agents_executed']}"
+        )
+        logger.info(
+            f"Successful agents: {result.execution_summary['successful_agents']}"
+        )
 
         # Log section analysis summary if available
-        if hasattr(result, 'analysis_plan') and result.analysis_plan:
+        if hasattr(result, "analysis_plan") and result.analysis_plan:
             plan = result.analysis_plan
             logger.info("Section-based analysis summary:")
             if plan.previous_methods_sections:
-                logger.info(f"  Previous methods sections: {plan.previous_methods_sections}")
+                logger.info(
+                    f"  Previous methods sections: {plan.previous_methods_sections}"
+                )
             if plan.research_questions_sections:
-                logger.info(f"  Research questions sections: {plan.research_questions_sections}")
+                logger.info(
+                    f"  Research questions sections: {plan.research_questions_sections}"
+                )
             if plan.methodology_sections:
                 logger.info(f"  Methodology sections: {plan.methodology_sections}")
             if plan.experiments_sections:
                 logger.info(f"  Experiments sections: {plan.experiments_sections}")
             if plan.future_directions_sections:
-                logger.info(f"  Future directions sections: {plan.future_directions_sections}")
+                logger.info(
+                    f"  Future directions sections: {plan.future_directions_sections}"
+                )
 
         return result
 
@@ -200,7 +220,11 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
         raise
 
 
-def run_comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat", debug_output: Optional[str] = None):
+def run_comprehensive_analysis(
+    pdf_file_path: str,
+    model: str = "deepseek/deepseek-chat",
+    debug_output: Optional[str] = None,
+):
     """Run comprehensive analysis synchronously.
 
     This is a wrapper around the async comprehensive_analysis function for use in synchronous contexts.
@@ -220,14 +244,18 @@ def run_comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepse
     if debug_output:
         # Create a new ToolAgent to access the interaction log
         tool_agent = ToolAgent(model)
-        tool_agent.interaction_log = result.interaction_log if hasattr(result, "interaction_log") else []
+        tool_agent.interaction_log = (
+            result.interaction_log if hasattr(result, "interaction_log") else []
+        )
         tool_agent.save_interaction_log(debug_output)
         logger.info(f"Debug interaction log saved to: {debug_output}")
 
     return result
 
 
-async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
+async def comprehensive_analysis_with_debug(
+    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
+):
     """Comprehensive analysis with ToolAgent that captures all interactions.
 
     Args:
@@ -237,7 +265,9 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
     Returns:
         ComprehensiveAnalysisResult with interaction log attached
     """
-    logger.info(f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}")
+    logger.info(
+        f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}"
+    )
 
     # Check if file exists
     if not Path(pdf_file_path).exists():
@@ -262,8 +292,12 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
         print(f"Found {len(section_names)} main sections:")
         for i, section_name in enumerate(section_names, 1):
             section_chunks = doc.get_sections_by_name([section_name])
-            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
-            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
+            section_word_count = sum(
+                len(chunk.content.split()) for chunk in section_chunks
+            )
+            print(
+                f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)"
+            )
         print()
 
         # Log section chunk distribution
@@ -276,7 +310,9 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
         print("\n📋 Document Structure Analysis")
         print("No named sections found - document will be analyzed as continuous text")
         print()
-        logger.info("No named sections found - document will be analyzed as continuous text")
+        logger.info(
+            "No named sections found - document will be analyzed as continuous text"
+        )
 
     # Check if document was loaded successfully
     if not doc.text.strip():
@@ -292,8 +328,12 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
 
         logger.info("Comprehensive analysis completed successfully!")
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
-        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
-        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
+        logger.info(
+            f"Agents executed: {result.execution_summary['total_agents_executed']}"
+        )
+        logger.info(
+            f"Successful agents: {result.execution_summary['successful_agents']}"
+        )
         logger.info(f"Total interactions logged: {len(result.interaction_log)}")
 
         return result
@@ -303,7 +343,9 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
         raise
 
 
-def run_comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
+def run_comprehensive_analysis_with_debug(
+    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
+):
     """Run comprehensive analysis with debug logging synchronously.
 
     Args:

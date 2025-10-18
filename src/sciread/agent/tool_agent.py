@@ -45,7 +45,6 @@ from .prompts import build_previous_methods_analysis_prompt
 from .prompts import build_report_synthesis_prompt
 from .prompts import build_research_questions_analysis_prompt
 from .text_processor import clean_academic_text
-from .text_processor import extract_document_metadata
 from .text_processor import remove_references_section
 
 # Pydantic models for structured results
@@ -307,7 +306,9 @@ class ExpertAgent:
             retries=self.max_retries,
         )
 
-        self.logger.info(f"Initialized {agent_name} agent with model: {self.model_identifier}")
+        self.logger.info(
+            f"Initialized {agent_name} agent with model: {self.model_identifier}"
+        )
 
     def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
         """Log interaction for this agent (centralized logging logic)."""
@@ -605,44 +606,73 @@ class ToolAgent:
         Returns:
             Formatted string displaying the analysis plan
         """
+        # ANSI color codes
+        CYAN = "\033[96m"
+        GREEN = "\033[92m"
+        YELLOW = "\033[93m"
+        BLUE = "\033[94m"
+        MAGENTA = "\033[95m"
+        RESET = "\033[0m"
+        BOLD = "\033[1m"
+
         plan_display = [
-            "ANALYSIS PLAN",
-            "=============",
-            f"Available Sections: {', '.join(section_names) if section_names else 'No sections found'}",
+            f"{BOLD}{CYAN}ANALYSIS PLAN{RESET}",
+            f"{CYAN}{'=' * 80}{RESET}",
             "",
-            "PLANNED ANALYSES:",
         ]
 
         analysis_configs = [
-            ("analyze_metadata", "Metadata Extraction Agent", "First 3 chunks (title, authors, abstract)"),
-            ("analyze_previous_methods", "Previous Methods Agent", "previous_methods_sections"),
-            ("analyze_research_questions", "Research Questions Agent", "research_questions_sections"),
+            (
+                "analyze_metadata",
+                "Metadata Extraction Agent",
+                "First 3 chunks (title, authors, abstract)",
+            ),
+            (
+                "analyze_previous_methods",
+                "Previous Methods Agent",
+                "previous_methods_sections",
+            ),
+            (
+                "analyze_research_questions",
+                "Research Questions Agent",
+                "research_questions_sections",
+            ),
             ("analyze_methodology", "Methodology Agent", "methodology_sections"),
             ("analyze_experiments", "Experiments Agent", "experiments_sections"),
-            ("analyze_future_directions", "Future Directions Agent", "future_directions_sections"),
+            (
+                "analyze_future_directions",
+                "Future Directions Agent",
+                "future_directions_sections",
+            ),
         ]
 
         for plan_field, agent_name, sections_field in analysis_configs:
             if getattr(analysis_plan, plan_field):
                 if sections_field == "First 3 chunks (title, authors, abstract)":
-                    plan_display.extend([
-                        f"✓ {agent_name}",
-                        f"  Sections: {sections_field}",
-                        ""
-                    ])
+                    sections_display = sections_field
                 else:
-                    sections = getattr(analysis_plan, sections_field) or ["All sections"]
+                    sections = getattr(analysis_plan, sections_field) or [
+                        "All sections"
+                    ]
                     if sections == ["All sections"]:
-                        sections_display = "All sections ⚠️  (fallback - consider improving section selection)"
+                        sections_display = f"All sections {YELLOW}⚠️  (fallback){RESET}"
                     else:
                         sections_display = f"{', '.join(sections)}"
-                    plan_display.extend([
-                        f"✓ {agent_name}",
-                        f"  Sections: {sections_display}",
-                        ""
-                    ])
 
-        plan_display.extend([f"Reasoning: {analysis_plan.reasoning}", ""])
+                # Combined display with colors
+                plan_display.append(
+                    f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}"
+                )
+                plan_display.append("")
+
+        # Add reasoning section with color
+        plan_display.extend(
+            [
+                f"{MAGENTA}{BOLD}Reasoning:{RESET}",
+                f"{MAGENTA}{analysis_plan.reasoning}{RESET}",
+                "",
+            ]
+        )
 
         # Add section selection quality assessment
         total_sections_selected = sum(
@@ -655,24 +685,28 @@ class ToolAgent:
             ]
         )
 
+        # Quality assessment with colors
         if total_sections_selected == 0:
             plan_display.extend(
                 [
-                    "⚠️  WARNING: No specific sections selected. All agents will use 'All sections'.",
-                    "   This may result in longer processing times and less focused analysis.",
+                    f"{YELLOW}⚠️  WARNING: No specific sections selected. All agents will use 'All sections'.{RESET}",
+                    f"{YELLOW}   This may result in longer processing times and less focused analysis.{RESET}",
                     "",
                 ]
             )
         elif total_sections_selected > 25:
             plan_display.extend(
                 [
-                    "ℹ️  INFO: Many sections selected. Ensure all selected sections are relevant to avoid unfocused analysis.",
+                    f"{BLUE}ℹ️  INFO: Many sections selected ({total_sections_selected}). Ensure all are relevant.{RESET}",
                     "",
                 ]
             )
         else:
             plan_display.extend(
-                ["✅ Good: Comprehensive section selection with relevant sections included.", ""]
+                [
+                    f"{GREEN}✅ Good: Comprehensive section selection with {total_sections_selected} relevant sections.{RESET}",
+                    "",
+                ]
             )
 
         if analysis_plan.estimated_relevance_scores:
@@ -682,7 +716,7 @@ class ToolAgent:
                     for k, v in analysis_plan.estimated_relevance_scores.items()
                 ]
             )
-            plan_display.append(f"Relevance Scores: {scores_text}")
+            plan_display.append(f"{CYAN}Relevance Scores: {scores_text}{RESET}")
 
         return "\n".join(plan_display)
 
@@ -748,7 +782,7 @@ class ToolAgent:
         self.logger.info(f"Analysis Plan:\n{plan_display}")
 
     def extract_abstract(self, document: Document) -> str:
-        """Extract abstract from document.
+        """Extract abstract from document using semantic sectioning.
 
         Args:
             document: Document object to extract abstract from
@@ -756,54 +790,35 @@ class ToolAgent:
         Returns:
             Abstract text as string
         """
-        self.logger.info("Extracting abstract from document")
+        self.logger.info("Extracting abstract from document using semantic sections")
 
-        # Try to get abstract from document metadata first
-        if document.metadata and document.metadata.title:
-            # Use text_processor to extract abstract
-            if document.chunks:
-                text = document.get_full_text()
-            else:
-                text = document.text
+        # Try to find abstract section using semantic sectioning
+        abstract_section_names = []
+        section_names = document.get_section_names()
 
-            metadata = extract_document_metadata(text)
-            if metadata.get("abstract"):
-                self.logger.info("Abstract extracted from document metadata")
-                return metadata["abstract"]
+        # Look for section names that indicate abstract content
+        for section_name in section_names:
+            section_lower = section_name.lower()
+            # Check for abstract-like section names (handle noise like numbers)
+            if any(
+                keyword in section_lower
+                for keyword in ["abstract", "summary", "overview"]
+            ):
+                abstract_section_names.append(section_name)
+                self.logger.debug(f"Found potential abstract section: '{section_name}'")
+                break  # Take the first match
 
-        # If no abstract in metadata, try to find it in the text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        # Look for abstract section
-        lines = text.split("\n")
-        abstract_lines = []
-        abstract_started = False
-
-        for line in lines:
-            line_stripped = line.strip().lower()
-
-            if line_stripped.startswith("abstract"):
-                abstract_started = True
-                continue
-
-            if abstract_started:
-                if line_stripped and not line_stripped.startswith(
-                    ("introduction", "keywords", "1.", "i.", "©")
-                ):
-                    abstract_lines.append(line.strip())
-                elif line_stripped and len(abstract_lines) > 0:
-                    # End of abstract
-                    break
-
-        if abstract_lines:
-            abstract = " ".join(abstract_lines)
-            self.logger.info(
-                f"Abstract extracted from text: {len(abstract)} characters"
-            )
-            return abstract
+        # If found abstract sections, extract content
+        if abstract_section_names:
+            abstract_chunks = document.get_sections_by_name(abstract_section_names)
+            if abstract_chunks:
+                abstract_content = " ".join(
+                    [chunk.content for chunk in abstract_chunks]
+                )
+                self.logger.info(
+                    f"Abstract extracted from semantic sections: {len(abstract_content)} characters"
+                )
+                return abstract_content
 
         # Fallback: Use first two chunks as "abstract" for planning purposes
         if document.chunks and len(document.chunks) >= 2:
@@ -812,22 +827,23 @@ class ToolAgent:
             # Limit to reasonable length (first ~2000 chars)
             fallback_text = fallback_text[:2000]
             self.logger.warning(
-                f"No abstract found in document, using first 2 chunks ({len(fallback_text)} chars) as fallback for analysis planning"
+                f"No abstract section found, using first 2 chunks ({len(fallback_text)} chars) as fallback for analysis planning"
             )
             return fallback_text
         elif document.chunks and len(document.chunks) == 1:
             # Use the single chunk
             fallback_text = document.chunks[0].content[:2000]
             self.logger.warning(
-                f"No abstract found in document, using first chunk ({len(fallback_text)} chars) as fallback for analysis planning"
+                f"No abstract section found, using first chunk ({len(fallback_text)} chars) as fallback for analysis planning"
             )
             return fallback_text
 
         # Last resort: use beginning of full text
+        text = document.get_full_text() if document.chunks else document.text
         if text:
             fallback_text = text[:2000]
             self.logger.warning(
-                "No abstract found in document, using first 2000 chars of document as fallback for analysis planning"
+                "No abstract section found, using first 2000 chars of document as fallback for analysis planning"
             )
             return fallback_text
 
@@ -966,12 +982,42 @@ class ToolAgent:
 
         # Define analysis tasks with their corresponding sections fields
         analysis_tasks = [
-            ("analyze_metadata", "metadata", "metadata", None),  # Special case: uses first 3 chunks
-            ("analyze_previous_methods", "previous_methods", "previous_methods_sections", "previous_methods_sections"),
-            ("analyze_research_questions", "research_questions", "research_questions_sections", "research_questions_sections"),
-            ("analyze_methodology", "methodology", "methodology_sections", "methodology_sections"),
-            ("analyze_experiments", "experiments", "experiments_sections", "experiments_sections"),
-            ("analyze_future_directions", "future_directions", "future_directions_sections", "future_directions_sections"),
+            (
+                "analyze_metadata",
+                "metadata",
+                "metadata",
+                None,
+            ),  # Special case: uses first 3 chunks
+            (
+                "analyze_previous_methods",
+                "previous_methods",
+                "previous_methods_sections",
+                "previous_methods_sections",
+            ),
+            (
+                "analyze_research_questions",
+                "research_questions",
+                "research_questions_sections",
+                "research_questions_sections",
+            ),
+            (
+                "analyze_methodology",
+                "methodology",
+                "methodology_sections",
+                "methodology_sections",
+            ),
+            (
+                "analyze_experiments",
+                "experiments",
+                "experiments_sections",
+                "experiments_sections",
+            ),
+            (
+                "analyze_future_directions",
+                "future_directions",
+                "future_directions_sections",
+                "future_directions_sections",
+            ),
         ]
 
         # Dynamically create and dispatch tasks based on analysis plan
@@ -981,17 +1027,23 @@ class ToolAgent:
                 if agent_key == "metadata":
                     # Special case: metadata uses first 3 chunks
                     metadata_chunks = (
-                        document.chunks[:3] if len(document.chunks) >= 3 else document.chunks
+                        document.chunks[:3]
+                        if len(document.chunks) >= 3
+                        else document.chunks
                     )
                     content = " ".join([chunk.content for chunk in metadata_chunks])
-                    sections_analyzed[result_key] = [f"First {len(metadata_chunks)} chunks"]
+                    sections_analyzed[result_key] = [
+                        f"First {len(metadata_chunks)} chunks"
+                    ]
                 else:
                     # Use planned sections or full document
                     sections = getattr(analysis_plan, sections_field)
                     if sections:
                         # Deduplicate sections within this agent
                         deduplicated_sections = self._deduplicate_sections(sections)
-                        filtered_chunks = document.get_sections_by_name(deduplicated_sections)
+                        filtered_chunks = document.get_sections_by_name(
+                            deduplicated_sections
+                        )
                         content = " ".join([chunk.content for chunk in filtered_chunks])
                         sections_analyzed[result_key] = deduplicated_sections
                         self.logger.debug(
@@ -1171,7 +1223,9 @@ class ToolAgent:
 
         prompt = build_report_synthesis_prompt(
             paper_title=paper_title,
-            source_path=str(document.source_path) if document.source_path else "text document",
+            source_path=(
+                str(document.source_path) if document.source_path else "text document"
+            ),
             abstract=self.extract_abstract(document),
             sub_agent_results=sub_agent_results,
         )
@@ -1216,11 +1270,25 @@ class ToolAgent:
 
         Args:
             document: Document object to analyze (must be PDF, should be created with to_markdown=True for best results)
+                     Note: When using to_markdown=True, MinerU API caching is enabled by default. This means:
+                     - First request: Downloads from API and caches the result
+                     - Subsequent requests with same PDF: Uses cached result (instant, no API call)
+                     - Cache is stored in ~/.sciread/mineru_cache by default
             custom_plan: Optional custom analysis plan (if None, will auto-generate)
             **kwargs: Additional arguments (currently unused but kept for compatibility)
 
         Returns:
             ComprehensiveAnalysisResult with all sub-analyses and final report
+
+        Example:
+            # Create document with MinerU (caching enabled by default)
+            doc = Document.from_file("paper.pdf", to_markdown=True, auto_split=True)
+
+            # First analysis: Calls MinerU API and caches result
+            result = await tool_agent.analyze_document(doc)
+
+            # Subsequent analyses with same PDF: Uses cache (instant)
+            result2 = await tool_agent.analyze_document(doc)
         """
         # Step 0: Validate PDF document
         self._validate_pdf_document(document)
@@ -1233,7 +1301,7 @@ class ToolAgent:
         try:
             # Step 1: Extract section names
             section_names = document.get_section_names()
-            self.logger.info(f"Found {len(section_names)} sections: {section_names}")
+            self.logger.debug(f"Found {len(section_names)} sections: {section_names}")
 
             # Step 2: Extract abstract
             abstract = self.extract_abstract(document)
@@ -1248,7 +1316,7 @@ class ToolAgent:
 
             # Step 4: Display and log the plan
             plan_display = self.display_analysis_plan(analysis_plan, section_names)
-            print(plan_display)  # Show user the plan
+            # print(plan_display)  # Show user the plan
             self._log_analysis_plan(analysis_plan, section_names)
 
             # Step 5: Execute sub-agents

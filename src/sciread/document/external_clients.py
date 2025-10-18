@@ -5,6 +5,7 @@ import math
 import time
 import uuid
 import zipfile
+from pathlib import Path
 from typing import Any, Optional
 
 import requests
@@ -38,7 +39,9 @@ class OllamaClient:
         self.embedding_cache: dict[str, list[float]] = {}
         self.logger = get_logger(__name__)
 
-    def get_embeddings(self, texts: list[str], batch_size: int = 10) -> list[list[float]]:
+    def get_embeddings(
+        self, texts: list[str], batch_size: int = 10
+    ) -> list[list[float]]:
         """
         Get embeddings for texts using Ollama API.
 
@@ -161,8 +164,17 @@ class OllamaClient:
 class MineruClient:
     """Client for interacting with Mineru API for PDF to markdown conversion."""
 
-    def __init__(self, token: str, enable_formula: bool = False, language: str = "en",
-                 enable_table: bool = True, timeout: int = 300, poll_interval: int = 10):
+    def __init__(
+        self,
+        token: str,
+        enable_formula: bool = False,
+        language: str = "en",
+        enable_table: bool = True,
+        timeout: int = 300,
+        poll_interval: int = 10,
+        enable_cache: bool = True,
+        cache_dir: Optional[str] = None,
+    ):
         """
         Initialize Mineru client.
 
@@ -173,6 +185,8 @@ class MineruClient:
             enable_table: Whether to enable table extraction
             timeout: Maximum processing time in seconds
             poll_interval: Polling interval in seconds
+            enable_cache: Whether to enable caching of API responses
+            cache_dir: Directory for cache storage (default: ~/.sciread/mineru_cache)
         """
         self.token = token
         self.enable_formula = enable_formula
@@ -180,7 +194,19 @@ class MineruClient:
         self.enable_table = enable_table
         self.timeout = timeout
         self.poll_interval = poll_interval
+        self.enable_cache = enable_cache
         self.logger = get_logger(__name__)
+
+        # Initialize cache manager if caching is enabled
+        if self.enable_cache:
+            from .mineru_cache import MineruCacheManager
+
+            cache_path = Path(cache_dir) if cache_dir else None
+            self.cache_manager = MineruCacheManager(cache_dir=cache_path)
+            self.logger.info("Mineru caching enabled")
+        else:
+            self.cache_manager = None
+            self.logger.info("Mineru caching disabled")
 
     def extract_markdown(self, file_path) -> str:
         """
@@ -195,14 +221,62 @@ class MineruClient:
         Raises:
             RuntimeError: If extraction fails
         """
-        import time
-        import uuid
-        import zipfile
-        import io
-        from pathlib import Path
-
         file_path = Path(file_path)
 
+        # Check cache first if enabled
+        if self.enable_cache and self.cache_manager:
+            cached_zip_path = self.cache_manager.get_cached_zip(file_path)
+            if cached_zip_path:
+                self.logger.info(f"Using cached result for {file_path.name}")
+                try:
+                    # Extract markdown from cached zip
+                    markdown_content = self._extract_from_cached_zip(cached_zip_path)
+                    if markdown_content:
+                        return markdown_content
+                except RuntimeError as e:
+                    self.logger.warning(
+                        f"Failed to use cached zip: {e}, falling back to API"
+                    )
+
+        # If no cache or cache failed, call API
+        markdown_content, zip_content = self._call_mineru_api(file_path)
+
+        # Save to cache if enabled
+        if self.enable_cache and self.cache_manager and zip_content:
+            self.cache_manager.save_to_cache(file_path, zip_content)
+
+        return markdown_content
+
+    def _extract_from_cached_zip(self, zip_path: Path) -> str:
+        """Extract markdown content from a cached zip file."""
+        with zipfile.ZipFile(zip_path, "r") as zip_file:
+            # Look for full.md file in the zip
+            full_md_path = None
+            for file_info in zip_file.filelist:
+                if file_info.filename.endswith("full.md"):
+                    full_md_path = file_info.filename
+                    break
+
+            if not full_md_path:
+                self.logger.error("No full.md file found in cached zip")
+                raise RuntimeError("No full.md file found in cached zip")
+
+            # Read the content of full.md
+            with zip_file.open(full_md_path) as md_file:
+                markdown_content = md_file.read().decode("utf-8")
+
+            self.logger.info(
+                f"Successfully extracted {len(markdown_content)} characters from cached zip"
+            )
+            return markdown_content
+
+    def _call_mineru_api(self, file_path: Path) -> tuple[str, Optional[bytes]]:
+        """
+        Call Mineru API to extract markdown from PDF.
+
+        Returns:
+            Tuple of (markdown_content, zip_file_content)
+        """
         # Prepare API request
         url = "https://mineru.net/api/v4/file-urls/batch"
         headers = {
@@ -254,7 +328,9 @@ class MineruClient:
         elif isinstance(upload_urls, str):
             upload_url = upload_urls
         else:
-            self.logger.error(f"Unexpected upload_urls format: {type(upload_urls)} - {upload_urls}")
+            self.logger.error(
+                f"Unexpected upload_urls format: {type(upload_urls)} - {upload_urls}"
+            )
             raise RuntimeError(f"Unexpected upload_urls format: {type(upload_urls)}")
 
         self.logger.info(f"Uploading PDF to Mineru (batch_id: {batch_id})")
@@ -284,9 +360,7 @@ class MineruClient:
             )
 
             try:
-                status_response = requests.get(
-                    result_url, headers=headers, timeout=30
-                )
+                status_response = requests.get(result_url, headers=headers, timeout=30)
 
                 if status_response.status_code == 200:
                     status_data = status_response.json()
@@ -313,16 +387,16 @@ class MineruClient:
                                 self.logger.error(
                                     "Mineru processing completed but no zip URL provided"
                                 )
-                                raise RuntimeError(
-                                    "No zip URL returned from Mineru"
-                                )
+                                raise RuntimeError("No zip URL returned from Mineru")
 
-                            markdown_content = self._download_and_extract_zip(zip_url)
+                            markdown_content, zip_content = (
+                                self._download_and_extract_zip(zip_url)
+                            )
                             if markdown_content:
                                 self.logger.info(
                                     f"Successfully extracted {len(markdown_content)} characters from Mineru"
                                 )
-                                return markdown_content
+                                return markdown_content, zip_content
                             else:
                                 self.logger.error(
                                     "Failed to extract markdown content from Mineru zip"
@@ -331,18 +405,19 @@ class MineruClient:
                                     "Failed to extract markdown from Mineru zip"
                                 )
                         elif state == "failed":
-                            error_msg = extract_result.get("err_msg", "Processing failed")
-                            self.logger.error(
-                                f"Mineru processing failed: {error_msg}"
+                            error_msg = extract_result.get(
+                                "err_msg", "Processing failed"
                             )
-                            raise RuntimeError(
-                                f"Mineru processing failed: {error_msg}"
-                            )
-                        elif state in ["waiting-file", "pending", "running", "converting"]:
+                            self.logger.error(f"Mineru processing failed: {error_msg}")
+                            raise RuntimeError(f"Mineru processing failed: {error_msg}")
+                        elif state in [
+                            "waiting-file",
+                            "pending",
+                            "running",
+                            "converting",
+                        ]:
                             # Still processing, wait and retry
-                            self.logger.debug(
-                                f"Mineru processing status: {state}"
-                            )
+                            self.logger.debug(f"Mineru processing status: {state}")
                             time.sleep(self.poll_interval)
                             continue
                         else:
@@ -351,9 +426,7 @@ class MineruClient:
                             continue
                     else:
                         error_msg = status_data.get("msg", "Unknown error")
-                        self.logger.error(
-                            f"Mineru status check failed: {error_msg}"
-                        )
+                        self.logger.error(f"Mineru status check failed: {error_msg}")
                         time.sleep(self.poll_interval)
                         continue
                 else:
@@ -369,15 +442,15 @@ class MineruClient:
                 continue
 
         # Timeout reached
-        self.logger.error(
-            f"Mineru processing timed out after {self.timeout} seconds"
-        )
-        raise RuntimeError(
-            f"Mineru processing timed out after {self.timeout} seconds"
-        )
+        self.logger.error(f"Mineru processing timed out after {self.timeout} seconds")
+        raise RuntimeError(f"Mineru processing timed out after {self.timeout} seconds")
 
-    def _download_and_extract_zip(self, zip_url: str) -> str:
-        """Download and extract the zip file to get the markdown content."""
+    def _download_and_extract_zip(self, zip_url: str) -> tuple[str, bytes]:
+        """Download and extract the zip file to get the markdown content.
+
+        Returns:
+            Tuple of (markdown_content, zip_file_content)
+        """
         try:
             self.logger.info(f"Downloading zip file from: {zip_url}")
 
@@ -391,8 +464,11 @@ class MineruClient:
                     f"Failed to download zip file: {response.status_code}"
                 )
 
+            # Store zip content for caching
+            zip_content = response.content
+
             # Extract the zip content in memory
-            zip_data = io.BytesIO(response.content)
+            zip_data = io.BytesIO(zip_content)
 
             with zipfile.ZipFile(zip_data) as zip_file:
                 # Look for full.md file in the zip
@@ -411,12 +487,12 @@ class MineruClient:
 
                 # Read the content of full.md
                 with zip_file.open(full_md_path) as md_file:
-                    markdown_content = md_file.read().decode('utf-8')
+                    markdown_content = md_file.read().decode("utf-8")
 
                 self.logger.info(
                     f"Successfully extracted {len(markdown_content)} characters from full.md"
                 )
-                return markdown_content
+                return markdown_content, zip_content
 
         except requests.RequestException as e:
             self.logger.error(f"Failed to download zip file: {e}")
@@ -427,6 +503,3 @@ class MineruClient:
         except UnicodeDecodeError as e:
             self.logger.error(f"Failed to decode markdown file: {e}")
             raise RuntimeError(f"Failed to decode markdown file: {e}") from e
-        except Exception as e:
-            self.logger.error(f"Failed to extract zip file: {e}")
-            raise RuntimeError(f"Failed to extract zip file: {e}") from e

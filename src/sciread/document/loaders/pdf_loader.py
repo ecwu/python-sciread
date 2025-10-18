@@ -69,6 +69,8 @@ class PdfLoader(BaseLoader):
                             enable_table=mineru_config.enable_table,
                             timeout=mineru_config.timeout,
                             poll_interval=mineru_config.poll_interval,
+                            enable_cache=mineru_config.enable_cache,
+                            cache_dir=mineru_config.cache_dir,
                         )
 
                     markdown_text = self.mineru_client.extract_markdown(file_path)
