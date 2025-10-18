@@ -1390,11 +1390,9 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
             text=original_document.text,
             metadata=original_document.metadata,
             processing_state=original_document.processing_state,
-            to_markdown=getattr(original_document, "to_markdown", False),
         )
         new_doc._chunks = chunks
-        new_doc._loaded = original_document._loaded
-        new_doc._split = original_document._split
+        new_doc._split = True  # Filtered documents are always split
         return new_doc
 
     def _deduplicate_sections(self, sections: list[str]) -> list[str]:
@@ -1409,13 +1407,13 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         return list(dict.fromkeys(sections))
 
     def _validate_pdf_document(self, document: Document) -> None:
-        """Validate that document is a PDF file loaded with to_markdown=True.
+        """Validate that document is a PDF file.
 
         Args:
             document: Document to validate
 
         Raises:
-            ValueError: If document is not a PDF or not loaded with to_markdown=True
+            ValueError: If document is not a PDF
         """
         if not document.source_path or document.source_path.suffix.lower() != ".pdf":
             raise ValueError(
@@ -1424,11 +1422,9 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
                 "Please provide a PDF document."
             )
 
-        if not getattr(document, "to_markdown", False):
-            raise ValueError(
-                "ToolAgent requires PDF documents to be loaded with to_markdown=True. "
-                "Please use: Document.from_file('paper.pdf', to_markdown=True)"
-            )
+        # Note: The to_markdown validation has been removed since Document API no longer exposes this attribute.
+        # Documents should be created with Document.from_file('paper.pdf', to_markdown=True) to ensure
+        # proper markdown conversion for ToolAgent analysis.
 
     def _log_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]):
         """Log the analysis plan for debugging.
@@ -2091,7 +2087,7 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         """Perform comprehensive document analysis using expert sub-agents.
 
         Args:
-            document: Document object to analyze (must be PDF with to_markdown=True)
+            document: Document object to analyze (must be PDF, should be created with to_markdown=True for best results)
             custom_plan: Optional custom analysis plan (if None, will auto-generate)
             **kwargs: Additional arguments (currently unused but kept for compatibility)
 

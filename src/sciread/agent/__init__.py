@@ -19,9 +19,8 @@ Example Usage:
     # Create a multi-agent system
     tool_agent = ToolAgent("deepseek/deepseek-chat")
 
-    # Process a document
-    doc = Document.from_file("paper.pdf")
-    doc.load()
+    # Process a document (automatically loaded and split)
+    doc = Document.from_file("paper.pdf", to_markdown=True)
 
     # Generate analysis report with simple agent
     result = await agent.analyze_document(doc, "Summarize this paper")

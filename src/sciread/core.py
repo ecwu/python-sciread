@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 from .agent import create_agent, remove_references_section, ToolAgent
-from .document import Document
+from .document import Document, DocumentFactory
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -47,25 +47,17 @@ async def main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
 
     # Load the document file using the document loading system
     # Use to_markdown=False for agent mode to keep traditional text extraction
-    doc = Document.from_file(document_file_path, to_markdown=False)
+    doc = Document.from_file(document_file_path, to_markdown=False, auto_split=True)
 
-    # Load the document content
-    load_result = doc.load()
-    if not load_result.success:
-        error_msg = f"Failed to load document: {load_result.errors}"
-        logger.error(error_msg)
-        # Also log any warnings that might provide context
-        if load_result.warnings:
-            logger.warning(f"Document loading warnings: {load_result.warnings}")
-        raise ValueError(error_msg)
-
+    # Document is automatically loaded and split with the new API
     logger.info(f"Document loaded successfully: {len(doc.text)} characters")
-    logger.info(f"Document loaded using: {load_result.extraction_info.get('extraction_method', 'unknown')}")
+    logger.info(f"Document split into {len(doc.chunks)} chunks")
 
-    # Log any warnings from the loading process
-    if load_result.warnings:
-        for warning in load_result.warnings:
-            logger.warning(f"Document loading warning: {warning}")
+    # Check if document was loaded successfully
+    if not doc.text.strip():
+        error_msg = "Failed to load document: no text content extracted"
+        logger.error(error_msg)
+        raise ValueError(error_msg)
 
     # Test the reference removal function
     cleaned_text = remove_references_section(doc.text)
@@ -141,19 +133,40 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
     tool_agent = ToolAgent(model)
 
     # Load the PDF file with to_markdown=True for ToolAgent
-    doc = Document.from_file(pdf_file_path, to_markdown=True)
+    doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
     logger.info(f"Document created from PDF: {pdf_file_path}")
-
-    # Load and split the document
-    load_result = doc.load()
-    if not load_result.success:
-        raise ValueError(f"Failed to load PDF: {load_result.errors}")
-
     logger.info(f"PDF loaded successfully: {len(doc.text)} characters")
+    logger.info(f"Document split into {len(doc.chunks)} chunks")
 
-    # Split document into chunks
-    chunks = doc.split()
-    logger.info(f"Document split into {len(chunks)} chunks")
+    # Extract and log section information
+    section_names = doc.get_section_names()
+    logger.info(f"Discovered {len(section_names)} sections: {section_names}")
+
+    # Display section information to user
+    if section_names:
+        print("\n📋 Document Structure Analysis")
+        print(f"Found {len(section_names)} main sections:")
+        for i, section_name in enumerate(section_names, 1):
+            section_chunks = doc.get_sections_by_name([section_name])
+            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
+            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
+        print()
+
+        # Log section chunk distribution
+        section_distribution = {}
+        for section_name in section_names:
+            section_chunks = doc.get_sections_by_name([section_name])
+            section_distribution[section_name] = len(section_chunks)
+        logger.info(f"Section distribution: {section_distribution}")
+    else:
+        print("\n📋 Document Structure Analysis")
+        print("No named sections found - document will be analyzed as continuous text")
+        print()
+        logger.info("No named sections found - document will be analyzed as continuous text")
+
+    # Check if document was loaded successfully
+    if not doc.text.strip():
+        raise ValueError("Failed to load PDF: no text content extracted")
 
     # Run comprehensive analysis
     logger.info("Starting comprehensive document analysis with ToolAgent...")
@@ -164,6 +177,21 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
         logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
         logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
+
+        # Log section analysis summary if available
+        if hasattr(result, 'analysis_plan') and result.analysis_plan:
+            plan = result.analysis_plan
+            logger.info("Section-based analysis summary:")
+            if plan.previous_methods_sections:
+                logger.info(f"  Previous methods sections: {plan.previous_methods_sections}")
+            if plan.research_questions_sections:
+                logger.info(f"  Research questions sections: {plan.research_questions_sections}")
+            if plan.methodology_sections:
+                logger.info(f"  Methodology sections: {plan.methodology_sections}")
+            if plan.experiments_sections:
+                logger.info(f"  Experiments sections: {plan.experiments_sections}")
+            if plan.future_directions_sections:
+                logger.info(f"  Future directions sections: {plan.future_directions_sections}")
 
         return result
 
@@ -219,19 +247,40 @@ async def comprehensive_analysis_with_debug(pdf_file_path: str, model: str = "de
     tool_agent = ToolAgent(model)
 
     # Load the PDF file with to_markdown=True for ToolAgent
-    doc = Document.from_file(pdf_file_path, to_markdown=True)
+    doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
     logger.info(f"Document created from PDF: {pdf_file_path}")
-
-    # Load and split the document
-    load_result = doc.load()
-    if not load_result.success:
-        raise ValueError(f"Failed to load PDF: {load_result.errors}")
-
     logger.info(f"PDF loaded successfully: {len(doc.text)} characters")
+    logger.info(f"Document split into {len(doc.chunks)} chunks")
 
-    # Split document into chunks
-    chunks = doc.split()
-    logger.info(f"Document split into {len(chunks)} chunks")
+    # Extract and log section information
+    section_names = doc.get_section_names()
+    logger.info(f"Discovered {len(section_names)} sections: {section_names}")
+
+    # Display section information to user
+    if section_names:
+        print("\n📋 Document Structure Analysis")
+        print(f"Found {len(section_names)} main sections:")
+        for i, section_name in enumerate(section_names, 1):
+            section_chunks = doc.get_sections_by_name([section_name])
+            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
+            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
+        print()
+
+        # Log section chunk distribution
+        section_distribution = {}
+        for section_name in section_names:
+            section_chunks = doc.get_sections_by_name([section_name])
+            section_distribution[section_name] = len(section_chunks)
+        logger.info(f"Section distribution: {section_distribution}")
+    else:
+        print("\n📋 Document Structure Analysis")
+        print("No named sections found - document will be analyzed as continuous text")
+        print()
+        logger.info("No named sections found - document will be analyzed as continuous text")
+
+    # Check if document was loaded successfully
+    if not doc.text.strip():
+        raise ValueError("Failed to load PDF: no text content extracted")
 
     # Run comprehensive analysis
     logger.info("Starting comprehensive document analysis with ToolAgent...")

@@ -1,4 +1,4 @@
-"""Main Document class for managing processed documents."""
+"""Main Document class for managing document content and chunks."""
 
 from collections.abc import Iterator
 from pathlib import Path
@@ -6,20 +6,16 @@ from typing import Optional
 from typing import Union
 
 from ..logging_config import get_logger
-from .loaders import BaseLoader
-from .loaders import LoadResult
-from .loaders.pdf_loader import PdfLoader
-from .loaders.txt_loader import TxtLoader
+from .document_builder import DocumentBuilder
+from .document_builder import DocumentFactory
 from .models import Chunk
 from .models import CoverageStats
 from .models import DocumentMetadata
 from .models import ProcessingState
-from .splitters import BaseSplitter
-from .splitters.regex_section_splitter import RegexSectionSplitter
 
 
 class Document:
-    """Main class for managing document processing and state."""
+    """Data container for document content and chunks."""
 
     def __init__(
         self,
@@ -27,16 +23,16 @@ class Document:
         text: Optional[str] = None,
         metadata: Optional[DocumentMetadata] = None,
         processing_state: Optional[ProcessingState] = None,
-        to_markdown: bool = False,
+        _is_markdown: bool = False,
     ):
         """Initialize a Document instance.
 
         Args:
-            source_path: Path to the source file.
+            source_path: Path to the source file (optional).
             text: Raw text content.
             metadata: Document metadata.
             processing_state: Processing state information.
-            to_markdown: If True, convert PDF to markdown using Mineru API.
+            _is_markdown: Internal flag to track if content is markdown-converted.
         """
         self.logger = get_logger(__name__)
         self.source_path = source_path
@@ -44,148 +40,52 @@ class Document:
         self.metadata = metadata or DocumentMetadata(source_path=source_path)
         self.processing_state = processing_state or ProcessingState()
         self._chunks: list[Chunk] = []
-        self._loaded = False
         self._split = False
-        self.to_markdown = to_markdown
-
-        # Initialize default loaders
-        self._loaders: list[BaseLoader] = [PdfLoader(to_markdown=to_markdown), TxtLoader()]
-
-        # Initialize default splitter
-        self._splitter: BaseSplitter = RegexSectionSplitter()
+        self._is_markdown = _is_markdown
 
     @classmethod
-    def from_file(cls, file_path: Union[str, Path], to_markdown: bool = False) -> "Document":
-        """Create a Document from a file path.
+    def from_file(
+        cls,
+        file_path: Union[str, Path],
+        to_markdown: bool = False,
+        auto_split: bool = True,
+        **split_kwargs
+    ) -> "Document":
+        """
+        Create a Document from a file path.
 
         Args:
             file_path: Path to the file.
             to_markdown: If True, convert PDF to markdown using Mineru API.
+            auto_split: Whether to automatically split the document after loading.
+            **split_kwargs: Additional arguments for splitting.
 
         Returns:
-            Document instance.
+            Document instance with loaded content and optionally split chunks.
         """
-        path = Path(file_path)
-        logger = get_logger(__name__)
-        logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
-        return cls(source_path=path, to_markdown=to_markdown)
+        return DocumentFactory.create_from_file(file_path, to_markdown=to_markdown)
 
     @classmethod
-    def from_text(cls, text: str, metadata: Optional[DocumentMetadata] = None) -> "Document":
-        """Create a Document from raw text."""
-        logger = get_logger(__name__)
-        logger.debug(f"Creating document from text ({len(text)} characters)")
-        doc = cls(text=text, metadata=metadata)
-        doc._loaded = True  # Text-based documents are already "loaded"
-        doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note("Document created from text")
-        return doc
+    def from_text(
+        cls,
+        text: str,
+        metadata: Optional[DocumentMetadata] = None,
+        auto_split: bool = True,
+        **split_kwargs
+    ) -> "Document":
+        """
+        Create a Document from raw text.
 
-    def load(self) -> LoadResult:
-        """Load the document from the source path."""
-        if self.source_path is None:
-            self.logger.error("No source path specified for loading")
-            raise ValueError("No source path specified for loading")
+        Args:
+            text: Raw text content.
+            metadata: Optional document metadata.
+            auto_split: Whether to automatically split the document.
+            **split_kwargs: Additional arguments for splitting.
 
-        self.logger.info(f"Loading document from: {self.source_path}")
-
-        # Find appropriate loader
-        loader = None
-        for available_loader in self._loaders:
-            if available_loader.can_load(self.source_path):
-                loader = available_loader
-                break
-
-        if loader is None:
-            self.logger.error(f"No loader available for file: {self.source_path}")
-            raise ValueError(f"No loader available for file: {self.source_path}")
-
-        self.logger.debug(f"Using loader: {loader.loader_name}")
-
-        # Load the document
-        result = loader.load(self.source_path)
-        if result.success:
-            self._raw_text = result.text
-            self.metadata = result.metadata
-            self._loaded = True
-            self.processing_state.update_timestamp("loaded")
-            self.processing_state.add_note(f"Document loaded using {loader.loader_name}")
-            self.logger.info(f"Successfully loaded document using {loader.loader_name}: {len(result.text)} characters")
-
-            # Add any warnings to processing state
-            for warning in result.warnings:
-                self.processing_state.add_note(f"Warning: {warning}")
-                self.logger.warning(f"Document loading warning: {warning}")
-        else:
-            self.logger.error("Failed to load document")
-
-        return result
-
-    def split(
-        self,
-        splitter: Optional[BaseSplitter] = None,
-        confidence_threshold: Optional[float] = None,
-        min_length: Optional[int] = None,
-        exclude_types: Optional[set[str]] = None,
-        auto_filter_quality: bool = False,
-        quality_confidence_threshold: float = 0.3,
-        quality_min_length: int = 20,
-    ) -> list[Chunk]:
-        """Split the document into chunks with optional quality filtering."""
-        if not self._loaded:
-            self.logger.error("Attempted to split document before loading")
-            raise ValueError("Document must be loaded before splitting")
-
-        if not self._raw_text.strip():
-            self.logger.error("Attempted to split empty document")
-            raise ValueError("Cannot split empty document")
-
-        # Use provided splitter or default
-        if splitter is not None:
-            active_splitter = splitter
-        else:
-            # Auto-select MarkdownSplitter for PDF with to_markdown=True
-            if (self.source_path and
-                self.source_path.suffix.lower() == ".pdf" and
-                self.to_markdown):
-                from .splitters.markdown_splitter import MarkdownSplitter
-                active_splitter = MarkdownSplitter()
-                self.logger.debug("Auto-selected MarkdownSplitter for PDF with to_markdown=True")
-            else:
-                active_splitter = self._splitter
-
-        self.logger.info(f"Splitting document using {active_splitter.splitter_name}")
-
-        # Split the text
-        self._chunks = active_splitter.split(self._raw_text)
-        self._split = True
-        self.processing_state.update_timestamp("split")
-        self.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
-
-        self.logger.info(f"Document split into {len(self._chunks)} chunks")
-
-        # Apply quality filtering if requested
-        if auto_filter_quality:
-            deactivated_count = self.deactivate_low_quality_chunks(
-                confidence_threshold=quality_confidence_threshold,
-                min_length=quality_min_length,
-                exclude_types=exclude_types,
-            )
-            if deactivated_count > 0:
-                self.logger.info(f"Auto-filtered {deactivated_count} low-quality chunks")
-
-        # Apply manual filtering if criteria provided
-        elif confidence_threshold is not None or min_length is not None or exclude_types:
-            # Get filtered chunks for return, but keep all chunks in self._chunks
-            filtered_chunks = self.get_chunks(
-                confidence_threshold=confidence_threshold,
-                min_length=min_length,
-                exclude_types=exclude_types,
-            )
-            self.logger.info(f"Returning {len(filtered_chunks)} filtered chunks out of {len(self._chunks)} total")
-            return filtered_chunks
-
-        return self._chunks
+        Returns:
+            Document instance with text and optionally split chunks.
+        """
+        return DocumentFactory.create_from_text(text, metadata=metadata)
 
     @property
     def chunks(self) -> list[Chunk]:
@@ -207,6 +107,11 @@ class Document:
         """Check if document is split."""
         return self._split
 
+    @property
+    def is_markdown(self) -> bool:
+        """Check if document content is markdown-converted."""
+        return self._is_markdown
+
     def get_chunks(
         self,
         processed: Optional[bool] = None,
@@ -216,7 +121,37 @@ class Document:
         min_length: Optional[int] = None,
         exclude_types: Optional[set[str]] = None,
     ) -> list[Chunk]:
-        """Get chunks with optional filtering."""
+        """
+        Get chunks with flexible filtering criteria.
+
+        This is the unified method for accessing chunks with any combination of filters.
+        It replaces the previous multiple specialized methods (get_unprocessed_chunks,
+        get_quality_chunks, filter_chunks, etc.).
+
+        Args:
+            processed: Filter by processing status (True for processed, False for unprocessed).
+            chunk_type: Filter by specific chunk type.
+            limit: Maximum number of chunks to return.
+            confidence_threshold: Minimum confidence score (0.0-1.0).
+            min_length: Minimum character length for chunks.
+            exclude_types: Set of chunk types to exclude.
+
+        Returns:
+            List of chunks matching the specified criteria.
+
+        Examples:
+            # Get all unprocessed chunks
+            doc.get_chunks(processed=False)
+
+            # Get high-quality chunks
+            doc.get_chunks(confidence_threshold=0.7, min_length=100)
+
+            # Get abstract chunks that haven't been processed yet
+            doc.get_chunks(chunk_type="abstract", processed=False)
+
+            # Get first 5 chunks with high confidence
+            doc.get_chunks(confidence_threshold=0.8, limit=5)
+        """
         chunks = self._chunks
 
         # Filter by processing status
@@ -246,7 +181,7 @@ class Document:
         return chunks
 
     def get_unprocessed_chunks(self, limit: Optional[int] = None) -> list[Chunk]:
-        """Get unprocessed chunks."""
+        """Get unprocessed chunks. Convenience method for get_chunks(processed=False)."""
         return self.get_chunks(processed=False, limit=limit)
 
     def get_quality_chunks(
@@ -256,7 +191,7 @@ class Document:
         exclude_types: Optional[set[str]] = None,
         processed: Optional[bool] = None,
     ) -> list[Chunk]:
-        """Get high-quality chunks based on quality criteria."""
+        """Get high-quality chunks based on quality criteria. Convenience method."""
         return self.get_chunks(
             confidence_threshold=confidence_threshold,
             min_length=min_length,
@@ -265,36 +200,44 @@ class Document:
         )
 
     def filter_chunks(self, **filter_kwargs) -> list[Chunk]:
-        """Filter chunks using any combination of criteria."""
+        """Filter chunks using any combination of criteria. Alias for get_chunks()."""
         return self.get_chunks(**filter_kwargs)
 
-    def deactivate_low_quality_chunks(
+    def mark_chunks_processed(
         self,
-        confidence_threshold: float = 0.3,
-        min_length: int = 20,
+        confidence_threshold: Optional[float] = None,
+        min_length: Optional[int] = None,
         exclude_types: Optional[set[str]] = None,
     ) -> int:
         """
-        Deactivate low-quality chunks by marking them as processed (so they're skipped).
+        Mark chunks as processed based on filtering criteria.
 
-        Returns the number of chunks deactivated.
+        This replaces the old deactivate_low_quality_chunks method with clearer semantics.
+
+        Args:
+            confidence_threshold: Mark chunks below this threshold as processed.
+            min_length: Mark chunks shorter than this as processed.
+            exclude_types: Don't mark these chunk types as processed.
+
+        Returns:
+            Number of chunks marked as processed.
         """
-        low_quality_chunks = self.get_chunks(
+        chunks_to_mark = self.get_chunks(
+            processed=False,
             confidence_threshold=confidence_threshold,
             min_length=min_length,
             exclude_types=exclude_types,
-            processed=False,
         )
 
-        # Mark low-quality chunks as processed so they won't be included in processing
-        for chunk in low_quality_chunks:
+        # Mark chunks as processed
+        for chunk in chunks_to_mark:
             chunk.mark_processed()
 
-        if low_quality_chunks:
-            self.processing_state.add_note(f"Deactivated {len(low_quality_chunks)} low-quality chunks")
-            self.logger.info(f"Deactivated {len(low_quality_chunks)} low-quality chunks")
+        if chunks_to_mark:
+            self.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
+            self.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
 
-        return len(low_quality_chunks)
+        return len(chunks_to_mark)
 
     def next_unprocessed(self) -> Optional[Chunk]:
         """Get the next unprocessed chunk."""

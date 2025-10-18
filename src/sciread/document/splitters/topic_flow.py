@@ -7,8 +7,8 @@ from typing import Any
 from typing import Optional
 
 import regex
-import requests
 
+from ..external_clients import OllamaClient
 from ..models import Chunk
 from .base import BaseSplitter
 
@@ -67,8 +67,7 @@ class TopicFlowSplitter(BaseSplitter):
 
     def __init__(
         self,
-        model: str = "embeddinggemma:latest",
-        base_url: str = "http://localhost:11434",
+        ollama_client: Optional[OllamaClient] = None,
         # Continuity thresholds
         local_continuity_threshold: float = 0.6,
         context_continuity_threshold: float = 0.65,
@@ -78,8 +77,6 @@ class TopicFlowSplitter(BaseSplitter):
         max_segment_chars: int = 2000,
         # Processing parameters
         embedding_batch_size: int = 10,
-        timeout: int = 30,
-        cache_embeddings: bool = True,
         # Adaptive thresholds
         adaptive_floor: float = 0.4,
         soft_target: float = 0.7,
@@ -88,39 +85,32 @@ class TopicFlowSplitter(BaseSplitter):
         Initialize TopicFlow splitter.
 
         Args:
-            model: Ollama model name for embeddings
-            base_url: Ollama API base URL
+            ollama_client: OllamaClient instance for embeddings (optional)
             local_continuity_threshold: Threshold for local continuity (adjacent sentences)
             context_continuity_threshold: Threshold for context continuity (segment vs sentence)
             min_segment_sentences: Minimum sentences per segment for content-based cuts
             min_segment_chars: Minimum characters per segment
             max_segment_chars: Maximum characters per segment (hard budget limit)
             embedding_batch_size: Number of sentences to embed in one request
-            timeout: Request timeout in seconds
-            cache_embeddings: Whether to cache embeddings
             adaptive_floor: Adaptive floor for local continuity detection
             soft_target: Soft target for context continuity
         """
-        self.model = model
-        self.base_url = base_url.rstrip("/")
+        self.ollama_client = ollama_client or OllamaClient()
         self.local_continuity_threshold = local_continuity_threshold
         self.context_continuity_threshold = context_continuity_threshold
         self.min_segment_sentences = min_segment_sentences
         self.min_segment_chars = min_segment_chars
         self.max_segment_chars = max_segment_chars
         self.embedding_batch_size = embedding_batch_size
-        self.timeout = timeout
-        self.cache_embeddings = cache_embeddings
         self.adaptive_floor = adaptive_floor
         self.soft_target = soft_target
 
         self.sentence_pattern = regex.compile(self.regex_pattern, regex.VERBOSE)
-        self.embedding_cache: dict[str, list[float]] = {}
 
     @property
     def splitter_name(self) -> str:
         """Return the splitter name."""
-        return f"TopicFlowSplitter(model={self.model}, min_sentences={self.min_segment_sentences})"
+        return f"TopicFlowSplitter(model={self.ollama_client.model}, min_sentences={self.min_segment_sentences})"
 
     def split(self, text: str) -> list[Chunk]:
         """Split text using TopicFlow algorithm."""
@@ -178,77 +168,8 @@ class TopicFlowSplitter(BaseSplitter):
         return sentences
 
     def _get_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for texts using Ollama API."""
-        embeddings = []
-
-        # Process in batches
-        for i in range(0, len(texts), self.embedding_batch_size):
-            batch = texts[i : i + self.embedding_batch_size]
-            batch_embeddings = self._get_batch_embeddings(batch)
-            embeddings.extend(batch_embeddings)
-
-        return embeddings
-
-    def _get_batch_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for a batch of texts."""
-        batch_embeddings = []
-
-        for text in texts:
-            # Check cache first
-            cache_key = f"{self.model}:{hash(text)}"
-            if self.cache_embeddings and cache_key in self.embedding_cache:
-                batch_embeddings.append(self.embedding_cache[cache_key])
-                continue
-
-            # Get embedding from Ollama
-            try:
-                embedding = self._get_single_embedding(text)
-                if embedding:
-                    batch_embeddings.append(embedding)
-                    if self.cache_embeddings:
-                        self.embedding_cache[cache_key] = embedding
-                else:
-                    batch_embeddings.append([0.0] * 768)  # Fallback
-            except Exception:
-                batch_embeddings.append([0.0] * 768)  # Fallback
-
-        return batch_embeddings
-
-    def _get_single_embedding(self, text: str) -> Optional[list[float]]:
-        """Get embedding for a single text from Ollama API."""
-        try:
-            url = f"{self.base_url}/api/embeddings"
-            payload = {"model": self.model, "prompt": text}
-
-            response = requests.post(
-                url,
-                json=payload,
-                timeout=self.timeout,
-                headers={"Content-Type": "application/json"},
-            )
-
-            if response.status_code == 200:
-                data = response.json()
-                if "embedding" in data:
-                    return data["embedding"]
-
-            return None
-        except Exception:
-            return None
-
-    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Calculate cosine similarity between two vectors."""
-        if not vec1 or not vec2 or len(vec1) != len(vec2):
-            return 0.0
-
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
-        magnitude1 = math.sqrt(sum(a * a for a in vec1))
-        magnitude2 = math.sqrt(sum(b * b for b in vec2))
-
-        if magnitude1 == 0 or magnitude2 == 0:
-            return 0.0
-
-        return dot_product / (magnitude1 * magnitude2)
+        """Get embeddings for texts using Ollama client."""
+        return self.ollama_client.get_embeddings(texts, self.embedding_batch_size)
 
     def _grow_segments(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[dict[str, Any]]:
         """Grow segments using continuity signals."""
@@ -272,7 +193,7 @@ class TopicFlowSplitter(BaseSplitter):
             embedding = embeddings[i]
 
             # Calculate continuity signals
-            local_continuity = self._cosine_similarity(embeddings[i - 1], embedding)
+            local_continuity = self.ollama_client.cosine_similarity(embeddings[i - 1], embedding)
             context_continuity = self._calculate_context_continuity(current_segment, embedding)
 
             # Check budget constraint
@@ -345,23 +266,9 @@ class TopicFlowSplitter(BaseSplitter):
             return 0.0
 
         # Calculate segment embedding (centroid of all sentence embeddings)
-        segment_embedding = self._calculate_centroid(segment["embeddings"])
+        segment_embedding = self.ollama_client.calculate_centroid(segment["embeddings"])
 
-        return self._cosine_similarity(segment_embedding, next_embedding)
-
-    def _calculate_centroid(self, embeddings: list[list[float]]) -> list[float]:
-        """Calculate centroid of embeddings."""
-        if not embeddings:
-            return []
-
-        n = len(embeddings[0])
-        centroid = [0.0] * n
-
-        for embedding in embeddings:
-            for i, value in enumerate(embedding):
-                centroid[i] += value
-
-        return [value / len(embeddings) for value in centroid]
+        return self.ollama_client.cosine_similarity(segment_embedding, next_embedding)
 
     def _create_chunks_from_segments(self, segments: list[dict[str, Any]]) -> list[Chunk]:
         """Create Chunk objects from segments."""
@@ -467,171 +374,14 @@ class TopicFlowSplitter(BaseSplitter):
 
     def clear_cache(self):
         """Clear the embedding cache."""
-        self.embedding_cache.clear()
+        self.ollama_client.clear_cache()
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Get embedding cache statistics."""
-        return {
-            "cache_size": len(self.embedding_cache),
-            "model": self.model,
-            "cache_enabled": self.cache_embeddings,
-        }
+        return self.ollama_client.get_cache_stats()
 
     def test_ollama_connection(self) -> bool:
         """Test connection to Ollama server."""
-        try:
-            url = f"{self.base_url}/api/tags"
-            response = requests.get(url, timeout=5)
-            return response.status_code == 200
-        except Exception:
-            return False
+        return self.ollama_client.test_connection()
 
 
-def main():
-    """Main function to demonstrate TopicFlowSplitter on a txt file."""
-    parser = argparse.ArgumentParser(description="Split a text file using TopicFlowSplitter and display chunks with metadata")
-    parser.add_argument("file_path", type=str, help="Path to the text file to split")
-    parser.add_argument(
-        "--model",
-        type=str,
-        default="embeddinggemma:latest",
-        help="Ollama model name for embeddings (default: embeddinggemma:latest)",
-    )
-    parser.add_argument(
-        "--base-url",
-        type=str,
-        default="http://localhost:11434",
-        help="Ollama API base URL (default: http://localhost:11434)",
-    )
-    parser.add_argument(
-        "--local-threshold",
-        type=float,
-        default=0.6,
-        help="Local continuity threshold (default: 0.6)",
-    )
-    parser.add_argument(
-        "--context-threshold",
-        type=float,
-        default=0.65,
-        help="Context continuity threshold (default: 0.65)",
-    )
-    parser.add_argument(
-        "--min-chars",
-        type=int,
-        default=300,
-        help="Minimum characters per segment (default: 300)",
-    )
-    parser.add_argument(
-        "--max-chars",
-        type=int,
-        default=2000,
-        help="Maximum characters per segment (default: 2000)",
-    )
-
-    args = parser.parse_args()
-
-    # Check if file exists
-    file_path = Path(args.file_path)
-    if not file_path.exists():
-        print(f"Error: File '{args.file_path}' not found.")
-        return 1
-
-    # Initialize the splitter
-    splitter = TopicFlowSplitter(
-        model=args.model,
-        base_url=args.base_url,
-        local_continuity_threshold=args.local_threshold,
-        context_continuity_threshold=args.context_threshold,
-        min_segment_chars=args.min_chars,
-        max_segment_chars=args.max_chars,
-    )
-
-    # Test Ollama connection
-    print(f"Testing connection to Ollama at {args.base_url}...")
-    if not splitter.test_ollama_connection():
-        print("Warning: Could not connect to Ollama. Make sure Ollama is running.")
-        print("Continuing anyway - fallback splitting may be used if embeddings fail...")
-    else:
-        print("✓ Ollama connection successful")
-
-    try:
-        # Read the text file with encoding detection
-        print(f"Reading file: {args.file_path}")
-        text = None
-
-        # Try different encodings in order of preference
-        encodings_to_try = ["utf-8", "utf-8-sig", "latin-1", "cp1252", "iso-8859-1"]
-
-        for encoding in encodings_to_try:
-            try:
-                with open(file_path, encoding=encoding) as f:
-                    text = f.read()
-                print(f"Successfully read file with {encoding} encoding")
-                break
-            except UnicodeDecodeError:
-                continue
-
-        if text is None:
-            print(f"Error: Could not read file with any of the attempted encodings: {', '.join(encodings_to_try)}")
-            return 1
-
-        if not text.strip():
-            print("Error: File is empty.")
-            return 1
-
-        print(f"File loaded: {len(text)} characters")
-        print("-" * 80)
-
-        # Split the text
-        print("Splitting text using TopicFlowSplitter...")
-        chunks = splitter.split(text)
-
-        if not chunks:
-            print("No chunks were generated.")
-            return 1
-
-        print(f"Generated {len(chunks)} chunks")
-        print("-" * 80)
-
-        # Display chunks with metadata
-        for i, chunk in enumerate(chunks, 1):
-            word_count = len(chunk.content.split())
-            confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
-
-            # Get the cut reason from chunk metadata
-            cut_reason = chunk.metadata.get("cut_reason", "unknown") if chunk.metadata else "unknown"
-
-            header = (
-                f"============= Chunk #{i} ({word_count} words) ============= "
-                f"Conf: {confidence_str} ============= Reason: {cut_reason} ============="
-            )
-            print(header)
-            print(chunk.content)
-            print("-" * 80)
-
-        # Print summary
-        total_words = sum(len(chunk.content.split()) for chunk in chunks)
-        avg_confidence = (
-            sum(c.confidence for c in chunks if c.confidence is not None) / len([c for c in chunks if c.confidence is not None])
-            if any(c.confidence for c in chunks)
-            else 0
-        )
-
-        print("\nSummary:")
-        print(f"  Total chunks: {len(chunks)}")
-        print(f"  Total words: {total_words}")
-        print(f"  Average confidence: {avg_confidence:.2f}")
-
-        # Print cache stats
-        cache_stats = splitter.get_cache_stats()
-        print(f"  Embeddings cached: {cache_stats['cache_size']}")
-
-    except Exception as e:
-        print(f"Error: {e}")
-        return 1
-
-    return 0
-
-
-if __name__ == "__main__":
-    exit(main())
