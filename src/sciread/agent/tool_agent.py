@@ -7,6 +7,9 @@ Each sub-agent specializes in extracting specific types of information from pape
 The system uses programmatic agent hand-off where the controller agent decides
 which sub-agents to invoke based on abstract analysis, then the application
 code orchestrates the execution and result synthesis.
+
+REFACTORED: Simplified architecture with generic expert agents to reduce code
+duplication and improve maintainability.
 """
 
 import asyncio
@@ -24,6 +27,23 @@ from ..document.document import Document
 from ..document.models import Chunk
 from ..llm_provider import get_model
 from ..logging_config import get_logger
+from .prompts import CONTROLLER_INSTRUCTIONS
+from .prompts import EXPERIMENTS_SYSTEM_PROMPT
+from .prompts import FUTURE_DIRECTIONS_SYSTEM_PROMPT
+from .prompts import METADATA_EXTRACTION_SYSTEM_PROMPT
+from .prompts import METHODOLOGY_SYSTEM_PROMPT
+from .prompts import PREVIOUS_METHODS_SYSTEM_PROMPT
+from .prompts import RESEARCH_QUESTIONS_SYSTEM_PROMPT
+from .prompts import SYNTHESIS_SYSTEM_PROMPT
+from .prompts import build_analysis_planning_prompt
+from .prompts import build_experiments_analysis_prompt
+from .prompts import build_future_directions_analysis_prompt
+from .prompts import build_generic_analysis_prompt
+from .prompts import build_metadata_analysis_prompt
+from .prompts import build_methodology_analysis_prompt
+from .prompts import build_previous_methods_analysis_prompt
+from .prompts import build_report_synthesis_prompt
+from .prompts import build_research_questions_analysis_prompt
 from .text_processor import clean_academic_text
 from .text_processor import extract_document_metadata
 from .text_processor import remove_references_section
@@ -231,159 +251,40 @@ class ComprehensiveAnalysisResult(BaseModel):
     )
 
 
-# Expert sub-agent classes
+# Generic expert agent implementation
 
 
-class MetadataExtractorAgent:
-    """Expert agent for extracting bibliographic metadata from academic papers."""
+class ExpertAgent:
+    """Generic expert agent that can be configured for different analysis types.
 
-    def __init__(
-        self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 60.0,
-        interaction_log: Optional[list] = None,
-    ):
-        """Initialize the metadata extractor agent."""
-        self.logger = get_logger(__name__)
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
-        # System prompt for metadata extraction
-        system_prompt = """You are an expert bibliographic analyst specializing in extracting structured metadata from academic papers. Your task is to carefully read academic documents and extract precise bibliographic information.
-
-Key responsibilities:
-1. Extract the exact title of the paper
-2. Identify all authors and their affiliations (company, university, or lab)
-3. Determine the publication venue (journal name, conference name, or arxiv)
-4. Extract publication year (if available)
-
-Guidelines:
-- Be precise and accurate in information extraction
-- If information is not clearly present, mark it as None rather than guessing
-- Author names should be extracted exactly as they appear
-- Extract affiliations as complete institutional names (e.g., "OpenAI", "Stanford University", "Google Research")
-- For venue: extract journal name, conference name, or identify as "arXiv" if it's an arXiv preprint
-- Only extract venue information if it can be clearly obtained from the text
-- Publication year should only be extracted if explicitly mentioned
-- Confidence should reflect how certain you are about the extracted information
-- Pay attention to formatting variations (e.g., different citation styles)
-
-Always provide structured, accurate metadata that could be used for academic citation purposes."""
-
-        # Create the pydantic-ai agent
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=MetadataExtractionResult,
-            retries=self.max_retries,
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "metadata_extractor",
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"MetadataExtractor interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    async def analyze(
-        self,
-        document: Document,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> MetadataExtractionResult:
-        """Extract metadata from the document."""
-        self.logger.info("Starting metadata extraction")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        if not text or not text.strip():
-            raise ValueError("Document has no text content to analyze")
-
-        # Process text
-        if remove_references:
-            text = remove_references_section(text)
-
-        if clean_text:
-            text = clean_academic_text(text)
-
-        # Build prompt
-        prompt = f"""Extract the following key bibliographic metadata from this academic paper:
-
-1. Title: The exact paper title
-2. Authors: Complete list of authors as they appear
-3. Affiliations: Author affiliations (company, university, or lab)
-4. Venue: Publication venue (journal name, conference name, or arxiv)
-5. Year: Publication year (only if explicitly mentioned)
-
-Document text:
-{text[:10000]}  # Limit to first 10k chars for metadata extraction
-
-Focus on extracting accurate information for these five fields. Only include venue and year if they can be clearly identified from the text. For affiliations, extract the complete institutional names. For venue, be specific about journal name, conference name, or identify as arXiv preprint if applicable."""
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info("Metadata extraction completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"Metadata extraction timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"Metadata extraction timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"Metadata extraction failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
-
-
-class PreviousMethodsAgent:
-    """Expert agent for analyzing previous work and methodologies."""
+    This replaces the six redundant expert agent classes with a single configurable
+    class that takes system_prompt, output_type, and agent_name as parameters.
+    """
 
     def __init__(
         self,
+        agent_name: str,
+        system_prompt: str,
+        output_type: type[BaseModel],
         model: Union[str, OpenAIChatModel, AnthropicModel],
         max_retries: int = 3,
         timeout: float = 120.0,
         interaction_log: Optional[list] = None,
     ):
-        """Initialize the previous methods agent."""
+        """Initialize the generic expert agent.
+
+        Args:
+            agent_name: Name identifier for logging (e.g., "metadata_extractor")
+            system_prompt: System prompt defining the agent's expertise and behavior
+            output_type: Pydantic model class for structured output
+            model: Model identifier or instance for the LLM provider
+            max_retries: Maximum number of retries for failed requests
+            timeout: Timeout in seconds for analysis operations
+            interaction_log: Shared interaction log list (or create local one)
+        """
         self.logger = get_logger(__name__)
+        self.agent_name = agent_name
+        self.system_prompt = system_prompt
         self.max_retries = max_retries
         self.timeout = timeout
 
@@ -398,39 +299,23 @@ class PreviousMethodsAgent:
         # Interaction log storage (use provided log or create local one)
         self.interaction_log = interaction_log if interaction_log is not None else []
 
-        system_prompt = """You are an expert research analyst specializing in understanding the context of academic papers within their research field. Your task is to analyze how a paper relates to existing work and identify its unique contributions.
-
-Key responsibilities:
-1. Identify key related work and prior approaches mentioned
-2. Extract important methodologies from previous research
-3. Analyze limitations of existing approaches
-4. Identify research gaps the current work addresses
-5. Highlight novel aspects compared to prior work
-
-Guidelines:
-- Focus on the context and background sections
-- Look for explicit mentions of related work
-- Identify limitations mentioned by the authors
-- Pay attention to claims about novelty
-- Consider both methodological and theoretical contributions
-- Be thorough in identifying the research landscape
-
-Provide a comprehensive analysis of how this work fits into the broader research context."""
-
+        # Create the pydantic-ai agent with provided configuration
         self.agent = Agent(
             model=self.model,
             system_prompt=system_prompt,
-            output_type=PreviousMethodsResult,
+            output_type=output_type,
             retries=self.max_retries,
         )
 
+        self.logger.info(f"Initialized {agent_name} agent with model: {self.model_identifier}")
+
     def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
+        """Log interaction for this agent (centralized logging logic)."""
         import datetime
 
         interaction_entry = {
             "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "previous_methods",
+            "agent": self.agent_name,
             "prompt": prompt,
             "output": output,
             "error": error,
@@ -440,603 +325,115 @@ Provide a comprehensive analysis of how this work fits into the broader research
 
         self.interaction_log.append(interaction_entry)
         self.logger.debug(
-            f"PreviousMethods interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
+            f"{self.agent_name} interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
         )
 
     async def analyze(
         self,
-        document: Document,
+        content: str,
         remove_references: bool = True,
         clean_text: bool = True,
-    ) -> PreviousMethodsResult:
-        """Analyze previous work and methods."""
-        self.logger.info("Starting previous methods analysis")
+    ) -> BaseModel:
+        """Analyze content using the agent's specific expertise.
 
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
+        Args:
+            content: Text content to analyze (decoupled from Document object)
+            remove_references: Whether to remove references section
+            clean_text: Whether to clean academic text
+
+        Returns:
+            Structured result as defined by the agent's output_type
+        """
+        self.logger.info(f"Starting {self.agent_name} analysis")
+
+        if not content or not content.strip():
+            raise ValueError("No content provided for analysis")
 
         # Process text
         if remove_references:
-            text = remove_references_section(text)
+            content = remove_references_section(content)
 
         if clean_text:
-            text = clean_academic_text(text)
+            content = clean_academic_text(content)
 
-        # Build prompt
-        prompt = f"""Analyze the research context and previous work related to this academic paper. Focus on:
-
-1. Related work: Identify key papers and approaches mentioned
-2. Key methods: Extract important methodologies from prior research
-3. Limitations: Analyze limitations of existing approaches identified by authors
-4. Research gaps: Identify specific gaps this work addresses
-5. Novelty: Highlight what makes this work novel compared to prior approaches
-
-Document text:
-{text}
-
-Provide a comprehensive analysis of how this work relates to and builds upon previous research."""
+        # Build prompt with the agent's specific analysis focus
+        prompt = self._build_analysis_prompt(content)
 
         try:
             result = await asyncio.wait_for(
                 self.agent.run(prompt),
                 timeout=self.timeout,
             )
-            self.logger.info("Previous methods analysis completed successfully")
+            self.logger.info(f"{self.agent_name} analysis completed successfully")
             self._log_interaction(prompt, str(result.output))
             return result.output
 
         except asyncio.TimeoutError:
             self.logger.error(
-                f"Previous methods analysis timed out after {self.timeout} seconds"
+                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
             )
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
             raise TimeoutError(
-                f"Previous methods analysis timed out after {self.timeout} seconds"
+                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
             ) from None
 
         except Exception as e:
-            self.logger.error(f"Previous methods analysis failed: {e}")
+            self.logger.error(f"{self.agent_name} analysis failed: {e}")
             self._log_interaction(prompt, "", str(e))
             raise
 
-
-class ResearchQuestionsAgent:
-    """Expert agent for analyzing research questions and contributions."""
-
-    def __init__(
-        self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 120.0,
-        interaction_log: Optional[list] = None,
-    ):
-        """Initialize the research questions agent."""
-        self.logger = get_logger(__name__)
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
-        system_prompt = """You are an expert research analyst specializing in identifying the core research questions and contributions of academic papers. Your task is to analyze what questions the paper addresses and what it contributes to the field.
-
-Key responsibilities:
-1. Identify primary research questions
-2. Extract research hypotheses when present
-3. Analyze main contributions of the work
-4. Assess research significance
-5. Identify target audience for the work
-
-Guidelines:
-- Look for explicit research questions in introduction
-- Identify hypotheses in theoretical work
-- Analyze contributions mentioned in abstract and conclusion
-- Consider both theoretical and practical contributions
-- Assess significance based on claimed impact
-- Identify who would benefit from this research
-
-Provide a comprehensive analysis of the research questions and contributions."""
-
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=ResearchQuestionsResult,
-            retries=self.max_retries,
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "research_questions",
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"ResearchQuestions interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    async def analyze(
-        self,
-        document: Document,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> ResearchQuestionsResult:
-        """Analyze research questions and contributions."""
-        self.logger.info("Starting research questions analysis")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        # Process text
-        if remove_references:
-            text = remove_references_section(text)
-
-        if clean_text:
-            text = clean_academic_text(text)
-
-        # Build prompt
-        prompt = f"""Analyze the research questions and contributions of this academic paper. Focus on:
-
-1. Main questions: Identify the primary research questions addressed
-2. Hypotheses: Extract research hypotheses if present
-3. Contributions: Analyze the main contributions of the work
-4. Significance: Assess the significance and impact of the research
-5. Target audience: Identify who would benefit from this research
-
-Document text:
-{text}
-
-Provide a comprehensive analysis of what research questions this work addresses and its contributions to the field."""
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info("Research questions analysis completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"Research questions analysis timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"Research questions analysis timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"Research questions analysis failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
-
-
-class MethodologyAgent:
-    """Expert agent for analyzing methodology and technical approach."""
-
-    def __init__(
-        self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 120.0,
-        interaction_log: Optional[list] = None,
-    ):
-        """Initialize the methodology agent."""
-        self.logger = get_logger(__name__)
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
-        system_prompt = """You are an expert technical analyst specializing in understanding research methodologies in academic papers. Your task is to analyze the technical approach, methods, and experimental design of research work.
-
-Key responsibilities:
-1. Identify the overall methodological approach
-2. Extract specific techniques and algorithms used
-3. Analyze key assumptions made in the methodology
-4. Identify data sources or datasets
-5. Extract evaluation metrics and validation methods
-6. Identify methodological limitations
-7. Assess reproducibility of the approach
-
-Guidelines:
-- Focus on methodology, methods, and experimental setup sections
-- Identify both theoretical foundations and practical implementations
-- Pay attention to assumptions and constraints
-- Consider data collection and processing methods
-- Analyze how results are evaluated
-- Assess limitations and potential issues with the approach
-
-Provide a comprehensive analysis of the technical methodology and approach."""
-
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=MethodologyResult,
-            retries=self.max_retries,
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "methodology",
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"Methodology interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    async def analyze(
-        self,
-        document: Document,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> MethodologyResult:
-        """Analyze methodology and technical approach."""
-        self.logger.info("Starting methodology analysis")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        # Process text
-        if remove_references:
-            text = remove_references_section(text)
-
-        if clean_text:
-            text = clean_academic_text(text)
-
-        # Build prompt
-        prompt = f"""Analyze the methodology and technical approach of this academic paper. Focus on:
-
-1. Overall approach: Describe the main methodological framework
-2. Techniques: Identify specific techniques, algorithms, or methods used
-3. Assumptions: Extract key assumptions made in the methodology
-4. Data sources: Identify datasets or data sources used
-5. Evaluation metrics: Extract metrics used for evaluation
-6. Limitations: Identify methodological limitations
-7. Reproducibility: Assess reproducibility of the approach
-
-Document text:
-{text}
-
-Provide a comprehensive analysis of the technical methodology and experimental approach."""
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info("Methodology analysis completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"Methodology analysis timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"Methodology analysis timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"Methodology analysis failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
-
-
-class ExperimentsAgent:
-    """Expert agent for analyzing experiments and results."""
-
-    def __init__(
-        self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 120.0,
-        interaction_log: Optional[list] = None,
-    ):
-        """Initialize the experiments agent."""
-        self.logger = get_logger(__name__)
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
-        system_prompt = """You are an expert experimental analyst specializing in understanding experimental design and results in academic papers. Your task is to analyze how experiments are conducted and what results are obtained.
-
-Key responsibilities:
-1. Analyze experimental setup and design
-2. Identify datasets and baselines used
-3. Extract key experimental results
-4. Analyze quantitative metrics and performance
-5. Identify qualitative findings and insights
-6. Analyze statistical significance
-7. Examine error analysis and failure cases
-
-Guidelines:
-- Focus on experiments, results, and evaluation sections
-- Identify both quantitative and qualitative results
-- Pay attention to experimental design choices
-- Consider statistical analysis and significance testing
-- Analyze comparison with baseline methods
-- Look for error analysis and ablation studies
-- Extract specific numbers and metrics when available
-
-Provide a comprehensive analysis of the experimental setup, results, and findings."""
-
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=ExperimentResult,
-            retries=self.max_retries,
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "experiments",
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"Experiments interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    async def analyze(
-        self,
-        document: Document,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> ExperimentResult:
-        """Analyze experiments and results."""
-        self.logger.info("Starting experiments analysis")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        # Process text
-        if remove_references:
-            text = remove_references_section(text)
-
-        if clean_text:
-            text = clean_academic_text(text)
-
-        # Build prompt
-        prompt = f"""Analyze the experiments and results of this academic paper. Focus on:
-
-1. Experimental setup: Describe how experiments are designed and conducted
-2. Datasets: Identify datasets used in the experiments
-3. Baselines: Extract baseline methods compared against
-4. Results: Analyze key experimental results and findings
-5. Quantitative results: Extract specific numerical results and metrics
-6. Qualitative findings: Identify qualitative insights and observations
-7. Statistical significance: Analyze statistical significance of results
-8. Error analysis: Examine error analysis and failure cases
-
-Document text:
-{text}
-
-Provide a comprehensive analysis of the experimental setup, results, and findings."""
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info("Experiments analysis completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"Experiments analysis timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"Experiments analysis timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"Experiments analysis failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
-
-
-class FutureDirectionsAgent:
-    """Expert agent for analyzing future work and implications."""
-
-    def __init__(
-        self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 120.0,
-        interaction_log: Optional[list] = None,
-    ):
-        """Initialize the future directions agent."""
-        self.logger = get_logger(__name__)
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
-        system_prompt = """You are an expert research analyst specializing in understanding the broader impact and future directions of academic research. Your task is to analyze the implications, limitations, and future work suggested by academic papers.
-
-Key responsibilities:
-1. Identify suggested future research directions
-2. Analyze current limitations of the work
-3. Extract practical applications and implications
-4. Identify theoretical contributions and impact
-5. Extract open questions raised by the work
-6. Analyze societal impact considerations
-
-Guidelines:
-- Focus on conclusion, discussion, and future work sections
-- Look for explicit mentions of limitations
-- Identify suggested improvements or extensions
-- Consider both theoretical and practical implications
-- Analyze impact on the research field and society
-- Look for open questions and challenges
-
-Provide a comprehensive analysis of the implications, limitations, and future directions."""
-
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=FutureDirectionsResult,
-            retries=self.max_retries,
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": "future_directions",
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"FutureDirections interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    async def analyze(
-        self,
-        document: Document,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> FutureDirectionsResult:
-        """Analyze future directions and implications."""
-        self.logger.info("Starting future directions analysis")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        # Process text
-        if remove_references:
-            text = remove_references_section(text)
-
-        if clean_text:
-            text = clean_academic_text(text)
-
-        # Build prompt
-        prompt = f"""Analyze the future directions and implications of this academic paper. Focus on:
-
-1. Future work: Identify suggested future research directions
-2. Limitations: Analyze current limitations of the work
-3. Practical implications: Extract practical applications and implications
-4. Theoretical implications: Identify theoretical contributions and impact
-5. Open questions: Extract open questions raised by the work
-6. Societal impact: Analyze societal impact considerations
-
-Document text:
-{text}
-
-Provide a comprehensive analysis of the implications, limitations, and future directions of this research."""
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info("Future directions analysis completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"Future directions analysis timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"Future directions analysis timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"Future directions analysis failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
+    def _build_analysis_prompt(self, content: str) -> str:
+        """Build the analysis prompt (can be overridden for custom prompts)."""
+        return build_generic_analysis_prompt(content)
+
+
+# Agent configuration definitions
+
+
+AGENT_CONFIGS = {
+    "metadata": {
+        "agent_name": "metadata_extractor",
+        "system_prompt": METADATA_EXTRACTION_SYSTEM_PROMPT,
+        "output_type": MetadataExtractionResult,
+        "timeout": 60.0,
+        "prompt_builder": build_metadata_analysis_prompt,
+    },
+    "previous_methods": {
+        "agent_name": "previous_methods",
+        "system_prompt": PREVIOUS_METHODS_SYSTEM_PROMPT,
+        "output_type": PreviousMethodsResult,
+        "timeout": 120.0,
+        "prompt_builder": build_previous_methods_analysis_prompt,
+    },
+    "research_questions": {
+        "agent_name": "research_questions",
+        "system_prompt": RESEARCH_QUESTIONS_SYSTEM_PROMPT,
+        "output_type": ResearchQuestionsResult,
+        "timeout": 120.0,
+        "prompt_builder": build_research_questions_analysis_prompt,
+    },
+    "methodology": {
+        "agent_name": "methodology",
+        "system_prompt": METHODOLOGY_SYSTEM_PROMPT,
+        "output_type": MethodologyResult,
+        "timeout": 120.0,
+        "prompt_builder": build_methodology_analysis_prompt,
+    },
+    "experiments": {
+        "agent_name": "experiments",
+        "system_prompt": EXPERIMENTS_SYSTEM_PROMPT,
+        "output_type": ExperimentResult,
+        "timeout": 120.0,
+        "prompt_builder": build_experiments_analysis_prompt,
+    },
+    "future_directions": {
+        "agent_name": "future_directions",
+        "system_prompt": FUTURE_DIRECTIONS_SYSTEM_PROMPT,
+        "output_type": FutureDirectionsResult,
+        "timeout": 120.0,
+        "prompt_builder": build_future_directions_analysis_prompt,
+    },
+}
 
 
 class ToolAgent:
@@ -1046,6 +443,9 @@ class ToolAgent:
     expert sub-agents for comprehensive academic paper analysis. It analyzes
     the abstract to determine which sub-agents to invoke, orchestrates their
     execution, and synthesizes the results into a comprehensive report.
+
+    REFACTORED: Simplified initialization and execution using configuration-driven
+    agent dispatch instead of hardcoded agent instances.
     """
 
     def __init__(
@@ -1080,86 +480,8 @@ class ToolAgent:
             f"Initialized ToolAgent controller with model: {self.model_identifier}"
         )
 
-        # Initialize expert sub-agents
-        self.metadata_agent = MetadataExtractorAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=60.0,
-            interaction_log=self.interaction_log,
-        )
-        self.previous_methods_agent = PreviousMethodsAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=120.0,
-            interaction_log=self.interaction_log,
-        )
-        self.research_questions_agent = ResearchQuestionsAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=120.0,
-            interaction_log=self.interaction_log,
-        )
-        self.methodology_agent = MethodologyAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=120.0,
-            interaction_log=self.interaction_log,
-        )
-        self.experiments_agent = ExperimentsAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=120.0,
-            interaction_log=self.interaction_log,
-        )
-        self.future_directions_agent = FutureDirectionsAgent(
-            model=model,
-            max_retries=self.max_retries,
-            timeout=120.0,
-            interaction_log=self.interaction_log,
-        )
-
         # Controller agent for planning and synthesis
-        # Using 'instructions' instead of 'system_prompt' as recommended by pydantic-ai
-        controller_instructions = """You are an expert academic research coordinator specializing in analyzing academic papers and determining the most effective analysis strategy. Your role is to understand the paper's content and domain to create an optimal analysis plan.
-
-Key responsibilities:
-1. Analyze the abstract to understand the paper's domain and type
-2. Examine the available section names and think about what content each section likely contains
-3. Determine which expert analyses would be most valuable
-4. For each analysis type, carefully select all relevant sections based on their likely content (include all necessary sections, but avoid irrelevant ones)
-5. Plan the sequence and priority of different analyses
-6. Synthesize results from multiple expert analyses into a coherent report
-
-CRITICAL: Think carefully about what each section contains based on its name:
-- "Introduction" typically contains research questions, contributions, and motivation
-- "Related Work" or "Background" contains previous methods and research gaps
-- "Methodology" or "Approach" contains technical details and methods
-- "Experiments" or "Evaluation" contains experimental setup and results
-- "Conclusion" or "Discussion" contains limitations and future work
-
-For section selection, ALWAYS analyze the section names and think:
-"What content would this section likely contain based on its name?"
-"Would this content be useful for this specific analysis type?"
-"Include ALL relevant sections that would contribute meaningful content, but exclude irrelevant ones"
-
-Analysis types available:
-- Metadata extraction: Bibliographic information and paper identification
-- Previous methods analysis: Context, related work, and novelty assessment
-- Research questions analysis: Core questions, contributions, and significance
-- Methodology analysis: Technical approach, methods, and design choices
-- Experiments analysis: Experimental setup, results, and validation
-- Future directions analysis: Limitations, implications, and future work
-
-Guidelines for planning:
-- Consider the paper's domain (e.g., theoretical CS, empirical study, survey)
-- Assess what information is likely to be present based on abstract content
-- Prioritize analyses that will provide the most valuable insights
-- Consider which analyses are most relevant for the paper type
-- Plan for comprehensive but focused analysis
-- Select all relevant sections for each analysis type, but only those that contain necessary content
-- If a section would not contribute meaningful information to a specific analysis, exclude it
-
-Provide clear reasoning for your analysis plan and relevance assessments."""
+        controller_instructions = CONTROLLER_INSTRUCTIONS
 
         self.controller_agent = Agent(
             model=self.model,
@@ -1169,6 +491,39 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         )
 
         self.logger.info("ToolAgent controller initialized successfully")
+
+    def _create_expert_agent(self, analysis_type: str) -> ExpertAgent:
+        """Create an expert agent instance based on configuration.
+
+        Args:
+            analysis_type: Type of analysis (e.g., "metadata", "methodology")
+
+        Returns:
+            Configured ExpertAgent instance
+        """
+        if analysis_type not in AGENT_CONFIGS:
+            raise ValueError(f"Unknown analysis type: {analysis_type}")
+
+        config = AGENT_CONFIGS[analysis_type]
+
+        # Override the default _build_analysis_prompt method if custom prompt builder provided
+        class ConfiguredExpertAgent(ExpertAgent):
+            def _build_analysis_prompt(self, content: str) -> str:
+                if "prompt_builder" in config:
+                    return config["prompt_builder"](content)
+                return super()._build_analysis_prompt(content)
+
+        agent = ConfiguredExpertAgent(
+            agent_name=config["agent_name"],
+            system_prompt=config["system_prompt"],
+            output_type=config["output_type"],
+            model=self.model,
+            max_retries=self.max_retries,
+            timeout=config["timeout"],
+            interaction_log=self.interaction_log,
+        )
+
+        return agent
 
     def _log_interaction(
         self, agent_name: str, prompt: str, output: str, error: Optional[str] = None
@@ -1258,74 +613,34 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
             "PLANNED ANALYSES:",
         ]
 
-        if analysis_plan.analyze_metadata:
-            plan_display.extend(
-                [
-                    "✓ Metadata Extraction Agent",
-                    "  Sections: First 3 chunks (title, authors, abstract)",
-                    "",
-                ]
-            )
+        analysis_configs = [
+            ("analyze_metadata", "Metadata Extraction Agent", "First 3 chunks (title, authors, abstract)"),
+            ("analyze_previous_methods", "Previous Methods Agent", "previous_methods_sections"),
+            ("analyze_research_questions", "Research Questions Agent", "research_questions_sections"),
+            ("analyze_methodology", "Methodology Agent", "methodology_sections"),
+            ("analyze_experiments", "Experiments Agent", "experiments_sections"),
+            ("analyze_future_directions", "Future Directions Agent", "future_directions_sections"),
+        ]
 
-        if analysis_plan.analyze_previous_methods:
-            sections = analysis_plan.previous_methods_sections or ["All sections"]
-            if sections == ["All sections"]:
-                sections_display = (
-                    "All sections ⚠️  (fallback - consider improving section selection)"
-                )
-            else:
-                sections_display = f"{', '.join(sections)}"
-            plan_display.extend(
-                ["✓ Previous Methods Agent", f"  Sections: {sections_display}", ""]
-            )
-
-        if analysis_plan.analyze_research_questions:
-            sections = analysis_plan.research_questions_sections or ["All sections"]
-            if sections == ["All sections"]:
-                sections_display = (
-                    "All sections ⚠️  (fallback - consider improving section selection)"
-                )
-            else:
-                sections_display = f"{', '.join(sections)}"
-            plan_display.extend(
-                ["✓ Research Questions Agent", f"  Sections: {sections_display}", ""]
-            )
-
-        if analysis_plan.analyze_methodology:
-            sections = analysis_plan.methodology_sections or ["All sections"]
-            if sections == ["All sections"]:
-                sections_display = (
-                    "All sections ⚠️  (fallback - consider improving section selection)"
-                )
-            else:
-                sections_display = f"{', '.join(sections)}"
-            plan_display.extend(
-                ["✓ Methodology Agent", f"  Sections: {sections_display}", ""]
-            )
-
-        if analysis_plan.analyze_experiments:
-            sections = analysis_plan.experiments_sections or ["All sections"]
-            if sections == ["All sections"]:
-                sections_display = (
-                    "All sections ⚠️  (fallback - consider improving section selection)"
-                )
-            else:
-                sections_display = f"{', '.join(sections)}"
-            plan_display.extend(
-                ["✓ Experiments Agent", f"  Sections: {sections_display}", ""]
-            )
-
-        if analysis_plan.analyze_future_directions:
-            sections = analysis_plan.future_directions_sections or ["All sections"]
-            if sections == ["All sections"]:
-                sections_display = (
-                    "All sections ⚠️  (fallback - consider improving section selection)"
-                )
-            else:
-                sections_display = f"{', '.join(sections)}"
-            plan_display.extend(
-                ["✓ Future Directions Agent", f"  Sections: {sections_display}", ""]
-            )
+        for plan_field, agent_name, sections_field in analysis_configs:
+            if getattr(analysis_plan, plan_field):
+                if sections_field == "First 3 chunks (title, authors, abstract)":
+                    plan_display.extend([
+                        f"✓ {agent_name}",
+                        f"  Sections: {sections_field}",
+                        ""
+                    ])
+                else:
+                    sections = getattr(analysis_plan, sections_field) or ["All sections"]
+                    if sections == ["All sections"]:
+                        sections_display = "All sections ⚠️  (fallback - consider improving section selection)"
+                    else:
+                        sections_display = f"{', '.join(sections)}"
+                    plan_display.extend([
+                        f"✓ {agent_name}",
+                        f"  Sections: {sections_display}",
+                        ""
+                    ])
 
         plan_display.extend([f"Reasoning: {analysis_plan.reasoning}", ""])
 
@@ -1422,10 +737,6 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
                 "Please provide a PDF document."
             )
 
-        # Note: The to_markdown validation has been removed since Document API no longer exposes this attribute.
-        # Documents should be created with Document.from_file('paper.pdf', to_markdown=True) to ensure
-        # proper markdown conversion for ToolAgent analysis.
-
     def _log_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]):
         """Log the analysis plan for debugging.
 
@@ -1516,7 +827,7 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
         if text:
             fallback_text = text[:2000]
             self.logger.warning(
-                f"No abstract found in document, using first 2000 chars of document as fallback for analysis planning"
+                "No abstract found in document, using first 2000 chars of document as fallback for analysis planning"
             )
             return fallback_text
 
@@ -1559,86 +870,7 @@ Provide clear reasoning for your analysis plan and relevance assessments."""
                 reasoning="No abstract available, using comprehensive analysis plan with all sections",
             )
 
-        prompt = f"""Based on the following abstract and available sections, create an optimal analysis plan for this academic paper.
-
-Abstract:
-{abstract}
-
-Available Sections in Document:
-{section_names}
-
-IMPORTANT: For each analysis type, you must carefully analyze the section names and think about what content each section likely contains. Then select ALL relevant sections that would contribute meaningful content to that analysis.
-
-THINKING PROCESS FOR SECTION SELECTION:
-1. Look at each section name and ask: "What content would this section contain?"
-2. For each analysis type, ask: "Which sections would have relevant content that would contribute to this analysis?"
-3. Include ALL sections that would be useful, but exclude those that wouldn't contribute meaningful information
-4. If section names are unclear, make your best guess based on academic paper structure
-
-ANALYSIS TYPES AND SECTION SELECTION STRATEGY:
-
-**Previous Methods Analysis**:
-- Look for sections like "Introduction", "Related Work", "Background", "Literature Review"
-- These sections typically discuss prior research and limitations
-- Include all sections that would contain discussion of existing approaches or research context
-
-**Research Questions Analysis**:
-- Look for sections like "Introduction", "Abstract", "Conclusion", "Discussion"
-- These sections typically state the main research questions and contributions
-- Include all sections that would contain the core research objectives, goals, or contributions
-
-**Methodology Analysis**:
-- Look for sections like "Methodology", "Methods", "Approach", "Technical Details", "System Design"
-- These sections describe the technical approach and implementation
-- Include all sections that would contain technical methods, design choices, or implementation details
-
-**Experiments Analysis**:
-- Look for sections like "Experiments", "Evaluation", "Results", "Experiments and Results", "Setup"
-- These sections contain experimental setup, datasets, and results
-- Include all sections that would contain empirical evaluation, experimental design, or results
-
-**Future Directions Analysis**:
-- Look for sections like "Conclusion", "Discussion", "Future Work", "Limitations", "Implications"
-- These sections typically discuss limitations and future research directions
-- Include all sections that would contain forward-looking content, limitations, or implications
-
-EXAMPLES:
-If sections are: ["1. Introduction", "2. Background", "3. Our Approach", "4. Experiments", "5. Conclusion"]
-
-Good selection with reasoning:
-- Previous Methods: ["Introduction", "Background"]
-  Reasoning: "Introduction contains research context and Background discusses related work - both provide necessary context for understanding previous methods"
-- Research Questions: ["Introduction", "Conclusion"]
-  Reasoning: "Introduction states research goals and Conclusion summarizes contributions - both sections contain core research objectives"
-- Methodology: ["Our Approach", "Introduction" (if it describes approach)]
-  Reasoning: "Our Approach section contains technical methods and Introduction may describe the overall approach - both provide methodological information"
-- Experiments: ["Experiments", "Setup", "Results"] (if all present)
-  Reasoning: "All these sections contain different aspects of experimental evaluation - setup, methodology, and results"
-- Future Directions: ["Conclusion", "Discussion", "Limitations"] (if all present)
-  Reasoning: "All these sections provide different perspectives on limitations and future directions"
-
-Bad selection:
-- Previous Methods: ["All sections"]
-  Problem: "Includes sections that wouldn't contribute to understanding previous methods (e.g., detailed technical implementation)"
-- Research Questions: ["Technical Implementation", "Appendix"]
-  Problem: "These sections unlikely to contain core research questions or contributions"
-
-YOUR TASK:
-1. Analyze the available section names and think about their likely content
-2. For each analysis type, select ALL relevant sections that would contribute meaningful content
-3. Provide specific reasoning for your section choices
-4. Return both which analyses to perform AND which specific sections to use
-
-For metadata extraction, I will always use the first 3 chunks since they typically contain title, authors, and abstract.
-
-Consider:
-1. What type of paper this appears to be (theoretical, empirical, survey, etc.)
-2. What domain/field the paper is in
-3. What information is likely to be present based on the abstract and available sections
-4. Which analyses would provide the most valuable insights
-5. Which sections are most relevant for each analysis type based on their likely content
-
-Provide a comprehensive analysis plan with clear reasoning and specific section selection."""
+        prompt = build_analysis_planning_prompt(abstract, section_names)
 
         try:
             self.logger.debug(
@@ -1715,6 +947,9 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
     ) -> dict[str, Any]:
         """Execute selected sub-agents based on analysis plan with section filtering.
 
+        REFACTORED: Uses dynamic dispatch with configuration-driven agent creation
+        instead of hardcoded agent instances and repetitive if-blocks.
+
         Args:
             document: Document object to analyze
             analysis_plan: Plan determining which agents to execute and which sections to use
@@ -1729,171 +964,59 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
         tasks = []
         sections_analyzed = {}
 
-        # Metadata agent - always use first 3 chunks
-        if analysis_plan.analyze_metadata:
-            metadata_chunks = (
-                document.chunks[:3] if len(document.chunks) >= 3 else document.chunks
-            )
-            metadata_document = self._create_filtered_document(
-                document, metadata_chunks
-            )
-            sections_analyzed["metadata"] = [f"First {len(metadata_chunks)} chunks"]
+        # Define analysis tasks with their corresponding sections fields
+        analysis_tasks = [
+            ("analyze_metadata", "metadata", "metadata", None),  # Special case: uses first 3 chunks
+            ("analyze_previous_methods", "previous_methods", "previous_methods_sections", "previous_methods_sections"),
+            ("analyze_research_questions", "research_questions", "research_questions_sections", "research_questions_sections"),
+            ("analyze_methodology", "methodology", "methodology_sections", "methodology_sections"),
+            ("analyze_experiments", "experiments", "experiments_sections", "experiments_sections"),
+            ("analyze_future_directions", "future_directions", "future_directions_sections", "future_directions_sections"),
+        ]
 
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.metadata_agent.analyze(metadata_document),
-                    "metadata_extraction",
-                )
-            )
-            tasks.append(("metadata", task))
+        # Dynamically create and dispatch tasks based on analysis plan
+        for plan_field, agent_key, result_key, sections_field in analysis_tasks:
+            if getattr(analysis_plan, plan_field):
+                # Determine content for analysis
+                if agent_key == "metadata":
+                    # Special case: metadata uses first 3 chunks
+                    metadata_chunks = (
+                        document.chunks[:3] if len(document.chunks) >= 3 else document.chunks
+                    )
+                    content = " ".join([chunk.content for chunk in metadata_chunks])
+                    sections_analyzed[result_key] = [f"First {len(metadata_chunks)} chunks"]
+                else:
+                    # Use planned sections or full document
+                    sections = getattr(analysis_plan, sections_field)
+                    if sections:
+                        # Deduplicate sections within this agent
+                        deduplicated_sections = self._deduplicate_sections(sections)
+                        filtered_chunks = document.get_sections_by_name(deduplicated_sections)
+                        content = " ".join([chunk.content for chunk in filtered_chunks])
+                        sections_analyzed[result_key] = deduplicated_sections
+                        self.logger.debug(
+                            f"{agent_key} agent using specific sections: {deduplicated_sections}"
+                        )
+                    else:
+                        # Use full document content
+                        if document.chunks:
+                            content = document.get_full_text()
+                        else:
+                            content = document.text
+                        sections_analyzed[result_key] = ["All sections"]
+                        self.logger.warning(
+                            f"{agent_key} agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
+                        )
 
-        # Previous methods agent - use planned sections or full document
-        if analysis_plan.analyze_previous_methods:
-            if analysis_plan.previous_methods_sections:
-                # Deduplicate sections within this agent
-                deduplicated_sections = self._deduplicate_sections(
-                    analysis_plan.previous_methods_sections
+                # Create agent and task dynamically
+                agent = self._create_expert_agent(agent_key)
+                task = asyncio.create_task(
+                    self._safe_execute_agent(
+                        agent.analyze(content),
+                        agent_key,
+                    )
                 )
-                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
-                filtered_document = self._create_filtered_document(
-                    document, filtered_chunks
-                )
-                sections_analyzed["previous_methods"] = deduplicated_sections
-                self.logger.debug(
-                    f"Previous methods agent using specific sections: {deduplicated_sections}"
-                )
-            else:
-                filtered_document = document
-                sections_analyzed["previous_methods"] = ["All sections"]
-                self.logger.warning(
-                    "Previous methods agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
-                )
-
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.previous_methods_agent.analyze(filtered_document),
-                    "previous_methods",
-                )
-            )
-            tasks.append(("previous_methods", task))
-
-        # Research questions agent - use planned sections or full document
-        if analysis_plan.analyze_research_questions:
-            if analysis_plan.research_questions_sections:
-                # Deduplicate sections within this agent
-                deduplicated_sections = self._deduplicate_sections(
-                    analysis_plan.research_questions_sections
-                )
-                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
-                filtered_document = self._create_filtered_document(
-                    document, filtered_chunks
-                )
-                sections_analyzed["research_questions"] = deduplicated_sections
-                self.logger.debug(
-                    f"Research questions agent using specific sections: {deduplicated_sections}"
-                )
-            else:
-                filtered_document = document
-                sections_analyzed["research_questions"] = ["All sections"]
-                self.logger.warning(
-                    "Research questions agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
-                )
-
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.research_questions_agent.analyze(filtered_document),
-                    "research_questions",
-                )
-            )
-            tasks.append(("research_questions", task))
-
-        # Methodology agent - use planned sections or full document
-        if analysis_plan.analyze_methodology:
-            if analysis_plan.methodology_sections:
-                # Deduplicate sections within this agent
-                deduplicated_sections = self._deduplicate_sections(
-                    analysis_plan.methodology_sections
-                )
-                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
-                filtered_document = self._create_filtered_document(
-                    document, filtered_chunks
-                )
-                sections_analyzed["methodology"] = deduplicated_sections
-                self.logger.debug(
-                    f"Methodology agent using specific sections: {deduplicated_sections}"
-                )
-            else:
-                filtered_document = document
-                sections_analyzed["methodology"] = ["All sections"]
-                self.logger.warning(
-                    "Methodology agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
-                )
-
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.methodology_agent.analyze(filtered_document), "methodology"
-                )
-            )
-            tasks.append(("methodology", task))
-
-        # Experiments agent - use planned sections or full document
-        if analysis_plan.analyze_experiments:
-            if analysis_plan.experiments_sections:
-                # Deduplicate sections within this agent
-                deduplicated_sections = self._deduplicate_sections(
-                    analysis_plan.experiments_sections
-                )
-                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
-                filtered_document = self._create_filtered_document(
-                    document, filtered_chunks
-                )
-                sections_analyzed["experiments"] = deduplicated_sections
-                self.logger.debug(
-                    f"Experiments agent using specific sections: {deduplicated_sections}"
-                )
-            else:
-                filtered_document = document
-                sections_analyzed["experiments"] = ["All sections"]
-                self.logger.warning(
-                    "Experiments agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
-                )
-
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.experiments_agent.analyze(filtered_document), "experiments"
-                )
-            )
-            tasks.append(("experiments", task))
-
-        # Future directions agent - use planned sections or full document
-        if analysis_plan.analyze_future_directions:
-            if analysis_plan.future_directions_sections:
-                # Deduplicate sections within this agent
-                deduplicated_sections = self._deduplicate_sections(
-                    analysis_plan.future_directions_sections
-                )
-                filtered_chunks = document.get_sections_by_name(deduplicated_sections)
-                filtered_document = self._create_filtered_document(
-                    document, filtered_chunks
-                )
-                sections_analyzed["future_directions"] = deduplicated_sections
-                self.logger.debug(
-                    f"Future directions agent using specific sections: {deduplicated_sections}"
-                )
-            else:
-                filtered_document = document
-                sections_analyzed["future_directions"] = ["All sections"]
-                self.logger.warning(
-                    "Future directions agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
-                )
-
-            task = asyncio.create_task(
-                self._safe_execute_agent(
-                    self.future_directions_agent.analyze(filtered_document),
-                    "future_directions",
-                )
-            )
-            tasks.append(("future_directions", task))
+                tasks.append((result_key, task))
 
         if not tasks:
             self.logger.warning("No agents selected for execution")
@@ -1966,7 +1089,7 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
             "You are an expert academic research analyst tasked with creating a comprehensive, coherent report from multiple expert analyses of an academic paper.",
             "",
             "REPORT STRUCTURE REQUIREMENTS:",
-            f"1. Title: Always start with the exact paper title followed by ' - Comprehensive Report'",
+            "1. Title: Always start with the exact paper title followed by ' - Comprehensive Report'",
             "2. Metadata Section: Include a clear metadata section with article information in list or table format",
             "3. Content Sections: Create well-organized content sections based on the available analyses",
             "4. Focus: Write directly about the paper content without mentioning agents, tools, or analysis processes",
@@ -2010,7 +1133,7 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
                 "Create a comprehensive academic paper analysis report with the following structure:",
                 "",
                 "REPORT FORMAT:",
-                f"[Exact Paper Title] - Comprehensive Report",
+                "[Exact Paper Title] - Comprehensive Report",
                 "",
                 "## Paper Information",
                 "- **Title:** [Paper title]",
@@ -2046,12 +1169,17 @@ Provide a comprehensive analysis plan with clear reasoning and specific section 
             ]
         )
 
-        prompt = "\n".join(prompt_parts)
+        prompt = build_report_synthesis_prompt(
+            paper_title=paper_title,
+            source_path=str(document.source_path) if document.source_path else "text document",
+            abstract=self.extract_abstract(document),
+            sub_agent_results=sub_agent_results,
+        )
 
         # Create synthesis agent
         synthesis_agent = Agent(
             model=self.model,
-            system_prompt="You are an expert academic research analyst specializing in creating comprehensive, well-structured reports from multiple expert analyses.",
+            system_prompt=SYNTHESIS_SYSTEM_PROMPT,
             retries=self.max_retries,
         )
 
