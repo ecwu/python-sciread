@@ -188,6 +188,7 @@ SYNTHESIS_SYSTEM_PROMPT = "You are an expert academic research analyst specializ
 # Analysis Prompt Templates
 # ============================================================================
 
+
 def build_metadata_analysis_prompt(content: str) -> str:
     """Build prompt for metadata extraction analysis."""
     return f"""Extract the following key bibliographic metadata from this academic paper:
@@ -202,6 +203,7 @@ Document text:
 {content[:10000]}  # Limit to first 10k chars for metadata extraction
 
 Focus on extracting accurate information for these five fields. Only include venue and year if they can be clearly identified from the text. For affiliations, extract the complete institutional names. For venue, be specific about journal name, conference name, or identify as arXiv preprint if applicable."""
+
 
 def build_previous_methods_analysis_prompt(content: str) -> str:
     """Build prompt for previous methods analysis."""
@@ -218,6 +220,7 @@ Document text:
 
 Provide a comprehensive analysis of how this work relates to and builds upon previous research."""
 
+
 def build_research_questions_analysis_prompt(content: str) -> str:
     """Build prompt for research questions analysis."""
     return f"""Analyze the research questions and contributions of this academic paper. Focus on:
@@ -232,6 +235,7 @@ Document text:
 {content}
 
 Provide a comprehensive analysis of what research questions this work addresses and its contributions to the field."""
+
 
 def build_methodology_analysis_prompt(content: str) -> str:
     """Build prompt for methodology analysis."""
@@ -249,6 +253,7 @@ Document text:
 {content}
 
 Provide a comprehensive analysis of the technical methodology and experimental approach."""
+
 
 def build_experiments_analysis_prompt(content: str) -> str:
     """Build prompt for experiments analysis."""
@@ -268,6 +273,7 @@ Document text:
 
 Provide a comprehensive analysis of the experimental setup, results, and findings."""
 
+
 def build_future_directions_analysis_prompt(content: str) -> str:
     """Build prompt for future directions analysis."""
     return f"""Analyze the future directions and implications of this academic paper. Focus on:
@@ -284,9 +290,11 @@ Document text:
 
 Provide a comprehensive analysis of the implications, limitations, and future directions of this research."""
 
+
 # ============================================================================
 # Planning and Synthesis Prompt Templates
 # ============================================================================
+
 
 def build_analysis_planning_prompt(abstract: str, section_names: list[str]) -> str:
     """Build prompt for analysis planning."""
@@ -371,6 +379,7 @@ Consider:
 
 Provide a comprehensive analysis plan with clear reasoning and specific section selection."""
 
+
 def build_report_synthesis_prompt(
     paper_title: str,
     source_path: str,
@@ -406,9 +415,7 @@ def build_report_synthesis_prompt(
     for agent_name, result_data in sub_agent_results.items():
         if result_data.get("success", False):
             result = result_data["result"]
-            prompt_parts.extend(
-                [f"{agent_name.upper()} ANALYSIS:", str(result), ""]
-            )
+            prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
         else:
             prompt_parts.extend(
                 [
@@ -447,7 +454,7 @@ def build_report_synthesis_prompt(
             "Choose and order sections based on what's most relevant to the paper. Use only the sections that have meaningful content.",
             "",
             "WRITING GUIDELINES:",
-            "1. Use the exact paper title followed by ' - Comprehensive Report' as the main title",
+            "1. Use the exact paper title followed by ' - Structural Report' as the main title",
             "2. Include a comprehensive metadata section with all available bibliographic information",
             "3. Focus exclusively on the paper's content, findings, and contributions",
             "4. DO NOT mention agents, tools, sub-agents, analysis processes, or methodologies used to create the report",
@@ -463,9 +470,11 @@ def build_report_synthesis_prompt(
 
     return "\n".join(prompt_parts)
 
+
 # ============================================================================
 # Generic Prompt Template
 # ============================================================================
+
 
 def build_generic_analysis_prompt(content: str) -> str:
     """Build a generic analysis prompt for expert agents."""
