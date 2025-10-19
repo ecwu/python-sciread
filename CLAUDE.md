@@ -35,8 +35,12 @@ src/sciread/
 ├── __init__.py      # Package initialization, exports main functions
 ├── agent/          # Agent module for LLM-driven processing
 │   ├── __init__.py
-│   ├── react_agent.py
-│   └── react_models.py
+│   ├── tool_agent.py     # Multi-agent ToolAgent system for comprehensive analysis
+│   ├── document_agent.py # Single DocumentAgent for basic analysis
+│   ├── react_agent.py    # ReAct agent for intelligent iterative analysis
+│   ├── react_models.py   # Pydantic models for ReAct agent
+│   ├── factory.py        # Agent factory functions
+│   └── text_processor.py # Text processing utilities
 ├── cli.py          # Command-line interface entry point
 ├── config.py       # Configuration management for API keys and provider settings
 ├── core.py         # Core functionality (compute function)
@@ -70,12 +74,39 @@ src/sciread/
 ```
 
 ### Key Components
-- **Core Function**: `compute()` in `src/sciread/core.py` - currently returns the longest string from input arguments
-- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution
+- **Core Function**: `compute()` in `src/sciread/core.py` - main entry point for analysis operations
+- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, tool, react)
 - **Package Interface**: `__init__.py` exports the `compute` function as the main API
 - **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
 - **Document Module**: `document/` provides comprehensive document processing capabilities
+- **Agent Module**: `agent/` provides LLM-driven document analysis agents
 - **LLM Provider Module**: `llm_provider/` provides unified interface for multiple LLM providers
+
+#### Agent System
+The `agent` module provides a complete LLM-driven analysis system:
+
+**Multi-Agent ToolAgent**: `ToolAgent` in `src/sciread/agent/tool_agent.py`
+- Coordinates multiple expert sub-agents for comprehensive analysis
+- Expert agents: metadata extraction, methodology analysis, experiments evaluation, etc.
+- Intelligent analysis planning based on document structure
+- Comprehensive report synthesis from sub-agent results
+- Built-in debug logging with detailed interaction traces
+
+**Single DocumentAgent**: `DocumentAgent` in `src/sciread/agent/document_agent.py`
+- Simple, single-agent analysis for basic document processing
+- Configurable analysis tasks and prompts
+- Direct LLM interaction for straightforward analysis needs
+
+**ReAct Agent**: `ReActAgent` in `src/sciread/agent/react_agent.py`
+- Reasoning and Acting pattern for intelligent iterative analysis
+- Dynamic analysis strategy adaptation
+- Custom task execution with reasoning steps
+- Progress tracking and loop control
+
+**Debug Logging**: All agents support detailed debug logging
+- Enable with `LOG_LEVEL=DEBUG` environment variable
+- Shows detailed prompts, outputs, and agent interactions
+- Example: `LOG_LEVEL=DEBUG python -msciread tool paper.pdf`
 
 #### Document Processing System
 The `document` module provides a complete pipeline for processing academic papers:
@@ -344,3 +375,41 @@ class CustomSplitter(BaseSplitter):
 builder = DocumentBuilder(loader=CustomLoader(), splitter=CustomSplitter())
 doc = builder.from_file("custom.ext")
 ```
+
+### CLI Usage Examples
+
+The sciread package provides a comprehensive command-line interface with three analysis modes:
+
+```bash
+# Tool mode - Multi-agent comprehensive analysis (recommended for academic papers)
+python -msciread tool paper.pdf
+python -msciread tool paper.pdf deepseek/reasoner
+
+# Simple mode - Single agent basic analysis
+python -msciread simple paper.pdf
+python -msciread simple paper.txt
+
+# ReAct mode - Intelligent iterative analysis with custom tasks
+python -msciread react paper.pdf
+python -msciread react paper.pdf "What are the main contributions?"
+python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
+```
+
+**Debug Logging**: Enable detailed agent interactions and prompts:
+
+```bash
+# Enable debug logging to see all agent interactions
+LOG_LEVEL=DEBUG python -msciread tool paper.pdf
+
+# Debug logging works with all modes
+LOG_LEVEL=DEBUG python -msciread simple paper.pdf
+LOG_LEVEL=DEBUG python -msciread react paper.pdf "Custom task"
+```
+
+**Available Models**:
+- `deepseek/deepseek-chat` (default)
+- `deepseek/deepseek-reasoner`
+- `glm-4`, `glm-4.5`
+- `ollama/qwen3:4b` (local models)
+
+The CLI automatically handles document loading, text splitting, and agent coordination. Debug logging shows detailed prompts, outputs, and agent decision-making processes.
