@@ -20,79 +20,72 @@ class TestDocument:
         assert doc.text == text
         assert doc.metadata.title == "Test Document"
         assert doc.source_path is None
-        assert doc.is_loaded  # Text-based documents are automatically loaded
-        assert not doc.is_split
+        assert doc.processing_state.loaded_at is not None  # Document is automatically loaded
+        assert doc.is_split  # Document is automatically split
 
     def test_document_from_file(self, sample_txt_file):
         """Test creating document from file path."""
         doc = Document.from_file(sample_txt_file)
 
         assert doc.source_path == sample_txt_file
-        assert not doc.is_loaded
-        assert not doc.is_split
+        assert doc.processing_state.loaded_at is not None  # Document is automatically loaded
+        assert doc.is_split  # Document is automatically split
 
     def test_load_txt_file(self, sample_txt_file):
         """Test loading a text file."""
         doc = Document.from_file(sample_txt_file)
-        result = doc.load()
 
-        assert result.success
-        assert doc.is_loaded
+        # Document is automatically loaded and split by from_file()
         assert len(doc.text) > 0
         assert "Abstract" in doc.text
         assert "Introduction" in doc.text
 
-    def test_load_without_source_path(self):
-        """Test loading when no source path is set."""
+    def test_document_properties_without_source_path(self):
+        """Test document properties when no source path is set."""
         doc = Document.from_text("Some text")
-        with pytest.raises(ValueError, match="No source path specified"):
-            doc.load()
+        assert doc.source_path is None
+        assert doc.text == "Some text"
+        assert doc.processing_state.loaded_at is not None
 
     def test_split_document(self, sample_txt_file):
-        """Test splitting a document."""
+        """Test that document is automatically split."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        chunks = doc.split()
 
         assert doc.is_split
-        assert len(chunks) > 1
         assert len(doc.chunks) > 1
 
         # Check chunk properties
-        for chunk in chunks:
+        for chunk in doc.chunks:
             assert isinstance(chunk, Chunk)
             assert len(chunk.content) > 0
             assert isinstance(chunk.position, int)
 
-    def test_split_without_loading(self, sample_txt_file):
-        """Test splitting without loading first."""
+    def test_document_auto_splitting(self, sample_txt_file):
+        """Test that document is automatically loaded and split by from_file()."""
         doc = Document.from_file(sample_txt_file)
-        with pytest.raises(ValueError, match="Document must be loaded before splitting"):
-            doc.split()
+        # Document should be automatically split
+        assert doc.is_split
+        assert len(doc.chunks) > 0
 
     def test_split_empty_document(self):
-        """Test splitting empty document."""
-        doc = Document.from_text("")
-        doc._loaded = True  # Manually set as loaded
+        """Test splitting empty document raises ValueError."""
         with pytest.raises(ValueError, match="Cannot split empty document"):
-            doc.split()
+            Document.from_text("")
 
-    def test_split_with_custom_splitter(self, sample_txt_file):
-        """Test splitting with custom splitter."""
+    def test_document_with_default_splitter(self, sample_txt_file):
+        """Test document created with default splitter."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
 
-        custom_splitter = TopicFlowSplitter(min_segment_sentences=3, min_segment_chars=100, max_segment_chars=1000, cache_embeddings=False)
-        chunks = doc.split(custom_splitter)
-
-        assert len(chunks) > 0
-        # Should use TopicFlow splitting
+        # Document should be automatically split with default splitter
+        assert len(doc.chunks) > 0
+        # Each chunk should have basic properties
+        for chunk in doc.chunks:
+            assert isinstance(chunk, Chunk)
+            assert len(chunk.content) > 0
 
     def test_get_chunks_filtered(self, sample_txt_file):
         """Test getting chunks with filters."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         # Get all chunks
         all_chunks = doc.get_chunks()
@@ -113,8 +106,6 @@ class TestDocument:
     def test_get_unprocessed_chunks(self, sample_txt_file):
         """Test getting unprocessed chunks."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         unprocessed = doc.get_unprocessed_chunks()
         assert len(unprocessed) > 0
@@ -127,8 +118,6 @@ class TestDocument:
     def test_next_unprocessed(self, sample_txt_file):
         """Test getting next unprocessed chunk."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         # Get first unprocessed chunk
         first = doc.next_unprocessed()
@@ -149,8 +138,6 @@ class TestDocument:
     def test_mark_all_processed(self, sample_txt_file):
         """Test marking all chunks as processed."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         doc.mark_all_processed()
 
@@ -186,16 +173,12 @@ class TestDocument:
     def test_length(self, sample_txt_file):
         """Test document length."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         assert len(doc) == len(doc.chunks)
 
     def test_indexing(self, sample_txt_file):
         """Test document indexing."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         if len(doc.chunks) > 0:
             # Test single index
@@ -213,16 +196,8 @@ class TestDocument:
         """Test that processing state is updated correctly."""
         doc = Document.from_file(sample_txt_file)
 
-        # Initially should have no timestamps
-        assert doc.processing_state.loaded_at is None
-        assert doc.processing_state.split_at is None
-
-        # Load should update loaded_at
-        doc.load()
+        # Document should be automatically loaded and split
         assert doc.processing_state.loaded_at is not None
-
-        # Split should update split_at
-        doc.split()
         assert doc.processing_state.split_at is not None
 
         # Mark all processed should update last_processed_at
@@ -232,8 +207,6 @@ class TestDocument:
     def test_processing_notes(self, sample_txt_file):
         """Test processing notes are added."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
 
         # Should have notes for loading and splitting
         assert len(doc.processing_state.notes) >= 2
