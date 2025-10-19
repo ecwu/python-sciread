@@ -110,7 +110,7 @@ class Document:
     def get_chunks(
         self,
         processed: Optional[bool] = None,
-        chunk_type: Optional[str] = None,
+        chunk_name: Optional[str] = None,
         limit: Optional[int] = None,
         confidence_threshold: Optional[float] = None,
         min_length: Optional[int] = None,
@@ -125,7 +125,7 @@ class Document:
 
         Args:
             processed: Filter by processing status (True for processed, False for unprocessed).
-            chunk_type: Filter by specific chunk type.
+            chunk_name: Filter by specific chunk name (section name).
             limit: Maximum number of chunks to return.
             confidence_threshold: Minimum confidence score (0.0-1.0).
             min_length: Minimum character length for chunks.
@@ -142,7 +142,7 @@ class Document:
             doc.get_chunks(confidence_threshold=0.7, min_length=100)
 
             # Get abstract chunks that haven't been processed yet
-            doc.get_chunks(chunk_type="abstract", processed=False)
+            doc.get_chunks(chunk_name="abstract", processed=False)
 
             # Get first 5 chunks with high confidence
             doc.get_chunks(confidence_threshold=0.8, limit=5)
@@ -153,9 +153,9 @@ class Document:
         if processed is not None:
             chunks = [chunk for chunk in chunks if chunk.processed == processed]
 
-        # Filter by chunk type
-        if chunk_type is not None:
-            chunks = [chunk for chunk in chunks if chunk.chunk_type == chunk_type]
+        # Filter by chunk name
+        if chunk_name is not None:
+            chunks = [chunk for chunk in chunks if chunk.chunk_name == chunk_name]
 
         # Filter by confidence threshold
         if confidence_threshold is not None:
@@ -167,7 +167,7 @@ class Document:
 
         # Exclude specific chunk types
         if exclude_types:
-            chunks = [chunk for chunk in chunks if chunk.chunk_type not in exclude_types]
+            chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
 
         # Apply limit
         if limit is not None:
@@ -269,12 +269,16 @@ class Document:
         """
         section_names = []
         for chunk in self._chunks:
-            if (chunk.metadata and
-                'section_name' in chunk.metadata and
-                chunk.metadata['section_name']):
-                section_name = chunk.metadata['section_name']
+            if chunk.chunk_name and chunk.chunk_name != "unknown":
+                section_name = chunk.chunk_name
                 if section_name not in section_names:  # Avoid duplicates
                     section_names.append(section_name)
+            elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
+                # For chunks without explicit section names, use a generic name based on splitter type
+                splitter_type = chunk.metadata["splitter"]
+                generic_name = f"untitled_{splitter_type}"
+                if generic_name not in section_names:
+                    section_names.append(generic_name)
         return section_names
 
     def get_sections_by_name(self, section_names: list[str]) -> list[Chunk]:
@@ -288,9 +292,7 @@ class Document:
         """
         matching_chunks = []
         for chunk in self._chunks:
-            if (chunk.metadata and
-                'section_name' in chunk.metadata and
-                chunk.metadata['section_name'] in section_names):
+            if chunk.chunk_name in section_names:
                 matching_chunks.append(chunk)
         return matching_chunks
 

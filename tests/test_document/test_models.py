@@ -18,14 +18,14 @@ class TestChunk:
         """Test basic chunk creation."""
         chunk = Chunk(
             content="This is a test chunk.",
-            chunk_type="test",
+            chunk_name="test",
             position=0,
             word_count=5,
             confidence=0.9,
         )
 
         assert chunk.content == "This is a test chunk."
-        assert chunk.chunk_type == "test"
+        assert chunk.chunk_name == "test"
         assert chunk.position == 0
         assert chunk.word_count == 5
         assert chunk.confidence == 0.9

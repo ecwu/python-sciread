@@ -331,15 +331,12 @@ class SemanticSplitter(BaseSplitter):
 
         chunk = Chunk(
             content=content,
-            chunk_type=chunk_type,
+            chunk_name=section_name if section_name else "unknown",
             position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
             confidence=confidence,
+            metadata={"splitter": chunk_type},
         )
-
-        # Store section name in chunk metadata if available
-        if section_name:
-            chunk.metadata['section_name'] = section_name
 
         return chunk
 
@@ -422,10 +419,11 @@ class SemanticSplitter(BaseSplitter):
         """Create a basic chunk."""
         return Chunk(
             content=content,
-            chunk_type=chunk_type,
+            chunk_name="unknown",
             position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
             confidence=confidence,
+            metadata={"splitter": chunk_type},
         )
 
     def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:
@@ -456,12 +454,13 @@ class SemanticSplitter(BaseSplitter):
                     merged_content = current.content + "\n\n" + next_chunk.content
                     merged_chunk = Chunk(
                         content=merged_content,
-                        chunk_type=next_chunk.chunk_type,
+                        chunk_name=next_chunk.chunk_name,
                         position=current.position,
                         char_range=(
                             (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
                         ),
                         confidence=max(current.confidence, next_chunk.confidence),
+                        metadata={"splitter": next_chunk.metadata.get("splitter", "unknown")},
                     )
                     merged.append(merged_chunk)
                     i += 2
@@ -478,8 +477,12 @@ class SemanticSplitter(BaseSplitter):
 
     def _are_chunks_related(self, chunk1: Chunk, chunk2: Chunk) -> bool:
         """Determine if two chunks should be merged."""
+        # Get splitter types from metadata
+        type1 = chunk1.metadata.get("splitter", "unknown")
+        type2 = chunk2.metadata.get("splitter", "unknown")
+
         # Same type chunks are usually related
-        if chunk1.chunk_type == chunk2.chunk_type:
+        if type1 == type2:
             return True
 
         # Academic paper sections with similar content
@@ -491,12 +494,12 @@ class SemanticSplitter(BaseSplitter):
             "discussion",
             "conclusion",
         }
-        if chunk1.chunk_type in academic_sections and chunk2.chunk_type in academic_sections:
+        if type1 in academic_sections and type2 in academic_sections:
             return True
 
         # Content types that can be merged
         mergeable_types = {"content", "list", "table"}
-        if chunk1.chunk_type in mergeable_types and chunk2.chunk_type in mergeable_types:
+        if type1 in mergeable_types and type2 in mergeable_types:
             return True
 
         return False

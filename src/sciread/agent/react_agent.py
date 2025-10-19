@@ -107,7 +107,7 @@ def get_section_content(document: Document, section_names: List[str]) -> str:
     # Combine content with section headers
     content_parts = []
     for chunk in sections_chunks:
-        section_name = chunk.metadata.get('section_name', 'unknown')
+        section_name = chunk.chunk_name if chunk.chunk_name != "unknown" else "unknown"
         content_parts.append(f"=== {section_name.upper()} ===\n{chunk.content}")
 
     combined_content = "\n\n".join(content_parts)

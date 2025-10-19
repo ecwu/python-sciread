@@ -290,11 +290,11 @@ class TopicFlowSplitter(BaseSplitter):
 
             chunk = Chunk(
                 content=content,
-                chunk_type="topic_flow",
+                chunk_name=f"segment_{i+1}",  # Give it a searchable name
                 position=i,
                 char_range=segment["char_span"],
                 confidence=confidence,
-                metadata=metadata,
+                metadata={**metadata, "splitter": "topic_flow"},
             )
             chunks.append(chunk)
 
@@ -345,10 +345,11 @@ class TopicFlowSplitter(BaseSplitter):
         """Create a single chunk for short texts."""
         chunk = Chunk(
             content=text,
-            chunk_type="topic_flow",
+            chunk_name="document",
             position=0,
             char_range=(0, len(text)),
             confidence=0.8,
+            metadata={"splitter": "topic_flow"},
         )
         return [chunk]
 
@@ -363,10 +364,11 @@ class TopicFlowSplitter(BaseSplitter):
             if len(paragraph) >= self.min_segment_chars // 2:
                 chunk = Chunk(
                     content=paragraph,
-                    chunk_type="fallback",
+                    chunk_name=f"paragraph_{i+1}",
                     position=i,
                     char_range=(0, len(paragraph)),
                     confidence=0.3,
+                    metadata={"splitter": "fallback"},
                 )
                 chunks.append(chunk)
 

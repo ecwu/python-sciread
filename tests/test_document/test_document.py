@@ -106,9 +106,9 @@ class TestDocument:
         processed = doc.get_chunks(processed=True)
         assert len(processed) == 0
 
-        # Get chunks by type
+        # Get chunks by name
         # May or may not have abstract chunks depending on splitting
-        doc.get_chunks(chunk_type="abstract")
+        doc.get_chunks(chunk_name="abstract")
 
     def test_get_unprocessed_chunks(self, sample_txt_file):
         """Test getting unprocessed chunks."""

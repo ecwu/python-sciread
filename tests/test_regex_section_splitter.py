@@ -34,8 +34,11 @@ This is the methods content."""
         chunks = splitter.split(text)
 
         assert len(chunks) >= 2  # At least abstract and methods content
-        chunk_types = [chunk.chunk_type for chunk in chunks]
-        assert "abstract" in chunk_types
+        chunk_names = [chunk.chunk_name for chunk in chunks]
+        # Check for actual section names (capitalized) or abstract in metadata
+        has_abstract = any("abstract" in name.lower() or "Abstract" in name for name in chunk_names)
+        has_abstract_metadata = any(chunk.metadata.get("splitter") == "abstract" for chunk in chunks)
+        assert has_abstract or has_abstract_metadata
         # Introduction might be grouped with abstract or methods depending on size
 
     def test_section_detection(self):
@@ -58,7 +61,7 @@ This is section 2."""
         assert len(chunks) >= 2  # Should detect at least some sections
 
         # Check section detection (subsection might not always be separate)
-        chunk_types = [chunk.chunk_type for chunk in chunks]
+        chunk_types = [chunk.chunk_name for chunk in chunks]
         # Enhanced classifier now classifies numbered sections by their content
         assert any(section_type in chunk_types for section_type in ["introduction", "related_work", "section"])
 
@@ -80,17 +83,17 @@ This describes the figure."""
         chunks = splitter.split(text)
 
         # Abstract should have high confidence
-        abstract_chunks = [c for c in chunks if c.chunk_type == "abstract"]
+        abstract_chunks = [c for c in chunks if c.metadata.get("splitter") == "abstract"]
         if abstract_chunks:
             assert abstract_chunks[0].confidence >= 0.9
 
         # Section should have medium confidence (after small chunk reduction and merging)
-        section_chunks = [c for c in chunks if c.chunk_type == "section"]
+        section_chunks = [c for c in chunks if c.metadata.get("splitter") == "section"]
         if section_chunks:
             assert 0.3 <= section_chunks[0].confidence <= 0.8
 
         # Figure should have lower confidence
-        figure_chunks = [c for c in chunks if c.chunk_type == "figure"]
+        figure_chunks = [c for c in chunks if c.metadata.get("splitter") == "figure"]
         if figure_chunks:
             assert figure_chunks[0].confidence <= 0.7
 
@@ -137,7 +140,7 @@ This is the introduction content with substantial text that should be above the 
 
         # Check that merged chunks are larger
         for chunk in chunks:
-            if chunk.chunk_type in ["introduction", "abstract"]:
+            if chunk.chunk_name in ["introduction", "abstract"]:
                 # These should be substantial or merged
                 assert len(chunk.content) >= 100 or chunk.confidence < 0.5
 
@@ -164,9 +167,9 @@ This introduction section provides substantial background information and contex
             assert chunk.confidence >= 0.7
 
         # Should include abstract and introduction (high confidence patterns)
-        chunk_types = [chunk.chunk_type for chunk in high_quality_chunks]
+        chunk_splitter_types = [chunk.metadata.get("splitter") for chunk in high_quality_chunks]
         if len(high_quality_chunks) > 0:
-            assert any(ct in ["abstract", "introduction", "section"] for ct in chunk_types)
+            assert any(ct in ["abstract", "introduction", "section"] for ct in chunk_splitter_types)
 
     def test_custom_patterns(self):
         """Test adding custom patterns."""
@@ -248,7 +251,7 @@ chunking based on academic paper patterns."""
 
         # Should have lower confidence for unstructured text
         for chunk in chunks:
-            if chunk.chunk_type == "unknown":
+            if chunk.chunk_name == "unknown":
                 assert chunk.confidence < 0.5
 
     def test_char_ranges(self):
@@ -314,7 +317,7 @@ This is abstract in title case."""
         chunks = splitter.split(text)
 
         # Should detect at least abstract pattern (may be grouped into one chunk)
-        abstract_chunks = [c for c in chunks if c.chunk_type == "abstract"]
+        abstract_chunks = [c for c in chunks if c.metadata.get("splitter") == "abstract"]
         assert len(abstract_chunks) >= 1
 
     def test_multiple_figure_table_references(self):
@@ -339,7 +342,7 @@ This describes figure 2."""
         chunks = splitter.split(text)
 
         # Should detect figure/table references
-        figure_chunks = [c for c in chunks if c.chunk_type == "figure"]
+        figure_chunks = [c for c in chunks if c.metadata.get("splitter") == "figure"]
         assert len(figure_chunks) >= 1  # May be grouped together
 
     def test_paragraph_break_pattern(self):

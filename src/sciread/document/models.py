@@ -14,7 +14,7 @@ class Chunk:
     """A chunk of text from a document with metadata."""
 
     content: str
-    chunk_type: str = "unknown"  # abstract, introduction, methods, etc.
+    chunk_name: str = "unknown"  # abstract, introduction, methods, etc.
     position: int = 0  # Sequential position in document
     page_range: Optional[tuple[int, int]] = None  # (start_page, end_page)
     char_range: Optional[tuple[int, int]] = None  # (start_char, end_char)

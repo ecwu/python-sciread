@@ -289,12 +289,16 @@ class RegexSectionSplitter(BaseSplitter):
                 # Use the pattern that caused the split before this chunk
                 chunk_type = self._infer_chunk_type(raw_chunk["pattern"], content)
 
+            # Extract actual section name from content
+            section_name = self._extract_section_name_from_content(content)
+
             chunk = Chunk(
                 content=content,
-                chunk_type=chunk_type,
+                chunk_name=section_name if section_name else "unknown",
                 position=i,
                 char_range=(raw_chunk["start_pos"], raw_chunk["end_pos"]),
                 confidence=confidence,
+                metadata={"splitter": chunk_type},
             )
             chunks.append(chunk)
 
@@ -409,6 +413,52 @@ class RegexSectionSplitter(BaseSplitter):
         """Classify a section based on its title (from RuleBasedSplitter)."""
         return self._classify_section_by_content(title)
 
+    def _extract_section_name_from_content(self, content: str) -> Optional[str]:
+        """Extract the actual section name from content for display/searching."""
+        lines = content.strip().split('\n')
+        if not lines:
+            return None
+
+        first_line = lines[0].strip()
+
+        # Check for numbered sections (e.g., "1. Introduction", "2. Methods")
+        numbered_match = re.match(r'^\d+(?:\.\d+)*\s+(.+)$', first_line)
+        if numbered_match:
+            return numbered_match.group(1).strip()
+
+        # Check for common section headers
+        section_patterns = [
+            r'^abstract\s*(?:[:\-])?\s*(.+)$',
+            r'^introduction\s*(?:[:\-])?\s*(.+)$',
+            r'^(?:method|methodology|methods?)\s*(?:[:\-])?\s*(.+)$',
+            r'^results?\s*(?:[:\-])?\s*(.+)$',
+            r'^discussion\s*(?:[:\-])?\s*(.+)$',
+            r'^conclusion\s*(?:[:\-])?\s*(.+)$',
+            r'^references?\s*(?:[:\-])?\s*(.+)$',
+        ]
+
+        for pattern in section_patterns:
+            match = re.match(pattern, first_line, re.IGNORECASE)
+            if match:
+                return match.group(1).strip() if match.group(1).strip() else match.group(0).strip()
+
+        # If it's a single word section header
+        single_word_patterns = [
+            r'^abstract$', r'^introduction$', r'^methodology$', r'^methods$',
+            r'^results$', r'^discussion$', r'^conclusion$', r'^references$',
+            r'^acknowledgments?$', r'^appendix$', r'^background$'
+        ]
+
+        for pattern in single_word_patterns:
+            if re.match(pattern, first_line, re.IGNORECASE):
+                return first_line
+
+        # Return first line as section name if it's reasonably short
+        if len(first_line) < 100 and len(first_line.split()) <= 10:
+            return first_line
+
+        return None
+
     def _merge_small_chunks(self, chunks: list[Chunk]) -> list[Chunk]:
         """Merge small chunks with neighbors."""
         if not chunks:
@@ -426,7 +476,8 @@ class RegexSectionSplitter(BaseSplitter):
                     next_chunk = chunks[i + 1]
 
                     # Don't merge high-confidence chunks (abstract, introduction, etc.)
-                    if current.confidence >= 0.8 and current.chunk_type in [
+                    current_splitter = current.metadata.get("splitter", "unknown")
+                    if current.confidence >= 0.8 and current_splitter in [
                         "abstract",
                         "introduction",
                         "methods",
@@ -441,10 +492,13 @@ class RegexSectionSplitter(BaseSplitter):
                     merged_content = current.content + "\n\n" + next_chunk.content
 
                     # Preserve the confidence of the more significant chunk (higher confidence or specific section types)
-                    if next_chunk.chunk_type in ["section", "subsection"] and next_chunk.confidence >= current.confidence:
+                    next_splitter = next_chunk.metadata.get("splitter", "unknown")
+                    current_splitter = current.metadata.get("splitter", "unknown")
+
+                    if next_splitter in ["section", "subsection"] and next_chunk.confidence >= current.confidence:
                         merged_confidence = next_chunk.confidence
                     elif (
-                        current.chunk_type
+                        current_splitter
                         in [
                             "abstract",
                             "introduction",
@@ -461,12 +515,13 @@ class RegexSectionSplitter(BaseSplitter):
 
                     merged_chunk = Chunk(
                         content=merged_content,
-                        chunk_type=next_chunk.chunk_type,  # Keep next chunk's type
+                        chunk_name=next_chunk.chunk_name,  # Keep next chunk's section name
                         position=current.position,
                         char_range=(
                             (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
                         ),
                         confidence=merged_confidence,
+                        metadata={"splitter": next_splitter},  # Use next chunk's splitter type
                     )
                     merged.append(merged_chunk)
                     i += 2  # Skip next chunk as it's merged
@@ -478,10 +533,10 @@ class RegexSectionSplitter(BaseSplitter):
                         merged_content = prev_chunk.content + "\n\n" + current.content
 
                         # Preserve the confidence of the more significant chunk
-                        if prev_chunk.chunk_type in ["section", "subsection"] and prev_chunk.confidence >= current.confidence:
+                        if prev_chunk.chunk_name in ["section", "subsection"] and prev_chunk.confidence >= current.confidence:
                             merged_confidence = prev_chunk.confidence
                         elif (
-                            current.chunk_type
+                            current.chunk_name
                             in [
                                 "abstract",
                                 "introduction",
@@ -498,7 +553,7 @@ class RegexSectionSplitter(BaseSplitter):
 
                         merged[-1] = Chunk(
                             content=merged_content,
-                            chunk_type=prev_chunk.chunk_type,
+                            chunk_name=prev_chunk.chunk_name,
                             position=prev_chunk.position,
                             char_range=(
                                 (prev_chunk.char_range[0], current.char_range[1]) if prev_chunk.char_range and current.char_range else None
@@ -625,9 +680,9 @@ def main():
             confidence_str = f"{chunk.confidence:.2f}" if chunk.confidence is not None else "N/A"
 
             # Get pattern/matching info from chunk metadata
-            split_reason = chunk.chunk_type
+            split_reason = chunk.chunk_name
             if hasattr(chunk, "metadata") and chunk.metadata:
-                split_reason = chunk.metadata.get("pattern", chunk.chunk_type)
+                split_reason = chunk.metadata.get("pattern", chunk.chunk_name)
 
             header = (
                 f"============= Chunk #{i} ({word_count} words) ============= "
@@ -648,7 +703,7 @@ def main():
         # Chunk type distribution
         type_counts = {}
         for chunk in chunks:
-            chunk_type = chunk.chunk_type
+            chunk_type = chunk.chunk_name
             type_counts[chunk_type] = type_counts.get(chunk_type, 0) + 1
 
         print("\nSummary:")

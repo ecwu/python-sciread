@@ -34,7 +34,7 @@ class TestTopicFlowSplitter:
 
         # Should produce at least one chunk
         assert len(chunks) >= 1
-        assert all(chunk.chunk_type == "topic_flow" for chunk in chunks)
+        assert all(chunk.chunk_name == "topic_flow" for chunk in chunks)
 
     def test_segment_growth_with_continuity(self):
         """Test segment growth based on continuity signals."""
@@ -125,7 +125,7 @@ class TestTopicFlowSplitter:
 
         # Should produce multiple chunks
         assert len(chunks) >= 1
-        assert all(chunk.chunk_type == "topic_flow" for chunk in chunks)
+        assert all(chunk.chunk_name == "topic_flow" for chunk in chunks)
 
     def test_cosine_similarity_calculation(self):
         """Test cosine similarity calculation."""

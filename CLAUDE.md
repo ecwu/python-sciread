@@ -315,9 +315,9 @@ all_chunks = doc.get_chunks()
 unprocessed_chunks = doc.get_chunks(processed=False)
 high_quality_chunks = doc.get_chunks(confidence_threshold=0.7, min_length=100)
 
-# Get chunks by type
-abstract_chunks = doc.get_chunks(chunk_type="abstract")
-introduction_chunks = doc.get_chunks(chunk_type="introduction")
+# Get chunks by name
+abstract_chunks = doc.get_chunks(chunk_name="abstract")
+introduction_chunks = doc.get_chunks(chunk_name="introduction")
 
 # Mark chunks as processed based on quality criteria
 processed_count = doc.mark_chunks_processed(confidence_threshold=0.5, min_length=50)
