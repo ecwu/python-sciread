@@ -160,8 +160,7 @@ class TestDocument:
     def test_mark_all_unprocessed(self, sample_txt_file):
         """Test marking all chunks as unprocessed."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
+        # Document is automatically loaded and split by from_file()
 
         # Mark all as processed first
         doc.mark_all_processed()
@@ -171,29 +170,11 @@ class TestDocument:
         for chunk in doc.chunks:
             assert not chunk.processed
 
-    def test_search(self, sample_txt_file):
-        """Test searching within chunks."""
-        doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
-
-        # Search for common terms
-        results = doc.search("abstract", case_sensitive=False)
-        # Should find chunks containing "abstract"
-
-        # Search with case sensitivity
-        results = doc.search("Abstract", case_sensitive=True)
-        # Should find chunks containing exact "Abstract"
-
-        # Search for non-existent term
-        results = doc.search("nonexistent_term_xyz123")
-        assert len(results) == 0
-
+    
     def test_iteration(self, sample_txt_file):
         """Test document iteration."""
         doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
+        # Document is automatically loaded and split by from_file()
 
         # Test iteration
         chunk_count = 0

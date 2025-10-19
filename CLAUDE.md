@@ -322,8 +322,9 @@ introduction_chunks = doc.get_chunks(chunk_type="introduction")
 # Mark chunks as processed based on quality criteria
 processed_count = doc.mark_chunks_processed(confidence_threshold=0.5, min_length=50)
 
-# Search within chunks
-matching_chunks = doc.search("machine learning")
+# Get chunks by content (alternative to search)
+# Can use get_chunks() with content filtering or section-based access
+matching_chunks = doc.get_sections_by_name(["abstract", "introduction"])
 
 # Work with sections
 section_names = doc.get_section_names()

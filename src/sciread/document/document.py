@@ -96,11 +96,7 @@ class Document:
         """Get the raw text content."""
         return self._raw_text
 
-    @property
-    def is_loaded(self) -> bool:
-        """Check if document is loaded."""
-        return self._loaded
-
+    
     @property
     def is_split(self) -> bool:
         """Check if document is split."""
@@ -261,19 +257,7 @@ class Document:
             return self._raw_text
         return separator.join(chunk.content for chunk in self._chunks)
 
-    def search(self, query: str, case_sensitive: bool = False) -> list[Chunk]:
-        """Search for text in chunks."""
-        if not case_sensitive:
-            query = query.lower()
-
-        matching_chunks = []
-        for chunk in self._chunks:
-            search_text = chunk.content if case_sensitive else chunk.content.lower()
-            if query in search_text:
-                matching_chunks.append(chunk)
-
-        return matching_chunks
-
+  
     def get_section_names(self) -> list[str]:
         """Return ordered list of section names from all chunks.
 
@@ -310,16 +294,7 @@ class Document:
                 matching_chunks.append(chunk)
         return matching_chunks
 
-    def get_section_list(self) -> list[str]:
-        """Return ordered list of section names from all chunks.
-
-        This is an alias for get_section_names().
-
-        Returns:
-            List of section names in document order.
-        """
-        return self.get_section_names()
-
+    
     def __iter__(self) -> Iterator[Chunk]:
         """Iterate over chunks."""
         return iter(self._chunks)
