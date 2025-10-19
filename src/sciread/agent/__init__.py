@@ -31,6 +31,13 @@ Example Usage:
 
 from .document_agent import DocumentAgent
 from .document_agent import DocumentAnalysisResult
+from .react_agent import ReActAgent
+from .react_agent import analyze_document_with_react
+from .react_agent import load_and_process_document
+from .react_agent import get_initial_sections
+from .react_agent import format_status_summary
+from .react_models import ReActAgentInput
+from .react_models import ReActAgentOutput
 from .text_processor import remove_references_section
 from .factory import create_agent
 from .tool_agent import ToolAgent
@@ -46,6 +53,13 @@ from .tool_agent import ComprehensiveAnalysisResult
 __all__ = [
     "DocumentAgent",
     "DocumentAnalysisResult",
+    "ReActAgent",
+    "analyze_document_with_react",
+    "load_and_process_document",
+    "get_initial_sections",
+    "format_status_summary",
+    "ReActAgentInput",
+    "ReActAgentOutput",
     "ToolAgent",
     "MetadataExtractionResult",
     "PreviousMethodsResult",

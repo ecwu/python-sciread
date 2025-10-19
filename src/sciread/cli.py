@@ -24,6 +24,7 @@ from .core import (
     run_main,
     run_comprehensive_analysis,
     run_comprehensive_analysis_with_debug,
+    run_react_analysis,
 )
 from .logging_config import logger
 
@@ -51,6 +52,8 @@ MODES:
   simple - Uses a single DocumentAgent for basic analysis
   tool   - Uses multiple expert agents for comprehensive analysis
          (metadata, methodology, experiments, future directions)
+  react  - Uses ReAct agent for intelligent iterative analysis
+         with reasoning and acting pattern
 
 EXAMPLES:
   python -msciread tool paper.pdf
@@ -58,6 +61,9 @@ EXAMPLES:
   python -msciread tool paper.pdf deepseek/reasoner --debug-output debug.json
   python -msciread simple paper.pdf
   python -msciread simple paper.txt
+  python -msciread react paper.pdf
+  python -msciread react paper.pdf "What are the main contributions?"
+  python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
 
 MODELS:
   deepseek/deepseek-chat     (default)
@@ -101,6 +107,38 @@ MODELS:
         "--debug-output",
         metavar="FILE",
         help="Save interaction log to the specified JSON file for debugging",
+    )
+
+    # ReAct mode parser
+    react_parser = subparsers.add_parser(
+        "react",
+        help="ReAct agent iterative analysis",
+        description="Use ReAct agent for intelligent iterative analysis with reasoning and acting pattern",
+    )
+    react_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    react_parser.add_argument(
+        "task",
+        nargs="?",
+        default="Analyze this academic paper focusing on: 1) What are the research questions and objectives? 2) What methodology and approach did the researchers use? 3) What are the key findings and results? 4) What are the main contributions and significance of this work?",
+        help="Analysis task or question about the document (default: comprehensive academic analysis)",
+    )
+    react_parser.add_argument(
+        "model",
+        nargs="?",
+        default="deepseek-chat",
+        help="Model identifier for the LLM provider (default: deepseek-chat)",
+    )
+    react_parser.add_argument(
+        "--max-loops",
+        type=int,
+        default=8,
+        metavar="N",
+        help="Maximum number of analysis iterations (default: 8)",
+    )
+    react_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Hide progress display during analysis",
     )
 
     # Parse arguments (skip the script name)
@@ -153,6 +191,33 @@ MODELS:
             return 0
         except Exception as e:
             logger.error(f"Tool analysis failed: {e}")
+            print(f"Error: {e}")
+            return 1
+
+    elif args.command == "react":
+        task_display = args.task[:100] + "..." if len(args.task) > 100 else args.task
+        logger.info(
+            f"Running react mode with file: {args.document_file}, task: {task_display}, model: {args.model}, max_loops: {args.max_loops}, show_progress: {not args.no_progress}"
+        )
+
+        try:
+            result = run_react_analysis(
+                args.document_file,
+                args.task,
+                model=args.model,
+                max_loops=args.max_loops,
+                show_progress=not args.no_progress
+            )
+            # The final report is already printed if show_progress=True
+            if args.no_progress:
+                print("=" * 60)
+                print("REACT ANALYSIS RESULT:")
+                print("=" * 60)
+                print(result)
+                print("=" * 60)
+            return 0
+        except Exception as e:
+            logger.error(f"ReAct analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 
