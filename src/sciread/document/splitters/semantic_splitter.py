@@ -16,7 +16,6 @@ class SemanticSplitter(BaseSplitter):
         max_chunk_size: int = 2000,
         preserve_code_blocks: bool = True,
         split_on_headers: bool = True,
-        merge_related_sections: bool = True,
         confidence_threshold: float = 0.7,
         enable_academic_patterns: bool = True,
         enable_markdown_patterns: bool = True,
@@ -29,7 +28,6 @@ class SemanticSplitter(BaseSplitter):
             max_chunk_size: Maximum chunk size in characters.
             preserve_code_blocks: Whether to keep code blocks intact.
             split_on_headers: Whether to split on headers.
-            merge_related_sections: Whether to merge small consecutive sections.
             confidence_threshold: Minimum confidence score for chunks.
             enable_academic_patterns: Whether to enable academic paper pattern detection.
             enable_markdown_patterns: Whether to enable markdown pattern detection.
@@ -38,7 +36,6 @@ class SemanticSplitter(BaseSplitter):
         self.max_chunk_size = max_chunk_size
         self.preserve_code_blocks = preserve_code_blocks
         self.split_on_headers = split_on_headers
-        self.merge_related_sections = merge_related_sections
         self.confidence_threshold = confidence_threshold
         self.enable_academic_patterns = enable_academic_patterns
         self.enable_markdown_patterns = enable_markdown_patterns
@@ -159,10 +156,6 @@ class SemanticSplitter(BaseSplitter):
         # Restore code blocks if they were extracted
         if self.preserve_code_blocks and self.enable_markdown_patterns and code_blocks:
             chunks = self._restore_code_blocks(chunks, code_blocks)
-
-        # Merge related sections if requested
-        if self.merge_related_sections:
-            chunks = self._merge_related_sections(chunks)
 
         # Ensure continuity by reassigning positions
         for i, chunk in enumerate(chunks):
@@ -434,76 +427,8 @@ class SemanticSplitter(BaseSplitter):
                     chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
         return chunks
 
-    def _merge_related_sections(self, chunks: list[Chunk]) -> list[Chunk]:
-        """Merge small, related consecutive sections."""
-        if not chunks:
-            return chunks
-
-        merged = []
-        i = 0
-
-        while i < len(chunks):
-            current = chunks[i]
-
-            # If chunk is too small and next chunk is related
-            if len(current.content) < self.min_chunk_size and i + 1 < len(chunks):
-                next_chunk = chunks[i + 1]
-
-                # Check if chunks are related (same type or compatible types)
-                if self._are_chunks_related(current, next_chunk):
-                    merged_content = current.content + "\n\n" + next_chunk.content
-                    merged_chunk = Chunk(
-                        content=merged_content,
-                        chunk_name=next_chunk.chunk_name,
-                        position=current.position,
-                        char_range=(
-                            (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
-                        ),
-                        confidence=max(current.confidence, next_chunk.confidence),
-                        metadata={"splitter": next_chunk.metadata.get("splitter", "unknown")},
-                    )
-                    merged.append(merged_chunk)
-                    i += 2
-                    continue
-
-            merged.append(current)
-            i += 1
-
-        # Reassign positions to ensure continuity
-        for i, chunk in enumerate(merged):
-            chunk.position = i
-
-        return merged
-
-    def _are_chunks_related(self, chunk1: Chunk, chunk2: Chunk) -> bool:
-        """Determine if two chunks should be merged."""
-        # Get splitter types from metadata
-        type1 = chunk1.metadata.get("splitter", "unknown")
-        type2 = chunk2.metadata.get("splitter", "unknown")
-
-        # Same type chunks are usually related
-        if type1 == type2:
-            return True
-
-        # Academic paper sections with similar content
-        academic_sections = {
-            "abstract",
-            "introduction",
-            "methods",
-            "results",
-            "discussion",
-            "conclusion",
-        }
-        if type1 in academic_sections and type2 in academic_sections:
-            return True
-
-        # Content types that can be merged
-        mergeable_types = {"content", "list", "table"}
-        if type1 in mergeable_types and type2 in mergeable_types:
-            return True
-
-        return False
-
+    
+    
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom pattern."""
         try:

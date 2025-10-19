@@ -122,28 +122,7 @@ Another substantial piece of content that describes the methodology used in this
         for chunk in substantial_chunks:
             assert len(chunk.content) >= 100 or chunk.confidence < 0.5
 
-    def test_merge_small_chunks(self):
-        """Test merging of small chunks."""
-        text = """Abstract
-
-Very short abstract.
-
-Introduction
-
-This is the introduction content with substantial text that should be above the minimum chunk size threshold and therefore should not be merged with other chunks in the normal splitting process."""
-
-        splitter = RegexSectionSplitter(min_chunk_size=200, merge_small_chunks=True)
-        chunks = splitter.split(text)
-
-        # Should merge small chunks
-        assert len(chunks) >= 1
-
-        # Check that merged chunks are larger
-        for chunk in chunks:
-            if chunk.chunk_name in ["introduction", "abstract"]:
-                # These should be substantial or merged
-                assert len(chunk.content) >= 100 or chunk.confidence < 0.5
-
+    
     def test_document_level_filtering(self):
         """Test that Document class handles confidence threshold filtering."""
         from sciread.document import Document

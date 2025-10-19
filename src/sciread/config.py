@@ -39,9 +39,6 @@ class RegexSectionSplitterConfig(BaseModel):
     confidence_threshold: float = Field(
         default=0.3, description="Minimum confidence score for chunks"
     )
-    merge_small_chunks: bool = Field(
-        default=True, description="Whether to merge small chunks with neighbors"
-    )
     custom_patterns: dict[str, str] = Field(
         default_factory=dict, description="Custom regex patterns"
     )

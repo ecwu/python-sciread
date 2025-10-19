@@ -18,7 +18,6 @@ class RegexSectionSplitter(BaseSplitter):
         patterns: Optional[dict[str, str]] = None,
         min_chunk_size: int = 200,
         confidence_threshold: float = 0.3,
-        merge_small_chunks: bool = True,
     ):
         """Initialize regex splitter with configuration.
 
@@ -26,11 +25,9 @@ class RegexSectionSplitter(BaseSplitter):
             patterns: Custom patterns dictionary. If None, uses default academic patterns.
             min_chunk_size: Minimum chunk size in characters.
             confidence_threshold: Minimum confidence score for chunks.
-            merge_small_chunks: Whether to merge small chunks with neighbors.
         """
         self.min_chunk_size = min_chunk_size
         self.confidence_threshold = confidence_threshold
-        self.merge_small_chunks = merge_small_chunks
 
         # Load patterns (custom or default)
         self.patterns = patterns or self._get_default_patterns()
@@ -53,10 +50,6 @@ class RegexSectionSplitter(BaseSplitter):
 
         # Create Chunk objects with metadata
         chunks = self._create_chunks(raw_chunks)
-
-        # Merge small chunks if requested
-        if self.merge_small_chunks:
-            chunks = self._merge_small_chunks(chunks)
 
         # Reassign positions to ensure continuous ordering
         for i, chunk in enumerate(chunks):
@@ -459,121 +452,7 @@ class RegexSectionSplitter(BaseSplitter):
 
         return None
 
-    def _merge_small_chunks(self, chunks: list[Chunk]) -> list[Chunk]:
-        """Merge small chunks with neighbors."""
-        if not chunks:
-            return chunks
-
-        merged = []
-        i = 0
-
-        while i < len(chunks):
-            current = chunks[i]
-
-            if len(current.content) < self.min_chunk_size:
-                # Try to merge with next chunk, but avoid merging high-confidence chunks
-                if i + 1 < len(chunks):
-                    next_chunk = chunks[i + 1]
-
-                    # Don't merge high-confidence chunks (abstract, introduction, etc.)
-                    current_splitter = current.metadata.get("splitter", "unknown")
-                    if current.confidence >= 0.8 and current_splitter in [
-                        "abstract",
-                        "introduction",
-                        "methods",
-                        "results",
-                        "discussion",
-                        "conclusion",
-                    ]:
-                        merged.append(current)
-                        i += 1
-                        continue
-
-                    merged_content = current.content + "\n\n" + next_chunk.content
-
-                    # Preserve the confidence of the more significant chunk (higher confidence or specific section types)
-                    next_splitter = next_chunk.metadata.get("splitter", "unknown")
-                    current_splitter = current.metadata.get("splitter", "unknown")
-
-                    if next_splitter in ["section", "subsection"] and next_chunk.confidence >= current.confidence:
-                        merged_confidence = next_chunk.confidence
-                    elif (
-                        current_splitter
-                        in [
-                            "abstract",
-                            "introduction",
-                            "methods",
-                            "results",
-                            "discussion",
-                            "conclusion",
-                        ]
-                        and current.confidence >= next_chunk.confidence
-                    ):
-                        merged_confidence = current.confidence
-                    else:
-                        merged_confidence = max(current.confidence, next_chunk.confidence)
-
-                    merged_chunk = Chunk(
-                        content=merged_content,
-                        chunk_name=next_chunk.chunk_name,  # Keep next chunk's section name
-                        position=current.position,
-                        char_range=(
-                            (current.char_range[0], next_chunk.char_range[1]) if current.char_range and next_chunk.char_range else None
-                        ),
-                        confidence=merged_confidence,
-                        metadata={"splitter": next_splitter},  # Use next chunk's splitter type
-                    )
-                    merged.append(merged_chunk)
-                    i += 2  # Skip next chunk as it's merged
-                    continue
-                else:
-                    # Last chunk, try to merge with previous
-                    if merged:
-                        prev_chunk = merged[-1]
-                        merged_content = prev_chunk.content + "\n\n" + current.content
-
-                        # Preserve the confidence of the more significant chunk
-                        if prev_chunk.chunk_name in ["section", "subsection"] and prev_chunk.confidence >= current.confidence:
-                            merged_confidence = prev_chunk.confidence
-                        elif (
-                            current.chunk_name
-                            in [
-                                "abstract",
-                                "introduction",
-                                "methods",
-                                "results",
-                                "discussion",
-                                "conclusion",
-                            ]
-                            and current.confidence >= prev_chunk.confidence
-                        ):
-                            merged_confidence = current.confidence
-                        else:
-                            merged_confidence = max(prev_chunk.confidence, current.confidence)
-
-                        merged[-1] = Chunk(
-                            content=merged_content,
-                            chunk_name=prev_chunk.chunk_name,
-                            position=prev_chunk.position,
-                            char_range=(
-                                (prev_chunk.char_range[0], current.char_range[1]) if prev_chunk.char_range and current.char_range else None
-                            ),
-                            confidence=merged_confidence,
-                        )
-                    else:
-                        # No previous chunk, keep as is
-                        merged.append(current)
-            else:
-                merged.append(current)
-
-            i += 1
-
-        # Reassign positions to ensure continuity after merging
-        for i, chunk in enumerate(merged):
-            chunk.position = i
-
-        return merged
-
+    
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom pattern."""
         self.patterns[name] = pattern
@@ -612,12 +491,7 @@ def main():
         default=0.3,
         help="Minimum confidence threshold for chunks (default: 0.3)",
     )
-    parser.add_argument(
-        "--no-merge",
-        action="store_true",
-        help="Disable merging of small chunks",
-    )
-
+    
     args = parser.parse_args()
 
     # Check if file exists
@@ -630,7 +504,6 @@ def main():
     splitter = RegexSectionSplitter(
         min_chunk_size=args.min_chunk_size,
         confidence_threshold=args.confidence_threshold,
-        merge_small_chunks=not args.no_merge,
     )
 
     try:
