@@ -127,7 +127,6 @@ The `document` module provides a complete pipeline for processing academic paper
 - **Chunk**: Text chunk with metadata (content, type, position, confidence, processing status)
 - **DocumentMetadata**: Document metadata (file info, timestamps, title, author, page count)
 - **ProcessingState**: Processing lifecycle tracking (timestamps, notes, version)
-- **CoverageStats**: Coverage statistics for processed chunks and words
 
 **External API Clients** in `src/sciread/document/external_clients.py`:
 - **MineruClient**: Client for PDF-to-markdown conversion via Mineru API
@@ -322,11 +321,6 @@ introduction_chunks = doc.get_chunks(chunk_type="introduction")
 
 # Mark chunks as processed based on quality criteria
 processed_count = doc.mark_chunks_processed(confidence_threshold=0.5, min_length=50)
-
-# Check processing state
-coverage_stats = doc.get_coverage()
-print(f"Processed {coverage_stats.processed_chunks}/{coverage_stats.total_chunks} chunks")
-print(f"Processed {coverage_stats.processed_words}/{coverage_stats.total_words} words")
 
 # Search within chunks
 matching_chunks = doc.search("machine learning")

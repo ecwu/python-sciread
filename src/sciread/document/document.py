@@ -9,7 +9,6 @@ from ..logging_config import get_logger
 from .document_builder import DocumentBuilder
 from .document_builder import DocumentFactory
 from .models import Chunk
-from .models import CoverageStats
 from .models import DocumentMetadata
 from .models import ProcessingState
 
@@ -243,21 +242,6 @@ class Document:
         """Get the next unprocessed chunk."""
         unprocessed = self.get_unprocessed_chunks(limit=1)
         return unprocessed[0] if unprocessed else None
-
-    def get_coverage(self) -> CoverageStats:
-        """Calculate coverage statistics."""
-        total_chunks = len(self._chunks)
-        processed_chunks = sum(1 for chunk in self._chunks if chunk.processed)
-
-        total_words = sum(chunk.word_count for chunk in self._chunks)
-        processed_words = sum(chunk.word_count for chunk in self._chunks if chunk.processed)
-
-        return CoverageStats(
-            processed_chunks=processed_chunks,
-            total_chunks=total_chunks,
-            processed_words=processed_words,
-            total_words=total_words,
-        )
 
     def mark_all_processed(self) -> None:
         """Mark all chunks as processed."""

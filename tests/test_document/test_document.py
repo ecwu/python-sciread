@@ -4,7 +4,6 @@ import pytest
 
 from sciread.document import Document
 from sciread.document.models import Chunk
-from sciread.document.models import CoverageStats
 from sciread.document.models import DocumentMetadata
 from sciread.document.splitters.topic_flow import TopicFlowSplitter
 
@@ -146,32 +145,7 @@ class TestDocument:
             assert second != first
             assert not second.processed
 
-    def test_coverage_calculation(self, sample_txt_file):
-        """Test coverage calculation."""
-        doc = Document.from_file(sample_txt_file)
-        doc.load()
-        doc.split()
-
-        coverage = doc.get_coverage()
-        assert isinstance(coverage, CoverageStats)
-        assert coverage.total_chunks > 0
-        assert coverage.total_words > 0
-        assert coverage.processed_chunks == 0  # Initially none processed
-        assert coverage.processed_words == 0
-        assert coverage.chunk_coverage == 0.0
-        assert coverage.word_coverage == 0.0
-
-        # Mark some chunks as processed
-        chunks = doc.get_unprocessed_chunks(limit=2)
-        for chunk in chunks:
-            chunk.mark_processed()
-
-        coverage = doc.get_coverage()
-        assert coverage.processed_chunks > 0
-        assert coverage.processed_words > 0
-        assert coverage.chunk_coverage > 0.0
-        assert coverage.word_coverage > 0.0
-
+    
     def test_mark_all_processed(self, sample_txt_file):
         """Test marking all chunks as processed."""
         doc = Document.from_file(sample_txt_file)
@@ -179,11 +153,6 @@ class TestDocument:
         doc.split()
 
         doc.mark_all_processed()
-        coverage = doc.get_coverage()
-        assert coverage.processed_chunks == coverage.total_chunks
-        assert coverage.processed_words == coverage.total_words
-        assert coverage.chunk_coverage == 100.0
-        assert coverage.word_coverage == 100.0
 
         for chunk in doc.chunks:
             assert chunk.processed
@@ -198,10 +167,6 @@ class TestDocument:
         doc.mark_all_processed()
         # Then mark all as unprocessed
         doc.mark_all_unprocessed()
-
-        coverage = doc.get_coverage()
-        assert coverage.processed_chunks == 0
-        assert coverage.processed_words == 0
 
         for chunk in doc.chunks:
             assert not chunk.processed

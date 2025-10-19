@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 
 from sciread.document.models import Chunk
-from sciread.document.models import CoverageStats
 from sciread.document.models import DocumentMetadata
 from sciread.document.models import ProcessingState
 
@@ -75,53 +74,6 @@ class TestChunk:
         assert chunk.is_processed is False
 
 
-class TestCoverageStats:
-    """Test cases for the CoverageStats model."""
-
-    def test_coverage_calculation(self):
-        """Test coverage percentage calculation."""
-        stats = CoverageStats(
-            processed_chunks=5,
-            total_chunks=10,
-            processed_words=1500,
-            total_words=3000,
-        )
-
-        assert stats.chunk_coverage == 50.0
-        assert stats.word_coverage == 50.0
-
-    def test_coverage_zero_division(self):
-        """Test coverage calculation with zero total."""
-        stats = CoverageStats(
-            processed_chunks=0,
-            total_chunks=0,
-            processed_words=0,
-            total_words=0,
-        )
-
-        assert stats.chunk_coverage == 0.0
-        assert stats.word_coverage == 0.0
-
-    def test_coverage_to_dict(self):
-        """Test dictionary conversion."""
-        stats = CoverageStats(
-            processed_chunks=3,
-            total_chunks=5,
-            processed_words=600,
-            total_words=1000,
-        )
-
-        result = stats.to_dict()
-        expected = {
-            "processed_chunks": 3,
-            "total_chunks": 5,
-            "processed_words": 600,
-            "total_words": 1000,
-            "chunk_coverage": 60.0,
-            "word_coverage": 60.0,
-        }
-
-        assert result == expected
 
 
 class TestDocumentMetadata:

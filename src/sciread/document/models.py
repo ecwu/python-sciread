@@ -52,39 +52,6 @@ class Chunk:
         return self.processed
 
 
-@dataclass
-class CoverageStats:
-    """Statistics about document coverage."""
-
-    processed_chunks: int = 0
-    total_chunks: int = 0
-    processed_words: int = 0
-    total_words: int = 0
-
-    @property
-    def chunk_coverage(self) -> float:
-        """Calculate chunk coverage percentage."""
-        if self.total_chunks == 0:
-            return 0.0
-        return (self.processed_chunks / self.total_chunks) * 100
-
-    @property
-    def word_coverage(self) -> float:
-        """Calculate word coverage percentage."""
-        if self.total_words == 0:
-            return 0.0
-        return (self.processed_words / self.total_words) * 100
-
-    def to_dict(self) -> dict[str, Union[int, float]]:
-        """Convert to dictionary for serialization."""
-        return {
-            "processed_chunks": self.processed_chunks,
-            "total_chunks": self.total_chunks,
-            "processed_words": self.processed_words,
-            "total_words": self.total_words,
-            "chunk_coverage": self.chunk_coverage,
-            "word_coverage": self.word_coverage,
-        }
 
 
 @dataclass
