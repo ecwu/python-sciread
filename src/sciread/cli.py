@@ -86,8 +86,7 @@ MODELS:
     )
     simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     simple_parser.add_argument(
-        "model",
-        nargs="?",
+        "--model",
         default="deepseek/deepseek-chat",
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
@@ -100,8 +99,7 @@ MODELS:
     )
     tool_parser.add_argument("pdf_file", help="Path to the PDF file to analyze")
     tool_parser.add_argument(
-        "model",
-        nargs="?",
+        "--model",
         default="deepseek/deepseek-chat",
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
@@ -120,10 +118,9 @@ MODELS:
         help="Analysis task or question about the document (default: comprehensive academic analysis)",
     )
     react_parser.add_argument(
-        "model",
-        nargs="?",
-        default="deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek-chat)",
+        "--model",
+        default="deepseek/deepseek-chat",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
     react_parser.add_argument(
         "--max-loops",
