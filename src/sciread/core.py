@@ -134,9 +134,11 @@ async def comprehensive_analysis(
         raise FileNotFoundError(f"PDF file not found: {pdf_file_path}")
 
     # Create the multi-agent system
+    logger.debug(f"Creating ToolAgent with model: {model}")
     tool_agent = ToolAgent(model)
 
     # Load the PDF file with to_markdown=True for ToolAgent
+    logger.debug(f"Loading document from file: {pdf_file_path}")
     doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
     logger.debug(f"Document created from PDF: {pdf_file_path}")
     logger.debug(f"PDF loaded successfully: {len(doc.text)} characters")
@@ -180,6 +182,7 @@ async def comprehensive_analysis(
 
     # Run comprehensive analysis
     logger.info("Starting comprehensive document analysis with ToolAgent...")
+    logger.debug(f"Analyzing document with {len(doc.chunks)} chunks using {len(section_names)} sections")
     try:
         result = await tool_agent.analyze_document(doc)
 
@@ -191,6 +194,7 @@ async def comprehensive_analysis(
         logger.info(
             f"Successful agents: {result.execution_summary['successful_agents']}"
         )
+        logger.debug(f"Final report length: {len(result.final_report)} characters")
 
         # Log section analysis summary if available
         if hasattr(result, "analysis_plan") and result.analysis_plan:
@@ -223,7 +227,6 @@ async def comprehensive_analysis(
 def run_comprehensive_analysis(
     pdf_file_path: str,
     model: str = "deepseek/deepseek-chat",
-    debug_output: Optional[str] = None,
 ):
     """Run comprehensive analysis synchronously.
 
@@ -232,130 +235,17 @@ def run_comprehensive_analysis(
     Args:
         pdf_file_path: Path to the PDF file to process
         model: Model identifier for the LLM provider
-        debug_output: Optional path to save interaction log for debugging
 
     Returns:
         ComprehensiveAnalysisResult object containing all sub-agent analyses
         and a synthesized final report
     """
     result = asyncio.run(comprehensive_analysis(pdf_file_path, model))
-
-    # Save debug output if requested
-    if debug_output:
-        # Create a new ToolAgent to access the interaction log
-        tool_agent = ToolAgent(model)
-        tool_agent.interaction_log = (
-            result.interaction_log if hasattr(result, "interaction_log") else []
-        )
-        tool_agent.save_interaction_log(debug_output)
-        logger.info(f"Debug interaction log saved to: {debug_output}")
-
     return result
 
 
-async def comprehensive_analysis_with_debug(
-    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
-):
-    """Comprehensive analysis with ToolAgent that captures all interactions.
-
-    Args:
-        pdf_file_path: Path to the PDF file to process
-        model: Model identifier for the LLM provider
-
-    Returns:
-        ComprehensiveAnalysisResult with interaction log attached
-    """
-    logger.info(
-        f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}"
-    )
-
-    # Check if file exists
-    if not Path(pdf_file_path).exists():
-        raise FileNotFoundError(f"PDF file not found: {pdf_file_path}")
-
-    # Create the multi-agent system
-    tool_agent = ToolAgent(model)
-
-    # Load the PDF file with to_markdown=True for ToolAgent
-    doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
-    logger.info(f"Document created from PDF: {pdf_file_path}")
-    logger.info(f"PDF loaded successfully: {len(doc.text)} characters")
-    logger.info(f"Document split into {len(doc.chunks)} chunks")
-
-    # Extract and log section information
-    section_names = doc.get_section_names()
-    logger.info(f"Discovered {len(section_names)} sections: {section_names}")
-
-    # Display section information to user
-    if section_names:
-        print("\n📋 Document Structure Analysis")
-        print(f"Found {len(section_names)} main sections:")
-        for i, section_name in enumerate(section_names, 1):
-            section_chunks = doc.get_sections_by_name([section_name])
-            section_word_count = sum(
-                len(chunk.content.split()) for chunk in section_chunks
-            )
-            print(
-                f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)"
-            )
-        print()
-
-        # Log section chunk distribution
-        section_distribution = {}
-        for section_name in section_names:
-            section_chunks = doc.get_sections_by_name([section_name])
-            section_distribution[section_name] = len(section_chunks)
-        logger.info(f"Section distribution: {section_distribution}")
-    else:
-        print("\n📋 Document Structure Analysis")
-        print("No named sections found - document will be analyzed as continuous text")
-        print()
-        logger.info(
-            "No named sections found - document will be analyzed as continuous text"
-        )
-
-    # Check if document was loaded successfully
-    if not doc.text.strip():
-        raise ValueError("Failed to load PDF: no text content extracted")
-
-    # Run comprehensive analysis
-    logger.info("Starting comprehensive document analysis with ToolAgent...")
-    try:
-        result = await tool_agent.analyze_document(doc)
-
-        # Attach interaction log to result
-        result.interaction_log = tool_agent.get_interaction_log()
-
-        logger.info("Comprehensive analysis completed successfully!")
-        logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
-        logger.info(
-            f"Agents executed: {result.execution_summary['total_agents_executed']}"
-        )
-        logger.info(
-            f"Successful agents: {result.execution_summary['successful_agents']}"
-        )
-        logger.info(f"Total interactions logged: {len(result.interaction_log)}")
-
-        return result
-
-    except Exception as e:
-        logger.error(f"Comprehensive analysis failed: {e}")
-        raise
 
 
-def run_comprehensive_analysis_with_debug(
-    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
-):
-    """Run comprehensive analysis with debug logging synchronously.
-
-    Args:
-        pdf_file_path: Path to the PDF file to process
-        model: Model identifier for the LLM provider
-
-    Returns:
-        ComprehensiveAnalysisResult with interaction log attached
-    """
-    return asyncio.run(comprehensive_analysis_with_debug(pdf_file_path, model))
 
 
 def run_react_analysis(

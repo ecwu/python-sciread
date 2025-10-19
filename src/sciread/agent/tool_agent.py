@@ -242,9 +242,6 @@ class ComprehensiveAnalysisResult(BaseModel):
     total_execution_time: float = Field(
         0.0, description="Total execution time in seconds"
     )
-    interaction_log: list[dict[str, Any]] = Field(
-        default_factory=list, description="Interaction log with prompts and outputs"
-    )
     sections_analyzed: dict[str, list[str]] = Field(
         default_factory=dict, description="Which sections were analyzed by each agent"
     )
@@ -268,7 +265,6 @@ class ExpertAgent:
         model: Union[str, OpenAIChatModel, AnthropicModel],
         max_retries: int = 3,
         timeout: float = 120.0,
-        interaction_log: Optional[list] = None,
     ):
         """Initialize the generic expert agent.
 
@@ -279,7 +275,6 @@ class ExpertAgent:
             model: Model identifier or instance for the LLM provider
             max_retries: Maximum number of retries for failed requests
             timeout: Timeout in seconds for analysis operations
-            interaction_log: Shared interaction log list (or create local one)
         """
         self.logger = get_logger(__name__)
         self.agent_name = agent_name
@@ -295,9 +290,6 @@ class ExpertAgent:
             self.model = model
             self.model_identifier = getattr(model, "model_name", "unknown")
 
-        # Interaction log storage (use provided log or create local one)
-        self.interaction_log = interaction_log if interaction_log is not None else []
-
         # Create the pydantic-ai agent with provided configuration
         self.agent = Agent(
             model=self.model,
@@ -311,23 +303,26 @@ class ExpertAgent:
         )
 
     def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent (centralized logging logic)."""
+        """Log interaction for this agent using debug logging."""
         import datetime
 
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": self.agent_name,
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
+        prompt_length = len(prompt)
+        output_length = len(output) if output else 0
 
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"{self.agent_name} interaction: Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
+        # Log detailed debug information
+        if error:
+            self.logger.debug(f"[{self.agent_name}] ERROR: {error}")
+
+        # Log prompt preview (first 200 chars)
+        prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+        self.logger.debug(f"[{self.agent_name}] Prompt ({prompt_length} chars): {prompt_preview}")
+
+        # Log output preview (first 200 chars)
+        if output:
+            output_preview = output[:200] + "..." if len(output) > 200 else output
+            self.logger.debug(f"[{self.agent_name}] Output ({output_length} chars): {output_preview}")
+        else:
+            self.logger.debug(f"[{self.agent_name}] No output generated")
 
     async def analyze(
         self,
@@ -466,9 +461,6 @@ class ToolAgent:
         self.max_retries = max_retries
         self.timeout = timeout
 
-        # Interaction logging storage (always available)
-        self.interaction_log = []
-
         # Initialize model
         if isinstance(model, str):
             self.model = get_model(model)
@@ -521,79 +513,12 @@ class ToolAgent:
             model=self.model,
             max_retries=self.max_retries,
             timeout=config["timeout"],
-            interaction_log=self.interaction_log,
         )
 
         return agent
 
-    def _log_interaction(
-        self, agent_name: str, prompt: str, output: str, error: Optional[str] = None
-    ):
-        """Log interaction information for agent prompts and outputs."""
-        import datetime
-
-        interaction_entry = {
-            "timestamp": datetime.datetime.now().isoformat(),
-            "agent": agent_name,
-            "prompt": prompt,
-            "output": output,
-            "error": error,
-            "prompt_length": len(prompt),
-            "output_length": len(output) if output else 0,
-        }
-
-        self.interaction_log.append(interaction_entry)
-        self.logger.debug(
-            f"Interaction log: {agent_name} - Prompt: {interaction_entry['prompt_length']} chars, Output: {interaction_entry['output_length']} chars"
-        )
-
-    def save_interaction_log(self, file_path: str):
-        """Save interaction log to a JSON file."""
-        import json
-        from pathlib import Path
-
-        try:
-            Path(file_path).write_text(
-                json.dumps(self.interaction_log, indent=2), encoding="utf-8"
-            )
-            self.logger.info(f"Interaction log saved to: {file_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to save interaction log: {e}")
-
-    def get_interaction_log(self) -> list[dict[str, Any]]:
-        """Get the complete interaction log."""
-        return self.interaction_log.copy()
-
-    def get_interaction_summary(self) -> dict[str, Any]:
-        """Get a summary of interaction information."""
-        total_interactions = len(self.interaction_log)
-        total_prompt_chars = sum(
-            entry["prompt_length"] for entry in self.interaction_log
-        )
-        total_output_chars = sum(
-            entry["output_length"] for entry in self.interaction_log
-        )
-        agents_used = list(set(entry["agent"] for entry in self.interaction_log))
-        errors = sum(1 for entry in self.interaction_log if entry["error"])
-
-        return {
-            "total_interactions": total_interactions,
-            "total_prompt_characters": total_prompt_chars,
-            "total_output_characters": total_output_chars,
-            "agents_used": agents_used,
-            "errors_count": errors,
-            "entries": self.interaction_log,
-        }
-
-    def get_agent_interactions(self, agent_name: str) -> list[dict[str, Any]]:
-        """Get interactions for a specific agent."""
-        return [entry for entry in self.interaction_log if entry["agent"] == agent_name]
-
-    def clear_interaction_log(self):
-        """Clear the interaction log."""
-        self.interaction_log.clear()
-        self.logger.info("Interaction log cleared")
-
+    
+    
     def display_analysis_plan(
         self, analysis_plan: AnalysisPlan, section_names: list[str]
     ) -> str:
@@ -904,7 +829,11 @@ class ToolAgent:
             self.logger.debug(
                 f"Result type: {type(result)}, Output type: {type(result.output)}"
             )
-            self._log_interaction("controller_agent", prompt, str(result.output))
+            # Log controller agent interaction at debug level
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
+            self.logger.debug(f"[controller_agent] Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[controller_agent] Output ({len(str(result.output))} chars): {output_preview}")
 
             # Validate that we got an actual plan, not empty defaults
             if not result.output.reasoning or not result.output.reasoning.strip():
@@ -918,9 +847,10 @@ class ToolAgent:
             self.logger.error(
                 f"Analysis planning timed out after {self.timeout} seconds"
             )
-            self._log_interaction(
-                "controller_agent", prompt, "", f"TimeoutError: {self.timeout} seconds"
-            )
+            # Log controller agent timeout
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            self.logger.debug(f"[controller_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.error(f"[controller_agent] Timeout after {self.timeout} seconds")
             # Return default plan
             return AnalysisPlan(
                 analyze_metadata=True,
@@ -939,7 +869,9 @@ class ToolAgent:
 
         except Exception as e:
             self.logger.error(f"Analysis planning failed: {e}")
-            self._log_interaction("controller_agent", prompt, "", str(e))
+            # Log controller agent error
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            self.logger.debug(f"[controller_agent] ERROR: {str(e)} - Prompt ({len(prompt)} chars): {prompt_preview}")
             # Return default plan
             return AnalysisPlan(
                 analyze_metadata=True,
@@ -1243,21 +1175,28 @@ class ToolAgent:
                 timeout=self.timeout,
             )
             self.logger.info("Report synthesis completed successfully")
-            self._log_interaction("synthesis_agent", prompt, str(result.output))
+            # Log synthesis agent interaction at debug level
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
+            self.logger.debug(f"[synthesis_agent] Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[synthesis_agent] Output ({len(str(result.output))} chars): {output_preview}")
             return result.output
 
         except asyncio.TimeoutError:
             self.logger.error(
                 f"Report synthesis timed out after {self.timeout} seconds"
             )
-            self._log_interaction(
-                "synthesis_agent", prompt, "", f"TimeoutError: {self.timeout} seconds"
-            )
+            # Log synthesis agent timeout
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            self.logger.debug(f"[synthesis_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.error(f"[synthesis_agent] Timeout after {self.timeout} seconds")
             return f"Report synthesis timed out after {self.timeout} seconds. Please try again or use a shorter document."
 
         except Exception as e:
             self.logger.error(f"Report synthesis failed: {e}")
-            self._log_interaction("synthesis_agent", prompt, "", str(e))
+            # Log synthesis agent error
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            self.logger.debug(f"[synthesis_agent] ERROR: {str(e)} - Prompt ({len(prompt)} chars): {prompt_preview}")
             return f"Report synthesis failed: {e}. Please try again."
 
     async def analyze_document(
@@ -1388,7 +1327,6 @@ class ToolAgent:
                 },
                 final_report=final_report,
                 total_execution_time=total_execution_time,
-                interaction_log=self.get_interaction_log(),
                 sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
             )
 

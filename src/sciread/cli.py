@@ -23,7 +23,6 @@ from .core import (
     compute,
     run_main,
     run_comprehensive_analysis,
-    run_comprehensive_analysis_with_debug,
     run_react_analysis,
 )
 from .logging_config import logger
@@ -55,10 +54,13 @@ MODES:
   react  - Uses ReAct agent for intelligent iterative analysis
          with reasoning and acting pattern
 
+DEBUG LOGGING:
+  Set log level to DEBUG to see detailed agent interactions, prompts,
+  and outputs. Use: LOG_LEVEL=DEBUG python -msciread tool paper.pdf
+
 EXAMPLES:
   python -msciread tool paper.pdf
   python -msciread tool paper.pdf deepseek/reasoner
-  python -msciread tool paper.pdf deepseek/reasoner --debug-output debug.json
   python -msciread simple paper.pdf
   python -msciread simple paper.txt
   python -msciread react paper.pdf
@@ -103,11 +105,6 @@ MODELS:
         default="deepseek/deepseek-chat",
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
-    tool_parser.add_argument(
-        "--debug-output",
-        metavar="FILE",
-        help="Save interaction log to the specified JSON file for debugging",
-    )
 
     # ReAct mode parser
     react_parser = subparsers.add_parser(
@@ -149,25 +146,11 @@ MODELS:
     # Handle different commands
     if args.command == "tool":
         logger.info(
-            f"Running tool mode with file: {args.pdf_file}, model: {args.model}, debug_output: {args.debug_output}"
+            f"Running tool mode with file: {args.pdf_file}, model: {args.model}"
         )
 
         try:
-            # Use debug version if debug output is requested
-            if args.debug_output:
-                result = run_comprehensive_analysis_with_debug(
-                    args.pdf_file, args.model
-                )
-                # Save the interaction log
-                from .agent import ToolAgent
-
-                tool_agent = ToolAgent(args.model)
-                tool_agent.interaction_log = result.interaction_log
-                tool_agent.save_interaction_log(args.debug_output)
-                print(f"Debug interaction log saved to: {args.debug_output}")
-                print(f"Total interactions logged: {len(result.interaction_log)}")
-            else:
-                result = run_comprehensive_analysis(args.pdf_file, args.model)
+            result = run_comprehensive_analysis(args.pdf_file, args.model)
 
             print("=" * 60)
             print("COMPREHENSIVE ANALYSIS RESULT:")
