@@ -205,7 +205,6 @@ class DocumentBuilder:
                 max_chunk_size=2000,
                 preserve_code_blocks=True,
                 split_on_headers=True,
-                merge_related_sections=True,
                 confidence_threshold=0.7,
             )
 
