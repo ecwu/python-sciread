@@ -33,30 +33,39 @@ This is a Python package called `sciread` designed to understand papers with LLM
 ```
 src/sciread/
 ├── __init__.py      # Package initialization, exports main functions
+├── agent/          # Agent module for LLM-driven processing
+│   ├── __init__.py
+│   ├── react_agent.py
+│   └── react_models.py
 ├── cli.py          # Command-line interface entry point
 ├── config.py       # Configuration management for API keys and provider settings
 ├── core.py         # Core functionality (compute function)
 ├── document/       # Document processing module
 │   ├── __init__.py # Document module exports
 │   ├── document.py # Main Document class for managing document lifecycle
+│   ├── document_builder.py # DocumentBuilder and DocumentFactory classes
+│   ├── external_clients.py # External API clients (Mineru, Ollama)
+│   ├── mineru_cache.py # Caching for Mineru API responses
 │   ├── models.py   # Core data models (Chunk, DocumentMetadata, etc.)
 │   ├── loaders/    # Document loaders for different file formats
 │   │   ├── __init__.py
 │   │   ├── base.py      # Base loader interface
-│   │   ├── pdf_loader.py # PDF file loader
+│   │   ├── pdf_loader.py # PDF file loader with Mineru support
 │   │   └── txt_loader.py # Text file loader
 │   └── splitters/   # Text splitters for chunking documents
 │       ├── __init__.py
 │       ├── base.py         # Base splitter interface
-│       ├── fixed_size.py   # Fixed-size text splitter
-│       ├── rule_based.py   # Academic paper rule-based splitter
-│       └── hybrid.py       # Hybrid splitter combining multiple approaches
+│       ├── markdown_splitter.py # Markdown-aware splitter
+│       ├── regex_section_splitter.py # Regex-based academic paper splitter
+│       ├── semantic_splitter.py   # Semantic splitter using embeddings
+│       └── topic_flow.py   # Topic flow splitter
 ├── llm_provider/   # LLM provider module with factory pattern
 │   ├── __init__.py  # Main interface exports get_model() function
 │   ├── factory.py   # ModelFactory for creating model instances
 │   ├── deepseek.py  # DeepSeek provider implementation
 │   ├── zhipu.py     # Zhipu GLM provider implementation
 │   └── ollama.py    # Ollama local provider implementation
+├── logging_config.py # Logging configuration with loguru
 └── __main__.py     # Module execution entry point
 ```
 
@@ -72,10 +81,16 @@ src/sciread/
 The `document` module provides a complete pipeline for processing academic papers:
 
 **Main Document Class**: `Document` in `src/sciread/document/document.py`
-- Factory methods: `Document.from_file(path)` and `Document.from_text(text)`
-- Lifecycle management: `load()` → `split()` → processing
+- Factory methods: `Document.from_file(path, to_markdown=False)` and `Document.from_text(text)`
+- Unified chunk access with flexible filtering via `get_chunks()`
 - State tracking: loading status, splitting status, processing history
-- Chunk management: get chunks, filter by type/processing status
+- Markdown conversion support for PDFs via Mineru API
+- Comprehensive chunk management operations
+
+**Document Creation and Management**: `DocumentBuilder` and `DocumentFactory` in `src/sciread/document/document_builder.py`
+- **DocumentBuilder**: Builder pattern for custom document processing pipelines
+- **DocumentFactory**: Factory methods for creating documents from files or text
+- Support for external clients (Mineru, Ollama) and custom processing components
 
 **Core Data Models** in `src/sciread/document/models.py`:
 - **Chunk**: Text chunk with metadata (content, type, position, confidence, processing status)
@@ -83,24 +98,33 @@ The `document` module provides a complete pipeline for processing academic paper
 - **ProcessingState**: Processing lifecycle tracking (timestamps, notes, version)
 - **CoverageStats**: Coverage statistics for processed chunks and words
 
+**External API Clients** in `src/sciread/document/external_clients.py`:
+- **MineruClient**: Client for PDF-to-markdown conversion via Mineru API
+- **OllamaClient**: Client for embedding operations using Ollama models
+- Caching support for API responses (`mineru_cache.py`)
+
 **Document Loaders** in `src/sciread/document/loaders/`:
 - **BaseLoader**: Abstract interface with common functionality
-- **PdfLoader**: PDF loading with PyPDF2 and pdfplumber fallbacks
+- **PdfLoader**: PDF loading with Mineru markdown conversion and fallback extraction methods
 - **TxtLoader**: Text file loading with encoding detection
 - LoadResult: Standardized result format with text, metadata, warnings, and errors
 
 **Text Splitters** in `src/sciread/document/splitters/`:
 - **BaseSplitter**: Abstract interface for text splitting strategies
+- **MarkdownSplitter**: Markdown-aware splitter for structured content
 - **RegexSectionSplitter**: Advanced regex-based academic paper section detection
+- **SemanticSplitter**: Semantic splitter using embeddings for intelligent chunking
 - **TopicFlowSplitter**: Bottom-up sentence splitter that grows segments based on semantic continuity
 
 **Key Features**:
-- Multi-format document loading (PDF, TXT, MD, RST)
-- Intelligent text splitting optimized for academic papers
+- Multi-format document loading (PDF, TXT) with markdown conversion support
+- Intelligent text splitting optimized for academic papers with multiple strategies
 - Comprehensive metadata tracking and state management
+- External API integration for enhanced processing capabilities
 - Error handling with detailed warnings and extraction statistics
 - Processing pipeline with chunk-level operations
 - Coverage tracking and progress monitoring
+- Flexible chunk filtering and management system
 
 #### LLM Provider System
 The `llm_provider` module implements a factory pattern for working with different LLM providers using pydantic-ai:
@@ -254,23 +278,48 @@ from sciread.document import Document
 from pathlib import Path
 
 # Load and process a document
-doc = Document.from_file("paper.pdf")
-result = doc.load()  # Returns LoadResult with text and metadata
+doc = Document.from_file("paper.pdf", to_markdown=True)  # Convert PDF to markdown
 
-if result.success:
-    # Split into chunks (uses TopicFlowSplitter by default)
-    chunks = doc.split()
+# Get all chunks with flexible filtering
+all_chunks = doc.get_chunks()
+unprocessed_chunks = doc.get_chunks(processed=False)
+high_quality_chunks = doc.get_chunks(confidence_threshold=0.7, min_length=100)
 
-    # Get all chunks
-    all_chunks = doc.get_chunks()
+# Get chunks by type
+abstract_chunks = doc.get_chunks(chunk_type="abstract")
+introduction_chunks = doc.get_chunks(chunk_type="introduction")
 
-    # Get chunks by type
-    abstract_chunks = doc.get_chunks(chunk_type="abstract")
-    unprocessed_chunks = doc.get_unprocessed_chunks()
+# Mark chunks as processed based on quality criteria
+processed_count = doc.mark_chunks_processed(confidence_threshold=0.5, min_length=50)
 
-    # Check processing state
-    coverage_stats = doc.get_coverage_stats()
-    print(f"Processed {coverage_stats.chunk_coverage}% of chunks")
+# Check processing state
+coverage_stats = doc.get_coverage()
+print(f"Processed {coverage_stats.processed_chunks}/{coverage_stats.total_chunks} chunks")
+print(f"Processed {coverage_stats.processed_words}/{coverage_stats.total_words} words")
+
+# Search within chunks
+matching_chunks = doc.search("machine learning")
+
+# Work with sections
+section_names = doc.get_section_names()
+sections_by_name = doc.get_sections_by_name(["abstract", "introduction"])
+```
+
+### Using DocumentBuilder for Custom Processing
+
+```python
+from sciread.document import DocumentBuilder
+from sciread.document.external_clients import MineruClient, OllamaClient
+from sciread.document.splitters import SemanticSplitter
+
+# Create custom processing pipeline
+builder = DocumentBuilder(
+    splitter=SemanticSplitter(ollama_client=OllamaClient()),
+    mineru_client=MineruClient()
+)
+
+# Build document with custom settings
+doc = builder.from_file("paper.pdf", to_markdown=True, auto_split=True)
 ```
 
 ### Adding Custom Loaders and Splitters
@@ -282,15 +331,16 @@ from sciread.document.loaders import BaseLoader
 from sciread.document.splitters import BaseSplitter
 
 class CustomLoader(BaseLoader):
-    # Implement loading logic for new format
-    pass
+    def load(self, file_path: Path) -> LoadResult:
+        # Implement loading logic for new format
+        pass
 
 class CustomSplitter(BaseSplitter):
-    # Implement custom splitting strategy
-    pass
+    def split(self, text: str) -> list[Chunk]:
+        # Implement custom splitting strategy
+        pass
 
-# Use with Document class
-doc = Document.from_file("custom.ext")
-doc.add_loader(CustomLoader())
-doc.set_splitter(CustomSplitter())
+# Use with DocumentBuilder
+builder = DocumentBuilder(loader=CustomLoader(), splitter=CustomSplitter())
+doc = builder.from_file("custom.ext")
 ```
