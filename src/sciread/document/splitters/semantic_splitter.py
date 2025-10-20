@@ -58,8 +58,12 @@ class SemanticSplitter(BaseSplitter):
                 # High confidence academic sections
                 "abstract": re.compile(r"^(?:abstract|summary)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
                 "introduction": re.compile(r"^(?:introduction|overview|background)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "related_work": re.compile(r"^(?:related\s+work|literature\s+review|background\s+work)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "methodology": re.compile(r"^(?:method(?:ology)?|approach|experimental\s+(?:method|setup|design))\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
+                "related_work": re.compile(
+                    r"^(?:related\s+work|literature\s+review|background\s+work)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE
+                ),
+                "methodology": re.compile(
+                    r"^(?:method(?:ology)?|approach|experimental\s+(?:method|setup|design))\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE
+                ),
                 "methods": re.compile(r"^(?:methods|materials\s+and\s+methods)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
                 "results": re.compile(r"^(?:results|findings|evaluation|outcome)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
                 "discussion": re.compile(r"^(?:discussion|analysis|interpretation)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
@@ -210,10 +214,10 @@ class SemanticSplitter(BaseSplitter):
 
         # Remove markdown symbols, brackets, and special characters
         # Keep letters, numbers, spaces, and hyphens only
-        cleaned = re.sub(r'[^\w\s-]', '', cleaned)
+        cleaned = re.sub(r"[^\w\s-]", "", cleaned)
 
         # Replace multiple spaces with single space and trim
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
         # Return "untitled" if empty after cleaning
         return cleaned if cleaned else "untitled"
@@ -226,9 +230,18 @@ class SemanticSplitter(BaseSplitter):
             # Find academic paper sections first (highest priority)
             if self.enable_academic_patterns:
                 for pattern_name, pattern in self.patterns.items():
-                    if pattern_name in ["abstract", "introduction", "related_work", "methodology",
-                                      "methods", "results", "discussion", "conclusion",
-                                      "references", "acknowledgments"]:
+                    if pattern_name in [
+                        "abstract",
+                        "introduction",
+                        "related_work",
+                        "methodology",
+                        "methods",
+                        "results",
+                        "discussion",
+                        "conclusion",
+                        "references",
+                        "acknowledgments",
+                    ]:
                         confidence = self.confidence_scores.get(pattern_name, 0.8)
                         for match in pattern.finditer(text):
                             section_name = pattern_name
@@ -335,13 +348,22 @@ class SemanticSplitter(BaseSplitter):
 
     def _extract_section_from_content(self, content: str) -> Optional[str]:
         """Extract section name from content if it starts with a header."""
-        first_line = content.split('\n')[0].strip()
+        first_line = content.split("\n")[0].strip()
 
         # Check for academic section headers
         if self.enable_academic_patterns:
-            for pattern_name in ["abstract", "introduction", "related_work", "methodology",
-                               "methods", "results", "discussion", "conclusion",
-                               "references", "acknowledgments"]:
+            for pattern_name in [
+                "abstract",
+                "introduction",
+                "related_work",
+                "methodology",
+                "methods",
+                "results",
+                "discussion",
+                "conclusion",
+                "references",
+                "acknowledgments",
+            ]:
                 if pattern_name in self.patterns:
                     pattern = self.patterns[pattern_name]
                     if pattern.match(first_line):
@@ -349,7 +371,7 @@ class SemanticSplitter(BaseSplitter):
 
         # Check for markdown headers
         if self.enable_markdown_patterns:
-            header_match = re.match(r'^(#{1,6})\s+(.+)$', first_line)
+            header_match = re.match(r"^(#{1,6})\s+(.+)$", first_line)
             if header_match:
                 raw_title = header_match.group(2).strip()
                 return self._clean_section_name(raw_title)
@@ -427,8 +449,6 @@ class SemanticSplitter(BaseSplitter):
                     chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
         return chunks
 
-    
-    
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom pattern."""
         try:

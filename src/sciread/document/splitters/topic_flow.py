@@ -1,8 +1,5 @@
 """TopicFlow splitter: Bottom-up sentence merging with semantic continuity detection."""
 
-import argparse
-import math
-from pathlib import Path
 from typing import Any
 from typing import Optional
 
@@ -290,7 +287,7 @@ class TopicFlowSplitter(BaseSplitter):
 
             chunk = Chunk(
                 content=content,
-                chunk_name=f"segment_{i+1}",  # Give it a searchable name
+                chunk_name=f"segment_{i + 1}",  # Give it a searchable name
                 position=i,
                 char_range=segment["char_span"],
                 confidence=confidence,
@@ -364,7 +361,7 @@ class TopicFlowSplitter(BaseSplitter):
             if len(paragraph) >= self.min_segment_chars // 2:
                 chunk = Chunk(
                     content=paragraph,
-                    chunk_name=f"paragraph_{i+1}",
+                    chunk_name=f"paragraph_{i + 1}",
                     position=i,
                     char_range=(0, len(paragraph)),
                     confidence=0.3,
@@ -385,5 +382,3 @@ class TopicFlowSplitter(BaseSplitter):
     def test_ollama_connection(self) -> bool:
         """Test connection to Ollama server."""
         return self.ollama_client.test_connection()
-
-

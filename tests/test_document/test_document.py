@@ -5,7 +5,6 @@ import pytest
 from sciread.document import Document
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
-from sciread.document.splitters.topic_flow import TopicFlowSplitter
 
 
 class TestDocument:
@@ -134,7 +133,6 @@ class TestDocument:
             assert second != first
             assert not second.processed
 
-    
     def test_mark_all_processed(self, sample_txt_file):
         """Test marking all chunks as processed."""
         doc = Document.from_file(sample_txt_file)
@@ -157,7 +155,6 @@ class TestDocument:
         for chunk in doc.chunks:
             assert not chunk.processed
 
-    
     def test_iteration(self, sample_txt_file):
         """Test document iteration."""
         doc = Document.from_file(sample_txt_file)

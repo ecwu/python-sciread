@@ -24,98 +24,60 @@ class LLMProviderConfig(BaseModel):
     """Configuration for an LLM provider."""
 
     api_key: Optional[str] = Field(default=None, description="API key for the provider")
-    base_url: Optional[str] = Field(
-        default=None, description="Base URL for the provider API"
-    )
+    base_url: Optional[str] = Field(default=None, description="Base URL for the provider API")
     default_model: str = Field(description="Default model name for this provider")
 
 
 class RegexSectionSplitterConfig(BaseModel):
     """Configuration for RegexSectionSplitter."""
 
-    min_chunk_size: int = Field(
-        default=200, description="Minimum chunk size in characters"
-    )
-    confidence_threshold: float = Field(
-        default=0.3, description="Minimum confidence score for chunks"
-    )
-    custom_patterns: dict[str, str] = Field(
-        default_factory=dict, description="Custom regex patterns"
-    )
+    min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
+    confidence_threshold: float = Field(default=0.3, description="Minimum confidence score for chunks")
+    custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
 
 
 class TopicFlowSplitterConfig(BaseModel):
     """Configuration for TopicFlowSplitter."""
 
-    model: str = Field(
-        default="embeddinggemma:latest", description="Ollama model for embeddings"
-    )
-    base_url: str = Field(
-        default="http://localhost:11434", description="Ollama API base URL"
-    )
+    model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
+    base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
     # Continuity thresholds
-    local_continuity_threshold: float = Field(
-        default=0.6, description="Threshold for local continuity (adjacent sentences)"
-    )
+    local_continuity_threshold: float = Field(default=0.6, description="Threshold for local continuity (adjacent sentences)")
     context_continuity_threshold: float = Field(
         default=0.65,
         description="Threshold for context continuity (segment vs sentence)",
     )
     # Size constraints
-    min_segment_sentences: int = Field(
-        default=4, description="Minimum sentences per segment for content-based cuts"
-    )
-    min_segment_chars: int = Field(
-        default=300, description="Minimum characters per segment"
-    )
-    max_segment_chars: int = Field(
-        default=2000, description="Maximum characters per segment (hard budget limit)"
-    )
+    min_segment_sentences: int = Field(default=4, description="Minimum sentences per segment for content-based cuts")
+    min_segment_chars: int = Field(default=300, description="Minimum characters per segment")
+    max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
     # Processing parameters
-    embedding_batch_size: int = Field(
-        default=10, description="Batch size for embedding requests"
-    )
+    embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
     timeout: int = Field(default=30, description="Request timeout in seconds")
-    cache_embeddings: bool = Field(
-        default=True, description="Whether to cache embeddings"
-    )
+    cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
     # Adaptive thresholds
-    adaptive_floor: float = Field(
-        default=0.4, description="Adaptive floor for local continuity detection"
-    )
-    soft_target: float = Field(
-        default=0.7, description="Soft target for context continuity"
-    )
+    adaptive_floor: float = Field(default=0.4, description="Adaptive floor for local continuity detection")
+    soft_target: float = Field(default=0.7, description="Soft target for context continuity")
 
 
 class DocumentSplitterConfig(BaseModel):
     """Configuration for document splitters."""
 
-    default_splitter: str = Field(
-        default="topic_flow", description="Default splitter to use"
-    )
-    regex_section: RegexSectionSplitterConfig = Field(
-        default_factory=RegexSectionSplitterConfig
-    )
+    default_splitter: str = Field(default="topic_flow", description="Default splitter to use")
+    regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
     topic_flow: TopicFlowSplitterConfig = Field(default_factory=TopicFlowSplitterConfig)
 
 
 class MineruConfig(BaseModel):
     """Configuration for Mineru API."""
 
-    token: Optional[str] = Field(
-        default=None, description="API token for Mineru service"
-    )
+    token: Optional[str] = Field(default=None, description="API token for Mineru service")
     enable_formula: bool = Field(default=True, description="Enable formula extraction")
     enable_table: bool = Field(default=True, description="Enable table extraction")
     language: str = Field(default="ch", description="Document language (ch/en)")
     timeout: int = Field(default=600, description="Processing timeout in seconds")
-    poll_interval: int = Field(
-        default=10, description="Status poll interval in seconds"
-    )
-    enable_cache: bool = Field(
-        default=True, description="Enable caching of API responses"
-    )
+    poll_interval: int = Field(default=10, description="Status poll interval in seconds")
+    enable_cache: bool = Field(default=True, description="Enable caching of API responses")
     cache_dir: Optional[str] = Field(
         default=None,
         description="Directory for cache storage (default: ~/.sciread/mineru_cache)",
@@ -140,30 +102,20 @@ class ScireadConfig(BaseSettings):
 
     llm_providers: dict[str, LLMProviderConfig] = Field(
         default_factory=lambda: {
-            "deepseek": LLMProviderConfig(
-                default_model="deepseek-chat", base_url="https://api.deepseek.com"
-            ),
+            "deepseek": LLMProviderConfig(default_model="deepseek-chat", base_url="https://api.deepseek.com"),
             "zhipu": LLMProviderConfig(
                 default_model="glm-4.6",
                 base_url="https://open.bigmodel.cn/api/anthropic",
             ),
-            "ollama": LLMProviderConfig(
-                default_model="qwen3:4b", base_url="http://localhost:11434/v1"
-            ),
+            "ollama": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:11434/v1"),
         }
     )
 
-    default: DefaultConfig = Field(
-        default=DefaultConfig(provider="deepseek", model="deepseek-chat")
-    )
-    document_splitters: DocumentSplitterConfig = Field(
-        default_factory=DocumentSplitterConfig
-    )
+    default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-chat"))
+    document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
     mineru: MineruConfig = Field(default_factory=MineruConfig)
 
-    config_file: Optional[Path] = Field(
-        default=None, description="Path to configuration file"
-    )
+    config_file: Optional[Path] = Field(default=None, description="Path to configuration file")
 
     @classmethod
     def load_from_file(cls, config_path: Optional[Path] = None) -> "ScireadConfig":
@@ -197,12 +149,7 @@ class ScireadConfig(BaseSettings):
             for provider_name, provider_data in providers_config.items():
                 # Support environment variable substitution
                 api_key = provider_data.get("api_key")
-                if (
-                    api_key
-                    and isinstance(api_key, str)
-                    and api_key.startswith("${")
-                    and api_key.endswith("}")
-                ):
+                if api_key and isinstance(api_key, str) and api_key.startswith("${") and api_key.endswith("}"):
                     env_var = api_key[2:-1]
                     api_key = os.getenv(env_var)
 
@@ -227,12 +174,7 @@ class ScireadConfig(BaseSettings):
             mineru_config = config_data.get("mineru", {})
             # Support environment variable substitution for token
             mineru_token = mineru_config.get("token")
-            if (
-                mineru_token
-                and isinstance(mineru_token, str)
-                and mineru_token.startswith("${")
-                and mineru_token.endswith("}")
-            ):
+            if mineru_token and isinstance(mineru_token, str) and mineru_token.startswith("${") and mineru_token.endswith("}"):
                 env_var = mineru_token[2:-1]
                 mineru_token = os.getenv(env_var)
             mineru_config["token"] = mineru_token
@@ -280,9 +222,7 @@ class ScireadConfig(BaseSettings):
         elif splitter_name == "topic_flow":
             return self.document_splitters.topic_flow
         else:
-            raise ValueError(
-                f"Unknown splitter: {splitter_name}. Available splitters: regex_section, topic_flow"
-            )
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section, topic_flow")
 
     def get_default_splitter_config(self):
         """Get configuration for the default splitter."""
@@ -295,9 +235,7 @@ class ScireadConfig(BaseSettings):
             # Try environment variable
             api_key = os.getenv("MINERU_TOKEN")
             if not api_key:
-                raise ValueError(
-                    "No Mineru token found. Set MINERU_TOKEN environment variable or configure in config file."
-                )
+                raise ValueError("No Mineru token found. Set MINERU_TOKEN environment variable or configure in config file.")
             return api_key
         return self.mineru.token
 

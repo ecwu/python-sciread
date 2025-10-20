@@ -6,7 +6,8 @@ import time
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
+from typing import Optional
 
 import requests
 
@@ -39,9 +40,7 @@ class OllamaClient:
         self.embedding_cache: dict[str, list[float]] = {}
         self.logger = get_logger(__name__)
 
-    def get_embeddings(
-        self, texts: list[str], batch_size: int = 10
-    ) -> list[list[float]]:
+    def get_embeddings(self, texts: list[str], batch_size: int = 10) -> list[list[float]]:
         """
         Get embeddings for texts using Ollama API.
 
@@ -234,9 +233,7 @@ class MineruClient:
                     if markdown_content:
                         return markdown_content
                 except RuntimeError as e:
-                    self.logger.warning(
-                        f"Failed to use cached zip: {e}, falling back to API"
-                    )
+                    self.logger.warning(f"Failed to use cached zip: {e}, falling back to API")
 
         # If no cache or cache failed, call API
         markdown_content, zip_content = self._call_mineru_api(file_path)
@@ -265,9 +262,7 @@ class MineruClient:
             with zip_file.open(full_md_path) as md_file:
                 markdown_content = md_file.read().decode("utf-8")
 
-            self.logger.info(
-                f"Successfully extracted {len(markdown_content)} characters from cached zip"
-            )
+            self.logger.info(f"Successfully extracted {len(markdown_content)} characters from cached zip")
             return markdown_content
 
     def _call_mineru_api(self, file_path: Path) -> tuple[str, Optional[bytes]]:
@@ -300,9 +295,7 @@ class MineruClient:
         response = requests.post(url, headers=headers, json=data, timeout=30)
 
         if response.status_code != 200:
-            self.logger.error(
-                f"Mineru API request failed: {response.status_code} - {response.text}"
-            )
+            self.logger.error(f"Mineru API request failed: {response.status_code} - {response.text}")
             raise RuntimeError(f"Mineru API request failed: {response.status_code}")
 
         result = response.json()
@@ -328,9 +321,7 @@ class MineruClient:
         elif isinstance(upload_urls, str):
             upload_url = upload_urls
         else:
-            self.logger.error(
-                f"Unexpected upload_urls format: {type(upload_urls)} - {upload_urls}"
-            )
+            self.logger.error(f"Unexpected upload_urls format: {type(upload_urls)} - {upload_urls}")
             raise RuntimeError(f"Unexpected upload_urls format: {type(upload_urls)}")
 
         self.logger.info(f"Uploading PDF to Mineru (batch_id: {batch_id})")
@@ -339,12 +330,8 @@ class MineruClient:
             upload_response = requests.put(upload_url, data=f, timeout=300)
 
         if upload_response.status_code != 200:
-            self.logger.error(
-                f"Failed to upload PDF to Mineru: {upload_response.status_code}"
-            )
-            raise RuntimeError(
-                f"Failed to upload PDF to Mineru: {upload_response.status_code}"
-            )
+            self.logger.error(f"Failed to upload PDF to Mineru: {upload_response.status_code}")
+            raise RuntimeError(f"Failed to upload PDF to Mineru: {upload_response.status_code}")
 
         self.logger.info("PDF uploaded successfully, waiting for processing...")
 
@@ -355,9 +342,7 @@ class MineruClient:
 
         while attempt < max_attempts:
             attempt += 1
-            self.logger.debug(
-                f"Checking processing status (attempt {attempt}/{max_attempts})"
-            )
+            self.logger.debug(f"Checking processing status (attempt {attempt}/{max_attempts})")
 
             try:
                 status_response = requests.get(result_url, headers=headers, timeout=30)
@@ -384,30 +369,18 @@ class MineruClient:
                             # Download and extract the zip file
                             zip_url = extract_result.get("full_zip_url")
                             if not zip_url:
-                                self.logger.error(
-                                    "Mineru processing completed but no zip URL provided"
-                                )
+                                self.logger.error("Mineru processing completed but no zip URL provided")
                                 raise RuntimeError("No zip URL returned from Mineru")
 
-                            markdown_content, zip_content = (
-                                self._download_and_extract_zip(zip_url)
-                            )
+                            markdown_content, zip_content = self._download_and_extract_zip(zip_url)
                             if markdown_content:
-                                self.logger.info(
-                                    f"Successfully extracted {len(markdown_content)} characters from Mineru"
-                                )
+                                self.logger.info(f"Successfully extracted {len(markdown_content)} characters from Mineru")
                                 return markdown_content, zip_content
                             else:
-                                self.logger.error(
-                                    "Failed to extract markdown content from Mineru zip"
-                                )
-                                raise RuntimeError(
-                                    "Failed to extract markdown from Mineru zip"
-                                )
+                                self.logger.error("Failed to extract markdown content from Mineru zip")
+                                raise RuntimeError("Failed to extract markdown from Mineru zip")
                         elif state == "failed":
-                            error_msg = extract_result.get(
-                                "err_msg", "Processing failed"
-                            )
+                            error_msg = extract_result.get("err_msg", "Processing failed")
                             self.logger.error(f"Mineru processing failed: {error_msg}")
                             raise RuntimeError(f"Mineru processing failed: {error_msg}")
                         elif state in [
@@ -430,9 +403,7 @@ class MineruClient:
                         time.sleep(self.poll_interval)
                         continue
                 else:
-                    self.logger.warning(
-                        f"Failed to check status: {status_response.status_code}"
-                    )
+                    self.logger.warning(f"Failed to check status: {status_response.status_code}")
                     time.sleep(self.poll_interval)
                     continue
 
@@ -457,12 +428,8 @@ class MineruClient:
             # Download the zip file
             response = requests.get(zip_url, timeout=300)
             if response.status_code != 200:
-                self.logger.error(
-                    f"Failed to download zip file: {response.status_code}"
-                )
-                raise RuntimeError(
-                    f"Failed to download zip file: {response.status_code}"
-                )
+                self.logger.error(f"Failed to download zip file: {response.status_code}")
+                raise RuntimeError(f"Failed to download zip file: {response.status_code}")
 
             # Store zip content for caching
             zip_content = response.content
@@ -489,9 +456,7 @@ class MineruClient:
                 with zip_file.open(full_md_path) as md_file:
                     markdown_content = md_file.read().decode("utf-8")
 
-                self.logger.info(
-                    f"Successfully extracted {len(markdown_content)} characters from full.md"
-                )
+                self.logger.info(f"Successfully extracted {len(markdown_content)} characters from full.md")
                 return markdown_content, zip_content
 
         except requests.RequestException as e:

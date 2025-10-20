@@ -18,12 +18,7 @@ Key guidelines:
 Always provide citations or references to specific parts of the paper when making claims about its content."""
 
 
-def build_analysis_prompt(
-    text: str,
-    task_prompt: str,
-    document_metadata: dict = None,
-    **kwargs
-) -> str:
+def build_analysis_prompt(text: str, task_prompt: str, document_metadata: dict = None, **kwargs) -> str:
     """Build the full analysis prompt for SimpleAgent.
 
     Args:

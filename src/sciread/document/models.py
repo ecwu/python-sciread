@@ -6,7 +6,6 @@ from datetime import datetime
 from datetime import timezone
 from pathlib import Path
 from typing import Optional
-from typing import Union
 
 
 @dataclass
@@ -50,8 +49,6 @@ class Chunk:
     def is_processed(self) -> bool:
         """Check if this chunk is processed."""
         return self.processed
-
-
 
 
 @dataclass

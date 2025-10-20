@@ -54,12 +54,7 @@ Remember: You are building a comprehensive understanding of the research piece b
 
 
 def format_agent_prompt(
-    task: str,
-    available_sections: list[str],
-    status: str,
-    section_content: str,
-    current_report: str,
-    processed_sections: list[str]
+    task: str, available_sections: list[str], status: str, section_content: str, current_report: str, processed_sections: list[str]
 ) -> str:
     """Format the agent prompt with all necessary information.
 
@@ -78,15 +73,15 @@ def format_agent_prompt(
 
 CURRENT STATUS: {status}
 
-AVAILABLE SECTIONS: {', '.join(available_sections)}
+AVAILABLE SECTIONS: {", ".join(available_sections)}
 
-ALREADY PROCESSED SECTIONS: {', '.join(processed_sections) if processed_sections else 'None'}
+ALREADY PROCESSED SECTIONS: {", ".join(processed_sections) if processed_sections else "None"}
 
 CURRENT REPORT BUILT SO FAR:
-{current_report if current_report else '[No previous analysis yet - this is the first iteration]'}
+{current_report if current_report else "[No previous analysis yet - this is the first iteration]"}
 
 === SECTIONS TO ANALYZE IN THIS ITERATION ===
-{section_content if section_content else '[No section content provided]'}
+{section_content if section_content else "[No section content provided]"}
 
 === YOUR ANALYSIS TASK ===
 Based on the sections provided above and your existing analysis, please:

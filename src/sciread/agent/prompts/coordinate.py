@@ -187,6 +187,7 @@ SYNTHESIS_SYSTEM_PROMPT = "You are an expert academic research analyst specializ
 # Analysis Prompt Templates
 # ============================================================================
 
+
 def build_metadata_analysis_prompt(content: str) -> str:
     """Build prompt for metadata extraction analysis."""
     return f"""Extract the following key bibliographic metadata from this academic paper:
@@ -292,6 +293,7 @@ Provide a comprehensive analysis of the implications, limitations, and future di
 # ============================================================================
 # Planning and Synthesis Prompt Templates
 # ============================================================================
+
 
 def build_analysis_planning_prompt(abstract: str, section_names: list[str]) -> str:
     """Build prompt for analysis planning."""

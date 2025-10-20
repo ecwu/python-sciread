@@ -17,10 +17,10 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from ..document.document import Document
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .text_utils import clean_academic_text
-from .text_utils import remove_references as remove_references_func
 from .prompts.simple import DEFAULT_SYSTEM_PROMPT
 from .prompts.simple import build_analysis_prompt
+from .text_utils import clean_academic_text
+from .text_utils import remove_references as remove_references_func
 
 
 class SimpleAnalysisResult(BaseModel):
@@ -62,7 +62,7 @@ class SimpleAgent:
             self.logger.info(f"Initialized agent with model: {model}")
         else:
             self.model = model
-            self.model_identifier = getattr(model, 'model_name', 'unknown')
+            self.model_identifier = getattr(model, "model_name", "unknown")
             self.logger.info("Initialized agent with provided model instance")
 
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
@@ -123,9 +123,9 @@ class SimpleAgent:
         document_metadata = None
         if include_metadata and document:
             document_metadata = {
-                'source_path': str(document.source_path) if document.source_path else None,
-                'title': document.metadata.title if document.metadata.title else None,
-                'author': document.metadata.author if document.metadata.author else None,
+                "source_path": str(document.source_path) if document.source_path else None,
+                "title": document.metadata.title if document.metadata.title else None,
+                "author": document.metadata.author if document.metadata.author else None,
             }
 
         full_prompt = build_analysis_prompt(

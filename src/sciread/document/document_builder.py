@@ -10,9 +10,7 @@ from .external_clients import OllamaClient
 from .loaders import BaseLoader
 from .loaders.pdf_loader import PdfLoader
 from .loaders.txt_loader import TxtLoader
-from .models import Chunk
 from .models import DocumentMetadata
-from .models import ProcessingState
 from .splitters import BaseSplitter
 from .splitters.semantic_splitter import SemanticSplitter
 from .splitters.topic_flow import TopicFlowSplitter
@@ -43,13 +41,7 @@ class DocumentBuilder:
         self.ollama_client = ollama_client
         self.mineru_client = mineru_client
 
-    def from_file(
-        self,
-        file_path: Union[str, Path],
-        to_markdown: bool = False,
-        auto_split: bool = True,
-        **split_kwargs
-    ) -> "Document":
+    def from_file(self, file_path: Union[str, Path], to_markdown: bool = False, auto_split: bool = True, **split_kwargs) -> "Document":
         """
         Create a Document from a file path.
 
@@ -102,12 +94,7 @@ class DocumentBuilder:
         return doc
 
     def from_text(
-        self,
-        text: str,
-        metadata: Optional[DocumentMetadata] = None,
-        auto_split: bool = True,
-        is_markdown: bool = False,
-        **split_kwargs
+        self, text: str, metadata: Optional[DocumentMetadata] = None, auto_split: bool = True, is_markdown: bool = False, **split_kwargs
     ) -> "Document":
         """
         Create a Document from raw text.
@@ -162,12 +149,7 @@ class DocumentBuilder:
 
             raise ValueError(f"Unsupported file format: {suffix}")
 
-    def _split_document(
-        self,
-        doc: "Document",
-        splitter: Optional[BaseSplitter] = None,
-        **split_kwargs
-    ) -> None:
+    def _split_document(self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs) -> None:
         """
         Split document into chunks.
 
@@ -200,6 +182,7 @@ class DocumentBuilder:
         # If document was created with markdown conversion, use the dedicated MarkdownSplitter
         if doc._is_markdown:
             from .splitters.markdown_splitter import MarkdownSplitter
+
             return MarkdownSplitter(
                 min_chunk_size=200,
                 max_chunk_size=2000,
@@ -270,9 +253,7 @@ class DocumentFactory:
 
     @staticmethod
     def create_academic_document(
-        file_path: Union[str, Path],
-        use_markdown: bool = True,
-        mineru_client: Optional[MineruClient] = None
+        file_path: Union[str, Path], use_markdown: bool = True, mineru_client: Optional[MineruClient] = None
     ) -> "Document":
         """
         Create document optimized for academic papers.
@@ -296,9 +277,7 @@ class DocumentFactory:
 
     @staticmethod
     def create_topic_flow_document(
-        file_path: Union[str, Path],
-        ollama_client: Optional[OllamaClient] = None,
-        **topic_flow_kwargs
+        file_path: Union[str, Path], ollama_client: Optional[OllamaClient] = None, **topic_flow_kwargs
     ) -> "Document":
         """
         Create document using TopicFlow splitting.

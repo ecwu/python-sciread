@@ -122,7 +122,6 @@ Another substantial piece of content that describes the methodology used in this
         for chunk in substantial_chunks:
             assert len(chunk.content) >= 100 or chunk.confidence < 0.5
 
-    
     def test_document_level_filtering(self):
         """Test that Document class handles confidence threshold filtering."""
         from sciread.document import Document

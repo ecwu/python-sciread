@@ -408,26 +408,26 @@ class RegexSectionSplitter(BaseSplitter):
 
     def _extract_section_name_from_content(self, content: str) -> Optional[str]:
         """Extract the actual section name from content for display/searching."""
-        lines = content.strip().split('\n')
+        lines = content.strip().split("\n")
         if not lines:
             return None
 
         first_line = lines[0].strip()
 
         # Check for numbered sections (e.g., "1. Introduction", "2. Methods")
-        numbered_match = re.match(r'^\d+(?:\.\d+)*\s+(.+)$', first_line)
+        numbered_match = re.match(r"^\d+(?:\.\d+)*\s+(.+)$", first_line)
         if numbered_match:
             return numbered_match.group(1).strip()
 
         # Check for common section headers
         section_patterns = [
-            r'^abstract\s*(?:[:\-])?\s*(.+)$',
-            r'^introduction\s*(?:[:\-])?\s*(.+)$',
-            r'^(?:method|methodology|methods?)\s*(?:[:\-])?\s*(.+)$',
-            r'^results?\s*(?:[:\-])?\s*(.+)$',
-            r'^discussion\s*(?:[:\-])?\s*(.+)$',
-            r'^conclusion\s*(?:[:\-])?\s*(.+)$',
-            r'^references?\s*(?:[:\-])?\s*(.+)$',
+            r"^abstract\s*(?:[:\-])?\s*(.+)$",
+            r"^introduction\s*(?:[:\-])?\s*(.+)$",
+            r"^(?:method|methodology|methods?)\s*(?:[:\-])?\s*(.+)$",
+            r"^results?\s*(?:[:\-])?\s*(.+)$",
+            r"^discussion\s*(?:[:\-])?\s*(.+)$",
+            r"^conclusion\s*(?:[:\-])?\s*(.+)$",
+            r"^references?\s*(?:[:\-])?\s*(.+)$",
         ]
 
         for pattern in section_patterns:
@@ -437,9 +437,17 @@ class RegexSectionSplitter(BaseSplitter):
 
         # If it's a single word section header
         single_word_patterns = [
-            r'^abstract$', r'^introduction$', r'^methodology$', r'^methods$',
-            r'^results$', r'^discussion$', r'^conclusion$', r'^references$',
-            r'^acknowledgments?$', r'^appendix$', r'^background$'
+            r"^abstract$",
+            r"^introduction$",
+            r"^methodology$",
+            r"^methods$",
+            r"^results$",
+            r"^discussion$",
+            r"^conclusion$",
+            r"^references$",
+            r"^acknowledgments?$",
+            r"^appendix$",
+            r"^background$",
         ]
 
         for pattern in single_word_patterns:
@@ -452,7 +460,6 @@ class RegexSectionSplitter(BaseSplitter):
 
         return None
 
-    
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom pattern."""
         self.patterns[name] = pattern
@@ -491,7 +498,7 @@ def main():
         default=0.3,
         help="Minimum confidence threshold for chunks (default: 0.3)",
     )
-    
+
     args = parser.parse_args()
 
     # Check if file exists

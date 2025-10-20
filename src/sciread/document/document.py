@@ -6,7 +6,6 @@ from typing import Optional
 from typing import Union
 
 from ..logging_config import get_logger
-from .document_builder import DocumentBuilder
 from .document_builder import DocumentFactory
 from .models import Chunk
 from .models import DocumentMetadata
@@ -43,13 +42,7 @@ class Document:
         self._is_markdown = _is_markdown
 
     @classmethod
-    def from_file(
-        cls,
-        file_path: Union[str, Path],
-        to_markdown: bool = False,
-        auto_split: bool = True,
-        **split_kwargs
-    ) -> "Document":
+    def from_file(cls, file_path: Union[str, Path], to_markdown: bool = False, auto_split: bool = True, **split_kwargs) -> "Document":
         """
         Create a Document from a file path.
 
@@ -65,13 +58,7 @@ class Document:
         return DocumentFactory.create_from_file(file_path, to_markdown=to_markdown)
 
     @classmethod
-    def from_text(
-        cls,
-        text: str,
-        metadata: Optional[DocumentMetadata] = None,
-        auto_split: bool = True,
-        **split_kwargs
-    ) -> "Document":
+    def from_text(cls, text: str, metadata: Optional[DocumentMetadata] = None, auto_split: bool = True, **split_kwargs) -> "Document":
         """
         Create a Document from raw text.
 
@@ -96,7 +83,6 @@ class Document:
         """Get the raw text content."""
         return self._raw_text
 
-    
     @property
     def is_split(self) -> bool:
         """Check if document is split."""
@@ -257,7 +243,6 @@ class Document:
             return self._raw_text
         return separator.join(chunk.content for chunk in self._chunks)
 
-  
     def get_section_names(self) -> list[str]:
         """Return ordered list of section names from all chunks.
 
@@ -296,7 +281,6 @@ class Document:
                 matching_chunks.append(chunk)
         return matching_chunks
 
-    
     def __iter__(self) -> Iterator[Chunk]:
         """Iterate over chunks."""
         return iter(self._chunks)

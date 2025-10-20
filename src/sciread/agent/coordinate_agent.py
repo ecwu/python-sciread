@@ -59,9 +59,7 @@ class MetadataExtractionResult(BaseModel):
         default_factory=list,
         description="Author affiliations (company, university, or lab)",
     )
-    venue: Optional[str] = Field(
-        None, description="Publication venue (journal, conference, or arxiv)"
-    )
+    venue: Optional[str] = Field(None, description="Publication venue (journal, conference, or arxiv)")
     year: Optional[int] = Field(None, description="Publication year")
     confidence: float = Field(1.0, description="Confidence in extracted metadata")
 
@@ -69,40 +67,22 @@ class MetadataExtractionResult(BaseModel):
 class PreviousMethodsResult(BaseModel):
     """Result of previous work and methods analysis."""
 
-    related_work: list[str] = Field(
-        default_factory=list, description="Key related work papers and approaches"
-    )
-    key_methods: list[str] = Field(
-        default_factory=list, description="Important methodologies from prior work"
-    )
-    limitations: list[str] = Field(
-        default_factory=list, description="Limitations of existing approaches"
-    )
-    research_gaps: list[str] = Field(
-        default_factory=list, description="Identified research gaps"
-    )
-    novelty_aspects: list[str] = Field(
-        default_factory=list, description="Novel aspects compared to prior work"
-    )
+    related_work: list[str] = Field(default_factory=list, description="Key related work papers and approaches")
+    key_methods: list[str] = Field(default_factory=list, description="Important methodologies from prior work")
+    limitations: list[str] = Field(default_factory=list, description="Limitations of existing approaches")
+    research_gaps: list[str] = Field(default_factory=list, description="Identified research gaps")
+    novelty_aspects: list[str] = Field(default_factory=list, description="Novel aspects compared to prior work")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
 class ResearchQuestionsResult(BaseModel):
     """Result of research questions and contributions analysis."""
 
-    main_questions: list[str] = Field(
-        default_factory=list, description="Primary research questions"
-    )
-    hypotheses: list[str] = Field(
-        default_factory=list, description="Research hypotheses"
-    )
-    contributions: list[str] = Field(
-        default_factory=list, description="Main contributions"
-    )
+    main_questions: list[str] = Field(default_factory=list, description="Primary research questions")
+    hypotheses: list[str] = Field(default_factory=list, description="Research hypotheses")
+    contributions: list[str] = Field(default_factory=list, description="Main contributions")
     research_significance: str = Field("", description="Significance of the research")
-    target_audience: list[str] = Field(
-        default_factory=list, description="Target audience for this work"
-    )
+    target_audience: list[str] = Field(default_factory=list, description="Target audience for this work")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
@@ -110,21 +90,11 @@ class MethodologyResult(BaseModel):
     """Result of methodology and technical approach analysis."""
 
     approach: str = Field("", description="Overall methodological approach")
-    techniques: list[str] = Field(
-        default_factory=list, description="Specific techniques used"
-    )
-    assumptions: list[str] = Field(
-        default_factory=list, description="Key assumptions made"
-    )
-    data_sources: list[str] = Field(
-        default_factory=list, description="Data sources or datasets used"
-    )
-    evaluation_metrics: list[str] = Field(
-        default_factory=list, description="Metrics used for evaluation"
-    )
-    limitations: list[str] = Field(
-        default_factory=list, description="Methodological limitations"
-    )
+    techniques: list[str] = Field(default_factory=list, description="Specific techniques used")
+    assumptions: list[str] = Field(default_factory=list, description="Key assumptions made")
+    data_sources: list[str] = Field(default_factory=list, description="Data sources or datasets used")
+    evaluation_metrics: list[str] = Field(default_factory=list, description="Metrics used for evaluation")
+    limitations: list[str] = Field(default_factory=list, description="Methodological limitations")
     reproducibility_notes: str = Field("", description="Notes on reproducibility")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
@@ -133,51 +103,25 @@ class ExperimentResult(BaseModel):
     """Result of experiments and results analysis."""
 
     setup: str = Field("", description="Experimental setup description")
-    datasets: list[str] = Field(
-        default_factory=list, description="Datasets used in experiments"
-    )
-    baselines: list[str] = Field(
-        default_factory=list, description="Baseline methods compared against"
-    )
-    results: list[str] = Field(
-        default_factory=list, description="Key experimental results"
-    )
-    quantitative_results: dict[str, float] = Field(
-        default_factory=dict, description="Quantitative metrics"
-    )
-    qualitative_findings: list[str] = Field(
-        default_factory=list, description="Qualitative findings"
-    )
-    statistical_significance: list[str] = Field(
-        default_factory=list, description="Statistical significance observations"
-    )
-    error_analysis: list[str] = Field(
-        default_factory=list, description="Error analysis and failure cases"
-    )
+    datasets: list[str] = Field(default_factory=list, description="Datasets used in experiments")
+    baselines: list[str] = Field(default_factory=list, description="Baseline methods compared against")
+    results: list[str] = Field(default_factory=list, description="Key experimental results")
+    quantitative_results: dict[str, float] = Field(default_factory=dict, description="Quantitative metrics")
+    qualitative_findings: list[str] = Field(default_factory=list, description="Qualitative findings")
+    statistical_significance: list[str] = Field(default_factory=list, description="Statistical significance observations")
+    error_analysis: list[str] = Field(default_factory=list, description="Error analysis and failure cases")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
 class FutureDirectionsResult(BaseModel):
     """Result of future work and implications analysis."""
 
-    future_work: list[str] = Field(
-        default_factory=list, description="Suggested future research directions"
-    )
-    limitations: list[str] = Field(
-        default_factory=list, description="Current limitations of the work"
-    )
-    practical_implications: list[str] = Field(
-        default_factory=list, description="Practical applications and implications"
-    )
-    theoretical_implications: list[str] = Field(
-        default_factory=list, description="Theoretical contributions"
-    )
-    open_questions: list[str] = Field(
-        default_factory=list, description="Open questions raised by the work"
-    )
-    societal_impact: list[str] = Field(
-        default_factory=list, description="Societal impact considerations"
-    )
+    future_work: list[str] = Field(default_factory=list, description="Suggested future research directions")
+    limitations: list[str] = Field(default_factory=list, description="Current limitations of the work")
+    practical_implications: list[str] = Field(default_factory=list, description="Practical applications and implications")
+    theoretical_implications: list[str] = Field(default_factory=list, description="Theoretical contributions")
+    open_questions: list[str] = Field(default_factory=list, description="Open questions raised by the work")
+    societal_impact: list[str] = Field(default_factory=list, description="Societal impact considerations")
     confidence: float = Field(1.0, description="Confidence in analysis")
 
 
@@ -185,17 +129,11 @@ class AnalysisPlan(BaseModel):
     """Plan for which sub-agents to use for analysis."""
 
     analyze_metadata: bool = Field(description="Whether to analyze metadata")
-    analyze_previous_methods: bool = Field(
-        description="Whether to analyze previous methods"
-    )
-    analyze_research_questions: bool = Field(
-        description="Whether to analyze research questions"
-    )
+    analyze_previous_methods: bool = Field(description="Whether to analyze previous methods")
+    analyze_research_questions: bool = Field(description="Whether to analyze research questions")
     analyze_methodology: bool = Field(description="Whether to analyze methodology")
     analyze_experiments: bool = Field(description="Whether to analyze experiments")
-    analyze_future_directions: bool = Field(
-        description="Whether to analyze future directions"
-    )
+    analyze_future_directions: bool = Field(description="Whether to analyze future directions")
 
     # Section selection fields for all agents EXCEPT metadata
     # Metadata uses hardcoded first 3 chunks approach
@@ -235,16 +173,10 @@ class ComprehensiveAnalysisResult(BaseModel):
     experiment_result: Optional[ExperimentResult] = None
     future_directions_result: Optional[FutureDirectionsResult] = None
 
-    execution_summary: dict[str, Any] = Field(
-        default_factory=dict, description="Summary of execution details"
-    )
+    execution_summary: dict[str, Any] = Field(default_factory=dict, description="Summary of execution details")
     final_report: str = Field("", description="Synthesized final report")
-    total_execution_time: float = Field(
-        0.0, description="Total execution time in seconds"
-    )
-    sections_analyzed: dict[str, list[str]] = Field(
-        default_factory=dict, description="Which sections were analyzed by each agent"
-    )
+    total_execution_time: float = Field(0.0, description="Total execution time in seconds")
+    sections_analyzed: dict[str, list[str]] = Field(default_factory=dict, description="Which sections were analyzed by each agent")
 
 
 # Generic expert agent implementation
@@ -298,13 +230,10 @@ class ExpertAgent:
             retries=self.max_retries,
         )
 
-        self.logger.info(
-            f"Initialized {agent_name} agent with model: {self.model_identifier}"
-        )
+        self.logger.info(f"Initialized {agent_name} agent with model: {self.model_identifier}")
 
     def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
         """Log interaction for this agent using debug logging."""
-        import datetime
 
         prompt_length = len(prompt)
         output_length = len(output) if output else 0
@@ -365,13 +294,9 @@ class ExpertAgent:
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(
-                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
-            )
+            self.logger.error(f"{self.agent_name} analysis timed out after {self.timeout} seconds")
             self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
-            ) from None
+            raise TimeoutError(f"{self.agent_name} analysis timed out after {self.timeout} seconds") from None
 
         except Exception as e:
             self.logger.error(f"{self.agent_name} analysis failed: {e}")
@@ -469,9 +394,7 @@ class CoordinateAgent:
             self.model = model
             self.model_identifier = getattr(model, "model_name", "unknown")
 
-        self.logger.info(
-            f"Initialized CoordinateAgent controller with model: {self.model_identifier}"
-        )
+        self.logger.info(f"Initialized CoordinateAgent controller with model: {self.model_identifier}")
 
         # Controller agent for planning and synthesis
         controller_instructions = CONTROLLER_INSTRUCTIONS
@@ -517,11 +440,7 @@ class CoordinateAgent:
 
         return agent
 
-    
-    
-    def display_analysis_plan(
-        self, analysis_plan: AnalysisPlan, section_names: list[str]
-    ) -> str:
+    def display_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]) -> str:
         """Create a clear, readable display of the analysis plan.
 
         Args:
@@ -576,18 +495,14 @@ class CoordinateAgent:
                 if sections_field == "First 3 chunks (title, authors, abstract)":
                     sections_display = sections_field
                 else:
-                    sections = getattr(analysis_plan, sections_field) or [
-                        "All sections"
-                    ]
+                    sections = getattr(analysis_plan, sections_field) or ["All sections"]
                     if sections == ["All sections"]:
                         sections_display = f"All sections {YELLOW}⚠️  (fallback){RESET}"
                     else:
                         sections_display = f"{', '.join(sections)}"
 
                 # Combined display with colors
-                plan_display.append(
-                    f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}"
-                )
+                plan_display.append(f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}")
                 plan_display.append("")
 
         # Add reasoning section with color
@@ -635,19 +550,12 @@ class CoordinateAgent:
             )
 
         if analysis_plan.estimated_relevance_scores:
-            scores_text = ", ".join(
-                [
-                    f"{k}: {v:.2f}"
-                    for k, v in analysis_plan.estimated_relevance_scores.items()
-                ]
-            )
+            scores_text = ", ".join([f"{k}: {v:.2f}" for k, v in analysis_plan.estimated_relevance_scores.items()])
             plan_display.append(f"{CYAN}Relevance Scores: {scores_text}{RESET}")
 
         return "\n".join(plan_display)
 
-    def _create_filtered_document(
-        self, original_document: Document, chunks: list[Chunk]
-    ) -> Document:
+    def _create_filtered_document(self, original_document: Document, chunks: list[Chunk]) -> Document:
         """Create a new Document object containing only specified chunks.
 
         Args:
@@ -725,10 +633,7 @@ class CoordinateAgent:
         for section_name in section_names:
             section_lower = section_name.lower()
             # Check for abstract-like section names (handle noise like numbers)
-            if any(
-                keyword in section_lower
-                for keyword in ["abstract", "summary", "overview"]
-            ):
+            if any(keyword in section_lower for keyword in ["abstract", "summary", "overview"]):
                 abstract_section_names.append(section_name)
                 self.logger.debug(f"Found potential abstract section: '{section_name}'")
                 break  # Take the first match
@@ -737,12 +642,8 @@ class CoordinateAgent:
         if abstract_section_names:
             abstract_chunks = document.get_sections_by_name(abstract_section_names)
             if abstract_chunks:
-                abstract_content = " ".join(
-                    [chunk.content for chunk in abstract_chunks]
-                )
-                self.logger.info(
-                    f"Abstract extracted from semantic sections: {len(abstract_content)} characters"
-                )
+                abstract_content = " ".join([chunk.content for chunk in abstract_chunks])
+                self.logger.info(f"Abstract extracted from semantic sections: {len(abstract_content)} characters")
                 return abstract_content
 
         # Fallback: Use first two chunks as "abstract" for planning purposes
@@ -767,17 +668,13 @@ class CoordinateAgent:
         text = document.get_full_text() if document.chunks else document.text
         if text:
             fallback_text = text[:2000]
-            self.logger.warning(
-                "No abstract section found, using first 2000 chars of document as fallback for analysis planning"
-            )
+            self.logger.warning("No abstract section found, using first 2000 chars of document as fallback for analysis planning")
             return fallback_text
 
         self.logger.error("No abstract found and no text available in document")
         return ""
 
-    async def plan_analysis(
-        self, abstract: str, section_names: list[str]
-    ) -> AnalysisPlan:
+    async def plan_analysis(self, abstract: str, section_names: list[str]) -> AnalysisPlan:
         """Plan which sub-agents to use based on abstract analysis and available sections.
 
         Args:
@@ -788,14 +685,11 @@ class CoordinateAgent:
             AnalysisPlan with selected sub-agents, sections, and reasoning
         """
         self.logger.info(
-            f"Planning analysis based on abstract ({len(abstract) if abstract else 0} chars) "
-            f"and {len(section_names)} available sections"
+            f"Planning analysis based on abstract ({len(abstract) if abstract else 0} chars) and {len(section_names)} available sections"
         )
 
         if not abstract or not abstract.strip():
-            self.logger.warning(
-                "Empty abstract provided, using default comprehensive analysis plan"
-            )
+            self.logger.warning("Empty abstract provided, using default comprehensive analysis plan")
             return AnalysisPlan(
                 analyze_metadata=True,
                 analyze_previous_methods=True,
@@ -814,9 +708,7 @@ class CoordinateAgent:
         prompt = build_analysis_planning_prompt(abstract, section_names)
 
         try:
-            self.logger.debug(
-                f"Calling controller agent with prompt length: {len(prompt)} chars"
-            )
+            self.logger.debug(f"Calling controller agent with prompt length: {len(prompt)} chars")
             self.logger.debug(f"Controller agent model: {self.model_identifier}")
 
             # Run the controller agent to generate analysis plan
@@ -826,9 +718,7 @@ class CoordinateAgent:
             )
 
             self.logger.info("Analysis plan created successfully")
-            self.logger.debug(
-                f"Result type: {type(result)}, Output type: {type(result.output)}"
-            )
+            self.logger.debug(f"Result type: {type(result)}, Output type: {type(result.output)}")
             # Log controller agent interaction at debug level
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
             output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
@@ -837,16 +727,12 @@ class CoordinateAgent:
 
             # Validate that we got an actual plan, not empty defaults
             if not result.output.reasoning or not result.output.reasoning.strip():
-                self.logger.warning(
-                    "Controller agent returned plan with empty reasoning - may indicate generation issue"
-                )
+                self.logger.warning("Controller agent returned plan with empty reasoning - may indicate generation issue")
 
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(
-                f"Analysis planning timed out after {self.timeout} seconds"
-            )
+            self.logger.error(f"Analysis planning timed out after {self.timeout} seconds")
             # Log controller agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
             self.logger.debug(f"[controller_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
@@ -871,7 +757,7 @@ class CoordinateAgent:
             self.logger.error(f"Analysis planning failed: {e}")
             # Log controller agent error
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(f"[controller_agent] ERROR: {str(e)} - Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[controller_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}")
             # Return default plan
             return AnalysisPlan(
                 analyze_metadata=True,
@@ -958,29 +844,19 @@ class CoordinateAgent:
                 # Determine content for analysis
                 if agent_key == "metadata":
                     # Special case: metadata uses first 3 chunks
-                    metadata_chunks = (
-                        document.chunks[:3]
-                        if len(document.chunks) >= 3
-                        else document.chunks
-                    )
+                    metadata_chunks = document.chunks[:3] if len(document.chunks) >= 3 else document.chunks
                     content = " ".join([chunk.content for chunk in metadata_chunks])
-                    sections_analyzed[result_key] = [
-                        f"First {len(metadata_chunks)} chunks"
-                    ]
+                    sections_analyzed[result_key] = [f"First {len(metadata_chunks)} chunks"]
                 else:
                     # Use planned sections or full document
                     sections = getattr(analysis_plan, sections_field)
                     if sections:
                         # Deduplicate sections within this agent
                         deduplicated_sections = self._deduplicate_sections(sections)
-                        filtered_chunks = document.get_sections_by_name(
-                            deduplicated_sections
-                        )
+                        filtered_chunks = document.get_sections_by_name(deduplicated_sections)
                         content = " ".join([chunk.content for chunk in filtered_chunks])
                         sections_analyzed[result_key] = deduplicated_sections
-                        self.logger.debug(
-                            f"{agent_key} agent using specific sections: {deduplicated_sections}"
-                        )
+                        self.logger.debug(f"{agent_key} agent using specific sections: {deduplicated_sections}")
                     else:
                         # Use full document content
                         if document.chunks:
@@ -1008,9 +884,7 @@ class CoordinateAgent:
 
         # Execute tasks in parallel
         self.logger.info(f"Executing {len(tasks)} sub-agents in parallel")
-        completed_tasks = await asyncio.gather(
-            *[task for _, task in tasks], return_exceptions=True
-        )
+        completed_tasks = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Process results
         for (agent_name, _), result in zip(tasks, completed_tasks):
@@ -1022,9 +896,7 @@ class CoordinateAgent:
                 results[agent_name] = {"result": result, "success": True}
 
         execution_time = asyncio.get_event_loop().time() - start_time
-        self.logger.info(
-            f"Sub-agent execution completed in {execution_time:.2f} seconds"
-        )
+        self.logger.info(f"Sub-agent execution completed in {execution_time:.2f} seconds")
 
         # Add sections analyzed information to results
         results["_sections_analyzed"] = sections_analyzed
@@ -1098,9 +970,7 @@ class CoordinateAgent:
         for agent_name, result_data in sub_agent_results.items():
             if result_data.get("success", False):
                 result = result_data["result"]
-                prompt_parts.extend(
-                    [f"{agent_name.upper()} ANALYSIS:", str(result), ""]
-                )
+                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
             else:
                 prompt_parts.extend(
                     [
@@ -1155,9 +1025,7 @@ class CoordinateAgent:
 
         prompt = build_report_synthesis_prompt(
             paper_title=paper_title,
-            source_path=(
-                str(document.source_path) if document.source_path else "text document"
-            ),
+            source_path=(str(document.source_path) if document.source_path else "text document"),
             abstract=self.extract_abstract(document),
             sub_agent_results=sub_agent_results,
         )
@@ -1183,9 +1051,7 @@ class CoordinateAgent:
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(
-                f"Report synthesis timed out after {self.timeout} seconds"
-            )
+            self.logger.error(f"Report synthesis timed out after {self.timeout} seconds")
             # Log synthesis agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
             self.logger.debug(f"[synthesis_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
@@ -1196,7 +1062,7 @@ class CoordinateAgent:
             self.logger.error(f"Report synthesis failed: {e}")
             # Log synthesis agent error
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(f"[synthesis_agent] ERROR: {str(e)} - Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[synthesis_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}")
             return f"Report synthesis failed: {e}. Please try again."
 
     async def analyze(
@@ -1232,9 +1098,7 @@ class CoordinateAgent:
         # Step 0: Validate PDF document
         self._validate_pdf_document(document)
 
-        self.logger.info(
-            f"Starting comprehensive document analysis: {document.source_path}"
-        )
+        self.logger.info(f"Starting comprehensive document analysis: {document.source_path}")
         start_time = asyncio.get_event_loop().time()
 
         try:
@@ -1262,9 +1126,7 @@ class CoordinateAgent:
             sub_agent_results = await self.execute_sub_agents(document, analysis_plan)
 
             # Step 6: Synthesize final report
-            final_report = await self.synthesize_report(
-                analysis_plan, sub_agent_results, document
-            )
+            final_report = await self.synthesize_report(analysis_plan, sub_agent_results, document)
 
             # Step 7: Build comprehensive result
             total_execution_time = asyncio.get_event_loop().time() - start_time
@@ -1272,9 +1134,7 @@ class CoordinateAgent:
             comprehensive_result = ComprehensiveAnalysisResult(
                 analysis_plan=analysis_plan,
                 metadata_result=(
-                    sub_agent_results.get("metadata", {}).get("result")
-                    if sub_agent_results.get("metadata", {}).get("success")
-                    else None
+                    sub_agent_results.get("metadata", {}).get("result") if sub_agent_results.get("metadata", {}).get("success") else None
                 ),
                 previous_methods_result=(
                     sub_agent_results.get("previous_methods", {}).get("result")
@@ -1302,22 +1162,12 @@ class CoordinateAgent:
                     else None
                 ),
                 execution_summary={
-                    "total_agents_executed": len(sub_agent_results)
-                    - 1,  # Exclude _sections_analyzed
+                    "total_agents_executed": len(sub_agent_results) - 1,  # Exclude _sections_analyzed
                     "successful_agents": len(
-                        [
-                            r
-                            for name, r in sub_agent_results.items()
-                            if name != "_sections_analyzed" and r.get("success", False)
-                        ]
+                        [r for name, r in sub_agent_results.items() if name != "_sections_analyzed" and r.get("success", False)]
                     ),
                     "failed_agents": len(
-                        [
-                            r
-                            for name, r in sub_agent_results.items()
-                            if name != "_sections_analyzed"
-                            and not r.get("success", False)
-                        ]
+                        [r for name, r in sub_agent_results.items() if name != "_sections_analyzed" and not r.get("success", False)]
                     ),
                     "agent_results": {
                         name: {"success": data.get("success", False)}
@@ -1330,9 +1180,7 @@ class CoordinateAgent:
                 sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
             )
 
-            self.logger.info(
-                f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds"
-            )
+            self.logger.info(f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds")
             return comprehensive_result
 
         except Exception as e:

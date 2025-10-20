@@ -7,12 +7,11 @@ iterative document analysis using pydantic-ai framework.
 from pathlib import Path
 from typing import List
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
+from pydantic import Field
 from pydantic_ai import Agent
 
 from ..document import Document
-from ..document.loaders import PdfLoader
-from ..document.external_clients import MineruClient
 from ..llm_provider import get_model
 from ..logging_config import get_logger
 from .prompts.react import SYSTEM_PROMPT
@@ -23,44 +22,27 @@ logger = get_logger(__name__)
 
 # Pydantic models for ReAct agent input and output
 
+
 class ReActAgentInput(BaseModel):
     """Input model for ReAct agent iterations."""
 
-    task_prompt: str = Field(
-        description="The original analysis task or question about the document"
-    )
-    available_sections: List[str] = Field(
-        description="List of all available section names in the document"
-    )
+    task_prompt: str = Field(description="The original analysis task or question about the document")
+    available_sections: List[str] = Field(description="List of all available section names in the document")
     status_summary: str = Field(
         description="Summary of current stage, loop count, and remaining loops (e.g., 'Initial analysis (loop 1 of 8)')"
     )
-    section_content: str = Field(
-        description="Content of the sections to analyze in this iteration (empty for initial step)"
-    )
-    current_report: str = Field(
-        description="The cumulative report built so far from previous iterations"
-    )
-    processed_sections: List[str] = Field(
-        description="List of sections that have already been processed"
-    )
+    section_content: str = Field(description="Content of the sections to analyze in this iteration (empty for initial step)")
+    current_report: str = Field(description="The cumulative report built so far from previous iterations")
+    processed_sections: List[str] = Field(description="List of sections that have already been processed")
 
 
 class ReActAgentOutput(BaseModel):
     """Output model for ReAct agent iterations."""
 
-    should_stop: bool = Field(
-        description="Whether to stop the analysis process (True) or continue (False)"
-    )
-    report_section: str = Field(
-        description="New content generated for the current section content"
-    )
-    next_sections: List[str] = Field(
-        description="List of section names to analyze in the next iteration (empty if should_stop is True)"
-    )
-    reasoning: str = Field(
-        description="Explanation of why the agent made these choices (stop decision and section selection)"
-    )
+    should_stop: bool = Field(description="Whether to stop the analysis process (True) or continue (False)")
+    report_section: str = Field(description="New content generated for the current section content")
+    next_sections: List[str] = Field(description="List of section names to analyze in the next iteration (empty if should_stop is True)")
+    reasoning: str = Field(description="Explanation of why the agent made these choices (stop decision and section selection)")
 
 
 def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
@@ -99,13 +81,13 @@ def get_initial_sections(document: Document) -> List[str]:
 
     # Look for abstract first
     for section in available_sections:
-        if 'abstract' in section.lower():
+        if "abstract" in section.lower():
             initial_sections.append(section)
             break
 
     # Look for introduction next
     for section in available_sections:
-        if 'introduction' in section.lower() and section not in initial_sections:
+        if "introduction" in section.lower() and section not in initial_sections:
             initial_sections.append(section)
             break
 
@@ -165,12 +147,7 @@ def get_section_content(document: Document, section_names: List[str]) -> str:
 
 
 def analyze_document_with_react(
-    document_file: str,
-    task: str,
-    model: str = "deepseek-chat",
-    max_loops: int = 8,
-    to_markdown: bool = True,
-    show_progress: bool = True
+    document_file: str, task: str, model: str = "deepseek-chat", max_loops: int = 8, to_markdown: bool = True, show_progress: bool = True
 ) -> str:
     """Analyze a document using the ReAct agent.
 
@@ -238,8 +215,15 @@ class ReActAgent:
 
         self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
 
-    def _format_agent_prompt(self, task: str, available_sections: List[str], status: str,
-                            section_content: str, current_report: str, processed_sections: List[str]) -> str:
+    def _format_agent_prompt(
+        self,
+        task: str,
+        available_sections: List[str],
+        status: str,
+        section_content: str,
+        current_report: str,
+        processed_sections: List[str],
+    ) -> str:
         """Format the agent prompt with all necessary information.
 
         Args:
@@ -259,7 +243,7 @@ class ReActAgent:
             status=status,
             section_content=section_content,
             current_report=current_report,
-            processed_sections=processed_sections
+            processed_sections=processed_sections,
         )
 
     def _create_agent(self) -> Agent[str, ReActAgentOutput]:
@@ -299,9 +283,7 @@ class ReActAgent:
             section_content = get_section_content(document, current_sections)
 
             # Format status summary
-            status = format_status_summary(
-                "Analyzing sections", self.loop_count, self.max_loops
-            )
+            status = format_status_summary("Analyzing sections", self.loop_count, self.max_loops)
 
             # Prepare input for the agent as a formatted string
             input_prompt = self._format_agent_prompt(
@@ -310,14 +292,14 @@ class ReActAgent:
                 status=status,
                 section_content=section_content,
                 current_report=self.current_report,
-                processed_sections=self.processed_sections.copy()
+                processed_sections=self.processed_sections.copy(),
             )
 
             self.logger.info(f"Loop {self.loop_count}/{self.max_loops}: Analyzing sections: {current_sections}")
 
             # Run the agent
             try:
-                self.logger.debug(f"Running agent with string prompt")
+                self.logger.debug("Running agent with string prompt")
                 result = self.agent.run_sync(input_prompt)
                 self.logger.debug(f"Agent result type: {type(result)}")
                 # Access the structured output from AgentRunResult
@@ -328,6 +310,7 @@ class ReActAgent:
                 self.logger.error(f"Agent execution failed in loop {self.loop_count}: {e}")
                 self.logger.error(f"Exception type: {type(e)}")
                 import traceback
+
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break
 
@@ -370,11 +353,11 @@ class ReActAgent:
             self.logger.info(f"Report length: {len(self.current_report)} characters")
 
             # Print the final report to console
-            print("\n" + "="*80)
+            print("\n" + "=" * 80)
             print("FINAL ANALYSIS REPORT")
-            print("="*80)
+            print("=" * 80)
             print(self.current_report)
-            print("="*80)
+            print("=" * 80)
         else:
             self.logger.warning("No final report generated")
             print("\nWarning: No analysis report was generated")

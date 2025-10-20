@@ -36,35 +36,37 @@ Example Usage:
 """
 
 # New agent imports
-from .simple_agent import SimpleAgent, SimpleAnalysisResult
+from .coordinate_agent import AnalysisPlan
+from .coordinate_agent import ComprehensiveAnalysisResult
 from .coordinate_agent import CoordinateAgent
-from .react_agent import ReActAgent, analyze_document_with_react, load_and_process_document, get_initial_sections, format_status_summary
-from .text_utils import remove_references
+from .coordinate_agent import ExperimentResult
+from .coordinate_agent import FutureDirectionsResult
 
 # CoordinateAgent result models
-from .coordinate_agent import (
-    MetadataExtractionResult,
-    PreviousMethodsResult,
-    ResearchQuestionsResult,
-    MethodologyResult,
-    ExperimentResult,
-    FutureDirectionsResult,
-    AnalysisPlan,
-    ComprehensiveAnalysisResult,
-)
+from .coordinate_agent import MetadataExtractionResult
+from .coordinate_agent import MethodologyResult
+from .coordinate_agent import PreviousMethodsResult
+from .coordinate_agent import ResearchQuestionsResult
+from .react_agent import ReActAgent
 
 # ReActAgent models
-from .react_agent import ReActAgentInput, ReActAgentOutput
+from .react_agent import ReActAgentInput
+from .react_agent import ReActAgentOutput
+from .react_agent import analyze_document_with_react
+from .react_agent import format_status_summary
+from .react_agent import get_initial_sections
+from .react_agent import load_and_process_document
+from .simple_agent import SimpleAgent
+from .simple_agent import SimpleAnalysisResult
+from .text_utils import remove_references
 
 __all__ = [
     # Agent classes
     "SimpleAgent",
     "CoordinateAgent",
     "ReActAgent",
-
     # Result classes
     "SimpleAnalysisResult",
-
     # CoordinateAgent result models
     "MetadataExtractionResult",
     "PreviousMethodsResult",
@@ -74,7 +76,6 @@ __all__ = [
     "FutureDirectionsResult",
     "AnalysisPlan",
     "ComprehensiveAnalysisResult",
-
     # ReActAgent functions and models
     "analyze_document_with_react",
     "load_and_process_document",
@@ -82,7 +83,6 @@ __all__ = [
     "format_status_summary",
     "ReActAgentInput",
     "ReActAgentOutput",
-
     # Text utilities
     "remove_references",
 ]

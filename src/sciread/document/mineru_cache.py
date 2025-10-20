@@ -52,10 +52,7 @@ class MineruCacheManager:
                 data = json.load(f)
 
             # Convert dict to CacheEntry objects
-            return {
-                pdf_md5: CacheEntry(**entry_data)
-                for pdf_md5, entry_data in data.items()
-            }
+            return {pdf_md5: CacheEntry(**entry_data) for pdf_md5, entry_data in data.items()}
         except (OSError, json.JSONDecodeError) as e:
             self.logger.warning(f"Failed to load cache index: {e}")
             return {}
@@ -123,9 +120,7 @@ class MineruCacheManager:
 
             # Verify zip file exists
             if not zip_path.exists():
-                self.logger.warning(
-                    f"Cached zip file not found: {zip_path}, removing cache entry"
-                )
+                self.logger.warning(f"Cached zip file not found: {zip_path}, removing cache entry")
                 del self.cache_index[pdf_md5]
                 self._save_index()
                 return None
@@ -133,9 +128,7 @@ class MineruCacheManager:
             # Verify zip file integrity
             current_zip_md5 = self.calculate_file_md5(zip_path)
             if current_zip_md5 != entry.zip_md5:
-                self.logger.warning(
-                    f"Zip file MD5 mismatch for {zip_path}, removing cache entry"
-                )
+                self.logger.warning(f"Zip file MD5 mismatch for {zip_path}, removing cache entry")
                 # Remove corrupted zip file
                 zip_path.unlink(missing_ok=True)
                 del self.cache_index[pdf_md5]

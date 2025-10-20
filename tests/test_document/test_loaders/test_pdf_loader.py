@@ -17,7 +17,6 @@ class TestPdfLoader:
         """Create a PdfLoader instance."""
         return PdfLoader()
 
-    
     def test_supported_extensions(self, loader):
         """Test supported file extensions."""
         extensions = loader.supported_extensions
@@ -156,7 +155,6 @@ class TestPdfLoader:
         # Should have warnings about the failed page
         assert len(result.warnings) > 0
 
-    
     def test_extraction_quality_warnings(self, loader, temp_dir):
         """Test extraction quality warning detection."""
         # Create a PDF-like file with text that has quality issues

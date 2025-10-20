@@ -17,14 +17,13 @@ Why does this file exist, and why not put this in __main__?
 
 import argparse
 import sys
+
 import logfire
 
-from .core import (
-    compute,
-    run_main,
-    run_comprehensive_analysis,
-    run_react_analysis,
-)
+from .core import compute
+from .core import run_comprehensive_analysis
+from .core import run_main
+from .core import run_react_analysis
 from .logging_config import logger
 
 logfire.configure()
@@ -142,9 +141,7 @@ MODELS:
 
     # Handle different commands
     if args.command == "coordinate":
-        logger.info(
-            f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}"
-        )
+        logger.info(f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}")
 
         try:
             result = run_comprehensive_analysis(args.pdf_file, args.model)
@@ -154,9 +151,7 @@ MODELS:
             print("=" * 60)
             print(f"Analysis Plan: {result.analysis_plan.reasoning}")
             print(f"Total Execution Time: {result.total_execution_time:.2f} seconds")
-            print(
-                f"Agents Executed: {result.execution_summary['total_agents_executed']}"
-            )
+            print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
             print(f"Successful Agents: {result.execution_summary['successful_agents']}")
             print(f"Failed Agents: {result.execution_summary['failed_agents']}")
 
@@ -182,11 +177,7 @@ MODELS:
 
         try:
             result = run_react_analysis(
-                args.document_file,
-                args.task,
-                model=args.model,
-                max_loops=args.max_loops,
-                show_progress=not args.no_progress
+                args.document_file, args.task, model=args.model, max_loops=args.max_loops, show_progress=not args.no_progress
             )
             # The final report is already printed if show_progress=True
             if args.no_progress:
@@ -202,9 +193,7 @@ MODELS:
             return 1
 
     elif args.command == "simple":
-        logger.info(
-            f"Running simple mode with file: {args.document_file}, model: {args.model}"
-        )
+        logger.info(f"Running simple mode with file: {args.document_file}, model: {args.model}")
 
         try:
             result = run_main(args.document_file, args.model)

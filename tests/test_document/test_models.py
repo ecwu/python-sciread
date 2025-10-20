@@ -74,8 +74,6 @@ class TestChunk:
         assert chunk.is_processed is False
 
 
-
-
 class TestDocumentMetadata:
     """Test cases for the DocumentMetadata model."""
 

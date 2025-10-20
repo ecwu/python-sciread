@@ -162,10 +162,10 @@ class MarkdownSplitter(BaseSplitter):
 
         # Remove markdown symbols, brackets, and special characters
         # Keep letters, numbers, spaces, and hyphens only
-        cleaned = re.sub(r'[^\w\s-]', '', cleaned)
+        cleaned = re.sub(r"[^\w\s-]", "", cleaned)
 
         # Replace multiple spaces with single space and trim
-        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
         # Return "untitled" if empty after cleaning
         return cleaned if cleaned else "untitled"
@@ -266,10 +266,10 @@ class MarkdownSplitter(BaseSplitter):
 
     def _extract_section_from_content(self, content: str) -> Optional[str]:
         """Extract section name from content if it starts with a header."""
-        first_line = content.split('\n')[0].strip()
+        first_line = content.split("\n")[0].strip()
 
         # Check if first line is a markdown header
-        header_match = re.match(r'^(#{1,6})\s+(.+)$', first_line)
+        header_match = re.match(r"^(#{1,6})\s+(.+)$", first_line)
         if header_match:
             raw_title = header_match.group(2).strip()
             return self._clean_section_name(raw_title)
@@ -347,8 +347,6 @@ class MarkdownSplitter(BaseSplitter):
                     chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
         return chunks
 
-    
-    
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom markdown pattern."""
         try:

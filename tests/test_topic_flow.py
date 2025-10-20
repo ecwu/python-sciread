@@ -20,8 +20,7 @@ class TestTopicFlowSplitter:
         """Test basic sentence extraction from text."""
         text = """This is the first sentence. This is the second sentence. This is the third sentence."""
 
-        splitter = TopicFlowSplitter(
-            min_segment_sentences=2, min_segment_chars=10, max_segment_chars=500, embedding_batch_size=1         )
+        splitter = TopicFlowSplitter(min_segment_sentences=2, min_segment_chars=10, max_segment_chars=500, embedding_batch_size=1)
 
         # Mock the embedding method to avoid API calls
         def mock_get_single_embedding(text):
@@ -40,8 +39,7 @@ class TestTopicFlowSplitter:
         text = """This is the first sentence. This is a related sentence about the same topic.
         Then we continue with more information. This is a different topic with unrelated content."""
 
-        splitter = TopicFlowSplitter(
-            min_segment_sentences=2, min_segment_chars=10, max_segment_chars=500, embedding_batch_size=1         )
+        splitter = TopicFlowSplitter(min_segment_sentences=2, min_segment_chars=10, max_segment_chars=500, embedding_batch_size=1)
 
         # Mock embeddings with different similarities
         mock_embeddings = [
@@ -69,8 +67,8 @@ class TestTopicFlowSplitter:
             min_segment_sentences=2,
             min_segment_chars=10,
             max_segment_chars=50,  # Very small budget
-            embedding_batch_size=1
-                    )
+            embedding_batch_size=1,
+        )
 
         def mock_get_single_embedding(text):
             return [0.1] * 768
@@ -86,8 +84,7 @@ class TestTopicFlowSplitter:
         """Test minimum segment size constraints."""
         text = "Short text."
 
-        splitter = TopicFlowSplitter(
-            min_segment_sentences=4, min_segment_chars=300, max_segment_chars=1000, embedding_batch_size=1         )
+        splitter = TopicFlowSplitter(min_segment_sentences=4, min_segment_chars=300, max_segment_chars=1000, embedding_batch_size=1)
 
         def mock_get_single_embedding(text):
             return [0.1] * 768
@@ -108,8 +105,8 @@ class TestTopicFlowSplitter:
             min_segment_sentences=2,
             min_segment_chars=10,
             max_segment_chars=100,  # Will trigger budget cuts
-            embedding_batch_size=1
-                    )
+            embedding_batch_size=1,
+        )
 
         def mock_get_single_embedding(text):
             return [0.1] * 768

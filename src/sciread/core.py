@@ -1,9 +1,11 @@
 import asyncio
 from pathlib import Path
-from typing import Optional
 
-from .agent import SimpleAgent, remove_references, CoordinateAgent, analyze_document_with_react
-from .document import Document, DocumentFactory
+from .agent import CoordinateAgent
+from .agent import SimpleAgent
+from .agent import analyze_document_with_react
+from .agent import remove_references
+from .document import Document
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -104,9 +106,7 @@ def run_main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
     return asyncio.run(main(document_file_path, model))
 
 
-async def comprehensive_analysis(
-    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
-):
+async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
     """Comprehensive document analysis using the multi-agent CoordinateAgent system.
 
     This function uses the CoordinateAgent with multiple expert sub-agents to provide
@@ -125,9 +125,7 @@ async def comprehensive_analysis(
         FileNotFoundError: If the PDF file is not found
         Exception: If the analysis fails
     """
-    logger.info(
-        f"Starting comprehensive analysis with CoordinateAgent for file: {pdf_file_path}"
-    )
+    logger.info(f"Starting comprehensive analysis with CoordinateAgent for file: {pdf_file_path}")
 
     # Check if file exists
     if not Path(pdf_file_path).exists():
@@ -154,12 +152,8 @@ async def comprehensive_analysis(
         print(f"Found {len(section_names)} main sections:")
         for i, section_name in enumerate(section_names, 1):
             section_chunks = doc.get_sections_by_name([section_name])
-            section_word_count = sum(
-                len(chunk.content.split()) for chunk in section_chunks
-            )
-            print(
-                f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)"
-            )
+            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
+            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
         print()
 
         # Log section chunk distribution
@@ -172,9 +166,7 @@ async def comprehensive_analysis(
         print("\n📋 Document Structure Analysis")
         print("No named sections found - document will be analyzed as continuous text")
         print()
-        logger.info(
-            "No named sections found - document will be analyzed as continuous text"
-        )
+        logger.info("No named sections found - document will be analyzed as continuous text")
 
     # Check if document was loaded successfully
     if not doc.text.strip():
@@ -188,12 +180,8 @@ async def comprehensive_analysis(
 
         logger.info("Comprehensive analysis completed successfully!")
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
-        logger.info(
-            f"Agents executed: {result.execution_summary['total_agents_executed']}"
-        )
-        logger.info(
-            f"Successful agents: {result.execution_summary['successful_agents']}"
-        )
+        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
+        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
         logger.debug(f"Final report length: {len(result.final_report)} characters")
 
         # Log section analysis summary if available
@@ -201,21 +189,15 @@ async def comprehensive_analysis(
             plan = result.analysis_plan
             logger.info("Section-based analysis summary:")
             if plan.previous_methods_sections:
-                logger.info(
-                    f"  Previous methods sections: {plan.previous_methods_sections}"
-                )
+                logger.info(f"  Previous methods sections: {plan.previous_methods_sections}")
             if plan.research_questions_sections:
-                logger.info(
-                    f"  Research questions sections: {plan.research_questions_sections}"
-                )
+                logger.info(f"  Research questions sections: {plan.research_questions_sections}")
             if plan.methodology_sections:
                 logger.info(f"  Methodology sections: {plan.methodology_sections}")
             if plan.experiments_sections:
                 logger.info(f"  Experiments sections: {plan.experiments_sections}")
             if plan.future_directions_sections:
-                logger.info(
-                    f"  Future directions sections: {plan.future_directions_sections}"
-                )
+                logger.info(f"  Future directions sections: {plan.future_directions_sections}")
 
         return result
 
@@ -244,17 +226,7 @@ def run_comprehensive_analysis(
     return result
 
 
-
-
-
-
-def run_react_analysis(
-    document_file: str,
-    task: str,
-    model: str = "deepseek-chat",
-    max_loops: int = 8,
-    show_progress: bool = True
-):
+def run_react_analysis(document_file: str, task: str, model: str = "deepseek-chat", max_loops: int = 8, show_progress: bool = True):
     """Run ReAct analysis on a document.
 
     Args:
@@ -277,12 +249,7 @@ def run_react_analysis(
 
     try:
         result = analyze_document_with_react(
-            document_file,
-            task,
-            model=model,
-            max_loops=max_loops,
-            to_markdown=True,
-            show_progress=show_progress
+            document_file, task, model=model, max_loops=max_loops, to_markdown=True, show_progress=show_progress
         )
 
         logger.info("ReAct analysis completed successfully!")
