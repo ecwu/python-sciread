@@ -4,8 +4,8 @@ This module implements a ReAct (Reasoning and Acting) agent for intelligent
 iterative document analysis using pydantic-ai framework.
 """
 
+import traceback
 from pathlib import Path
-from typing import List
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -27,13 +27,13 @@ class ReActAgentInput(BaseModel):
     """Input model for ReAct agent iterations."""
 
     task_prompt: str = Field(description="The original analysis task or question about the document")
-    available_sections: List[str] = Field(description="List of all available section names in the document")
+    available_sections: list[str] = Field(description="List of all available section names in the document")
     status_summary: str = Field(
         description="Summary of current stage, loop count, and remaining loops (e.g., 'Initial analysis (loop 1 of 8)')"
     )
     section_content: str = Field(description="Content of the sections to analyze in this iteration (empty for initial step)")
     current_report: str = Field(description="The cumulative report built so far from previous iterations")
-    processed_sections: List[str] = Field(description="List of sections that have already been processed")
+    processed_sections: list[str] = Field(description="List of sections that have already been processed")
 
 
 class ReActAgentOutput(BaseModel):
@@ -41,7 +41,7 @@ class ReActAgentOutput(BaseModel):
 
     should_stop: bool = Field(description="Whether to stop the analysis process (True) or continue (False)")
     report_section: str = Field(description="New content generated for the current section content")
-    next_sections: List[str] = Field(description="List of section names to analyze in the next iteration (empty if should_stop is True)")
+    next_sections: list[str] = Field(description="List of section names to analyze in the next iteration (empty if should_stop is True)")
     reasoning: str = Field(description="Explanation of why the agent made these choices (stop decision and section selection)")
 
 
@@ -67,7 +67,7 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     return document
 
 
-def get_initial_sections(document: Document) -> List[str]:
+def get_initial_sections(document: Document) -> list[str]:
     """Get the initial sections to start analysis (abstract and introduction).
 
     Args:
@@ -113,7 +113,7 @@ def format_status_summary(stage: str, current_loop: int, max_loops: int) -> str:
     return f"{stage} (loop {current_loop} of {max_loops})"
 
 
-def get_section_content(document: Document, section_names: List[str]) -> str:
+def get_section_content(document: Document, section_names: list[str]) -> str:
     """Get content for specified sections.
 
     Args:
@@ -207,7 +207,7 @@ class ReActAgent:
 
         # State management
         self.current_report = ""
-        self.processed_sections: List[str] = []
+        self.processed_sections: list[str] = []
         self.loop_count = 0
 
         # Create the pydantic-ai agent
@@ -218,11 +218,11 @@ class ReActAgent:
     def _format_agent_prompt(
         self,
         task: str,
-        available_sections: List[str],
+        available_sections: list[str],
         status: str,
         section_content: str,
         current_report: str,
-        processed_sections: List[str],
+        processed_sections: list[str],
     ) -> str:
         """Format the agent prompt with all necessary information.
 
@@ -309,7 +309,6 @@ class ReActAgent:
             except Exception as e:
                 self.logger.error(f"Agent execution failed in loop {self.loop_count}: {e}")
                 self.logger.error(f"Exception type: {type(e)}")
-                import traceback
 
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break
@@ -364,7 +363,7 @@ class ReActAgent:
 
         return self.current_report
 
-    def _update_state(self, agent_output: ReActAgentOutput, current_sections: List[str]) -> None:
+    def _update_state(self, agent_output: ReActAgentOutput, current_sections: list[str]) -> None:
         """Update agent state after each iteration.
 
         Args:

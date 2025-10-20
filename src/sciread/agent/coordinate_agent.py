@@ -928,6 +928,12 @@ class CoordinateAgent:
             Comprehensive synthesized report
         """
         self.logger.info("Synthesizing final report from sub-agent results")
+        self.logger.debug(f"synthesize_report received sub_agent_results type: {type(sub_agent_results)}")
+        if not isinstance(sub_agent_results, dict):
+            self.logger.error(
+                f"ERROR: sub_agent_results is not a dict! Type: {type(sub_agent_results)}, Content: {str(sub_agent_results)[:500]}"
+            )
+            raise TypeError(f"Expected dict for sub_agent_results, got {type(sub_agent_results)}")
 
         # Extract paper title for structured reporting
         paper_title = "Unknown Paper"
@@ -1126,6 +1132,10 @@ class CoordinateAgent:
             sub_agent_results = await self.execute_sub_agents(document, analysis_plan)
 
             # Step 6: Synthesize final report
+            self.logger.debug(f"About to synthesize report, sub_agent_results type: {type(sub_agent_results)}")
+            self.logger.debug(
+                f"sub_agent_results keys: {list(sub_agent_results.keys()) if isinstance(sub_agent_results, dict) else 'Not a dict'}"
+            )
             final_report = await self.synthesize_report(analysis_plan, sub_agent_results, document)
 
             # Step 7: Build comprehensive result

@@ -1,8 +1,12 @@
 """Document builder class for creating and processing documents."""
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 from typing import Optional
 from typing import Union
+
+if TYPE_CHECKING:
+    from .document import Document
 
 from ..logging_config import get_logger
 from .external_clients import MineruClient
@@ -12,6 +16,7 @@ from .loaders.pdf_loader import PdfLoader
 from .loaders.txt_loader import TxtLoader
 from .models import DocumentMetadata
 from .splitters import BaseSplitter
+from .splitters.markdown_splitter import MarkdownSplitter
 from .splitters.semantic_splitter import SemanticSplitter
 from .splitters.topic_flow import TopicFlowSplitter
 
@@ -181,8 +186,6 @@ class DocumentBuilder:
         """Create appropriate splitter based on document content."""
         # If document was created with markdown conversion, use the dedicated MarkdownSplitter
         if doc._is_markdown:
-            from .splitters.markdown_splitter import MarkdownSplitter
-
             return MarkdownSplitter(
                 min_chunk_size=200,
                 max_chunk_size=2000,

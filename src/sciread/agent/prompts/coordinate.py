@@ -413,25 +413,27 @@ def build_report_synthesis_prompt(
     # Add results from successful agents
     # Defensive check: ensure sub_agent_results is a dictionary
     if not isinstance(sub_agent_results, dict):
-        prompt_parts.extend([
-            "ERROR: sub_agent_results is not a dictionary. Unable to process agent results.",
-            f"Actual type: {type(sub_agent_results)}",
-            f"Content: {str(sub_agent_results)[:500]}...",
-            ""
-        ])
+        prompt_parts.extend(
+            [
+                "ERROR: sub_agent_results is not a dictionary. Unable to process agent results.",
+                f"Actual type: {type(sub_agent_results)}",
+                f"Content: {str(sub_agent_results)[:500]}...",
+                "",
+            ]
+        )
     else:
         for agent_name, result_data in sub_agent_results.items():
-        if result_data.get("success", False):
-            result = result_data["result"]
-            prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
-        else:
-            prompt_parts.extend(
-                [
-                    f"{agent_name.upper()} ANALYSIS:",
-                    f"Analysis failed: {result_data.get('error', 'Unknown error')}",
-                    "",
-                ]
-            )
+            if result_data.get("success", False):
+                result = result_data["result"]
+                prompt_parts.extend([f"{agent_name.upper()} ANALYSIS:", str(result), ""])
+            else:
+                prompt_parts.extend(
+                    [
+                        f"{agent_name.upper()} ANALYSIS:",
+                        f"Analysis failed: {result_data.get('error', 'Unknown error')}",
+                        "",
+                    ]
+                )
 
     prompt_parts.extend(
         [

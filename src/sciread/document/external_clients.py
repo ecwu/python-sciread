@@ -12,6 +12,7 @@ from typing import Optional
 import requests
 
 from ..logging_config import get_logger
+from .mineru_cache import MineruCacheManager
 
 
 class OllamaClient:
@@ -198,8 +199,6 @@ class MineruClient:
 
         # Initialize cache manager if caching is enabled
         if self.enable_cache:
-            from .mineru_cache import MineruCacheManager
-
             cache_path = Path(cache_dir) if cache_dir else None
             self.cache_manager = MineruCacheManager(cache_dir=cache_path)
             self.logger.info("Mineru caching enabled")
