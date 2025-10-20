@@ -6,7 +6,7 @@ from typing import Optional
 from typing import Union
 
 from ..logging_config import get_logger
-from .document_builder import DocumentFactory
+from .factory import DocumentFactory
 from .models import Chunk
 from .models import DocumentMetadata
 from .models import ProcessingState
