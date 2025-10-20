@@ -7,14 +7,14 @@ based on document content and custom prompts.
 Main Interface:
     DocumentAgent - Main agent class for document analysis
     ToolAgent - Multi-agent controller with expert sub-agents
-    create_agent - Factory function to create configured agents
+    ReActAgent - Reasoning and Acting agent for iterative analysis
 
 Example Usage:
-    from sciread.agent import create_agent, ToolAgent
+    from sciread.agent import DocumentAgent, ToolAgent
     from sciread.document import Document
 
     # Create a simple agent
-    agent = create_agent("deepseek/deepseek-chat")
+    agent = DocumentAgent("deepseek/deepseek-chat")
 
     # Create a multi-agent system
     tool_agent = ToolAgent("deepseek/deepseek-chat")
@@ -39,7 +39,6 @@ from .react_agent import format_status_summary
 from .react_models import ReActAgentInput
 from .react_models import ReActAgentOutput
 from .text_processor import remove_references_section
-from .factory import create_agent
 from .tool_agent import ToolAgent
 from .tool_agent import MetadataExtractionResult
 from .tool_agent import PreviousMethodsResult
@@ -69,7 +68,6 @@ __all__ = [
     "FutureDirectionsResult",
     "AnalysisPlan",
     "ComprehensiveAnalysisResult",
-    "create_agent",
     "remove_references_section",
 ]
 

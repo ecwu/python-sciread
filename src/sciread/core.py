@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from .agent import create_agent, remove_references_section, ToolAgent, analyze_document_with_react
+from .agent import DocumentAgent, remove_references_section, ToolAgent, analyze_document_with_react
 from .document import Document, DocumentFactory
 from .logging_config import get_logger
 
@@ -43,7 +43,7 @@ async def main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
         raise FileNotFoundError(f"Document file not found: {document_file_path}")
 
     # Create an agent
-    agent = create_agent(model)
+    agent = DocumentAgent(model, max_retries=3, timeout=300.0)
 
     # Load the document file using the document loading system
     # Use to_markdown=False for agent mode to keep traditional text extraction
