@@ -48,19 +48,19 @@ def run(argv=sys.argv):
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 MODES:
-  simple - Uses a single DocumentAgent for basic analysis
-  tool   - Uses multiple expert agents for comprehensive analysis
+  simple - Uses a single SimpleAgent for basic analysis
+  coordinate - Uses CoordinateAgent with multiple expert agents for comprehensive analysis
          (metadata, methodology, experiments, future directions)
   react  - Uses ReAct agent for intelligent iterative analysis
          with reasoning and acting pattern
 
 DEBUG LOGGING:
   Set log level to DEBUG to see detailed agent interactions, prompts,
-  and outputs. Use: LOG_LEVEL=DEBUG python -msciread tool paper.pdf
+  and outputs. Use: LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf
 
 EXAMPLES:
-  python -msciread tool paper.pdf
-  python -msciread tool paper.pdf deepseek/reasoner
+  python -msciread coordinate paper.pdf
+  python -msciread coordinate paper.pdf deepseek/reasoner
   python -msciread simple paper.pdf
   python -msciread simple paper.txt
   python -msciread react paper.pdf
@@ -82,7 +82,7 @@ MODELS:
     simple_parser = subparsers.add_parser(
         "simple",
         help="Single agent analysis",
-        description="Use a single DocumentAgent for basic analysis",
+        description="Use a single SimpleAgent for basic analysis",
     )
     simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     simple_parser.add_argument(
@@ -91,14 +91,14 @@ MODELS:
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
     )
 
-    # Tool mode parser
-    tool_parser = subparsers.add_parser(
-        "tool",
+    # Coordinate mode parser
+    coordinate_parser = subparsers.add_parser(
+        "coordinate",
         help="Multi-agent comprehensive analysis",
         description="Use multiple expert agents for comprehensive analysis",
     )
-    tool_parser.add_argument("pdf_file", help="Path to the PDF file to analyze")
-    tool_parser.add_argument(
+    coordinate_parser.add_argument("pdf_file", help="Path to the PDF file to analyze")
+    coordinate_parser.add_argument(
         "--model",
         default="deepseek/deepseek-chat",
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
@@ -141,9 +141,9 @@ MODELS:
     logger.info(f"Running sciread with command: {args.command}")
 
     # Handle different commands
-    if args.command == "tool":
+    if args.command == "coordinate":
         logger.info(
-            f"Running tool mode with file: {args.pdf_file}, model: {args.model}"
+            f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}"
         )
 
         try:
@@ -170,7 +170,7 @@ MODELS:
             print("=" * 60)
             return 0
         except Exception as e:
-            logger.error(f"Tool analysis failed: {e}")
+            logger.error(f"Coordinate analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 

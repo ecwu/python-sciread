@@ -1,8 +1,7 @@
-"""Centralized LLM prompts for the multi-agent document analysis system.
+"""Prompts for the CoordinateAgent (formerly ToolAgent).
 
 This module contains all system prompts and instruction templates used by the
-expert agents and controller agent in the tool_agent.py module. Centralizing
-prompts makes them easier to maintain, update, and version control.
+CoordinateAgent multi-agent system for comprehensive academic paper analysis.
 """
 
 from typing import Any
@@ -188,7 +187,6 @@ SYNTHESIS_SYSTEM_PROMPT = "You are an expert academic research analyst specializ
 # Analysis Prompt Templates
 # ============================================================================
 
-
 def build_metadata_analysis_prompt(content: str) -> str:
     """Build prompt for metadata extraction analysis."""
     return f"""Extract the following key bibliographic metadata from this academic paper:
@@ -294,7 +292,6 @@ Provide a comprehensive analysis of the implications, limitations, and future di
 # ============================================================================
 # Planning and Synthesis Prompt Templates
 # ============================================================================
-
 
 def build_analysis_planning_prompt(abstract: str, section_names: list[str]) -> str:
     """Build prompt for analysis planning."""
@@ -469,11 +466,6 @@ def build_report_synthesis_prompt(
     )
 
     return "\n".join(prompt_parts)
-
-
-# ============================================================================
-# Generic Prompt Template
-# ============================================================================
 
 
 def build_generic_analysis_prompt(content: str) -> str:

@@ -1,6 +1,6 @@
-"""Document analysis agent using pydantic-ai.
+"""Simple document analysis agent using pydantic-ai.
 
-This module provides the main DocumentAgent class that can analyze academic papers
+This module provides the main SimpleAgent class that can analyze academic papers
 using pydantic-ai framework and the existing LLM provider infrastructure.
 """
 
@@ -17,18 +17,19 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from ..document.document import Document
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .text_processor import clean_academic_text
-from .text_processor import extract_document_metadata
-from .text_processor import remove_references_section
+from .text_utils import clean_academic_text
+from .text_utils import remove_references as remove_references_func
+from .prompts.simple import DEFAULT_SYSTEM_PROMPT
+from .prompts.simple import build_analysis_prompt
 
 
-class DocumentAnalysisResult(BaseModel):
-    """Result of document analysis."""
+class SimpleAnalysisResult(BaseModel):
+    """Result of simple document analysis."""
 
     report: str
 
 
-class DocumentAgent:
+class SimpleAgent:
     """Agent for analyzing academic documents and generating reports.
 
     This agent uses pydantic-ai to process academic papers and generate
@@ -42,7 +43,7 @@ class DocumentAgent:
         max_retries: int = 3,
         timeout: float = 300.0,
     ):
-        """Initialize the DocumentAgent.
+        """Initialize the SimpleAgent.
 
         Args:
             model: Either a model identifier string or a pydantic-ai model instance
@@ -64,20 +65,7 @@ class DocumentAgent:
             self.model_identifier = getattr(model, 'model_name', 'unknown')
             self.logger.info("Initialized agent with provided model instance")
 
-        # Default system prompt for academic document analysis
-        default_system_prompt = """You are an expert academic document analyst with deep knowledge across multiple scientific disciplines. Your task is to carefully analyze academic papers and provide comprehensive, accurate, and insightful reports.
-
-Key guidelines:
-1. Read the entire document thoroughly before forming conclusions
-2. Focus on the main research question, methodology, findings, and implications
-3. Be objective and evidence-based in your analysis
-4. Highlight both strengths and limitations of the research
-5. Use clear, academic language appropriate for scholarly discourse
-6. Structure your responses to be useful for researchers and students
-
-Always provide citations or references to specific parts of the paper when making claims about its content."""
-
-        self.system_prompt = system_prompt or default_system_prompt
+        self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 
         # Create the pydantic-ai agent
         self.agent = Agent(
@@ -86,9 +74,9 @@ Always provide citations or references to specific parts of the paper when makin
             retries=max_retries,
         )
 
-        self.logger.info("DocumentAgent initialized successfully")
+        self.logger.info("SimpleAgent initialized successfully")
 
-    async def analyze_document(
+    async def analyze(
         self,
         document: Document,
         task_prompt: str,
@@ -124,7 +112,7 @@ Always provide citations or references to specific parts of the paper when makin
 
         # Process text
         if remove_references:
-            text = remove_references_section(text)
+            text = remove_references_func(text)
             self.logger.debug("Removed reference section from document text")
 
         if clean_text:
@@ -132,10 +120,18 @@ Always provide citations or references to specific parts of the paper when makin
             self.logger.debug("Cleaned document text for better processing")
 
         # Build the full prompt
-        full_prompt = self._build_analysis_prompt(
+        document_metadata = None
+        if include_metadata and document:
+            document_metadata = {
+                'source_path': str(document.source_path) if document.source_path else None,
+                'title': document.metadata.title if document.metadata.title else None,
+                'author': document.metadata.author if document.metadata.author else None,
+            }
+
+        full_prompt = build_analysis_prompt(
             text=text,
             task_prompt=task_prompt,
-            document=document if include_metadata else None,
+            document_metadata=document_metadata,
             **kwargs,
         )
 
@@ -157,7 +153,7 @@ Always provide citations or references to specific parts of the paper when makin
             self.logger.error(f"Document analysis failed: {e}")
             raise
 
-    async def analyze_document_structured(
+    async def analyze_structured(
         self,
         document: Document,
         task_prompt: str,
@@ -165,7 +161,7 @@ Always provide citations or references to specific parts of the paper when makin
         remove_references: bool = True,
         clean_text: bool = True,
         **kwargs: Any,
-    ) -> DocumentAnalysisResult:
+    ) -> SimpleAnalysisResult:
         """Analyze a document and return structured results.
 
         Args:
@@ -179,7 +175,7 @@ Always provide citations or references to specific parts of the paper when makin
         Returns:
             Structured analysis result
         """
-        result_text = await self.analyze_document(
+        result_text = await self.analyze(
             document=document,
             task_prompt=task_prompt,
             include_metadata=include_metadata,
@@ -189,76 +185,8 @@ Always provide citations or references to specific parts of the paper when makin
         )
 
         # Return the result as a single report
-        return DocumentAnalysisResult(report=result_text)
+        return SimpleAnalysisResult(report=result_text)
 
-    def _build_analysis_prompt(
-        self,
-        text: str,
-        task_prompt: str,
-        document: Optional[Document] = None,
-        **kwargs: Any,
-    ) -> str:
-        """Build the full analysis prompt.
-
-        Args:
-            text: Document text content
-            task_prompt: Specific task for the analysis
-            document: Optional document object for metadata
-            **kwargs: Additional context information
-
-        Returns:
-            Complete prompt for the agent
-        """
-        prompt_parts = []
-
-        # Add task prompt first
-        prompt_parts.append(f"ANALYSIS TASK:\n{task_prompt}")
-        prompt_parts.append("")
-
-        # Add document metadata if available
-        if document:
-            metadata_info = []
-            if document.source_path:
-                metadata_info.append(f"Source File: {document.source_path.name}")
-            if document.metadata.title:
-                metadata_info.append(f"Title: {document.metadata.title}")
-            if document.metadata.author:
-                metadata_info.append(f"Author: {document.metadata.author}")
-
-            if metadata_info:
-                prompt_parts.append("DOCUMENT METADATA:")
-                for info in metadata_info:
-                    prompt_parts.append(f"- {info}")
-                prompt_parts.append("")
-
-            # Try to extract additional metadata from text
-            text_metadata = extract_document_metadata(text[:2000])  # Check first 2000 chars
-            if text_metadata:
-                prompt_parts.append("EXTRACTED METADATA:")
-                for key, value in text_metadata.items():
-                    if value:
-                        prompt_parts.append(f"- {key.title()}: {value}")
-                prompt_parts.append("")
-
-        # Add the document text
-        prompt_parts.append("DOCUMENT TEXT:")
-        prompt_parts.append(text)
-        prompt_parts.append("")
-
-        # Add any additional context from kwargs
-        if kwargs:
-            prompt_parts.append("ADDITIONAL CONTEXT:")
-            for key, value in kwargs.items():
-                if value:
-                    prompt_parts.append(f"- {key}: {value}")
-            prompt_parts.append("")
-
-        # Add final instructions
-        prompt_parts.append("Please provide a thorough analysis based on the document content and the specific task requirements above.")
-
-        return "\n".join(prompt_parts)
-
-  
     def __repr__(self) -> str:
-        """String representation of the DocumentAgent."""
-        return f"DocumentAgent(model={self.model_identifier})"
+        """String representation of the SimpleAgent."""
+        return f"SimpleAgent(model={self.model_identifier})"

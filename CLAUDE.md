@@ -35,12 +35,15 @@ src/sciread/
 ├── __init__.py      # Package initialization, exports main functions
 ├── agent/          # Agent module for LLM-driven processing
 │   ├── __init__.py
-│   ├── tool_agent.py     # Multi-agent ToolAgent system for comprehensive analysis
-│   ├── document_agent.py # Single DocumentAgent for basic analysis
+│   ├── simple_agent.py   # Single SimpleAgent for basic analysis
+│   ├── coordinate_agent.py # Multi-agent CoordinateAgent system for comprehensive analysis
 │   ├── react_agent.py    # ReAct agent for intelligent iterative analysis
-│   ├── react_models.py   # Pydantic models for ReAct agent
-│   ├── factory.py        # Agent factory functions
-│   └── text_processor.py # Text processing utilities
+│   ├── text_utils.py     # Text processing utilities
+│   └── prompts/          # Organized prompt templates for all agents
+│       ├── __init__.py
+│       ├── simple.py     # SimpleAgent prompts
+│       ├── coordinate.py # CoordinateAgent prompts
+│       └── react.py      # ReActAgent prompts
 ├── cli.py          # Command-line interface entry point
 ├── config.py       # Configuration management for API keys and provider settings
 ├── core.py         # Core functionality (compute function)
@@ -75,7 +78,7 @@ src/sciread/
 
 ### Key Components
 - **Core Function**: `compute()` in `src/sciread/core.py` - main entry point for analysis operations
-- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, tool, react)
+- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, coordinate, react)
 - **Package Interface**: `__init__.py` exports the `compute` function as the main API
 - **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
 - **Document Module**: `document/` provides comprehensive document processing capabilities
@@ -85,14 +88,14 @@ src/sciread/
 #### Agent System
 The `agent` module provides a complete LLM-driven analysis system:
 
-**Multi-Agent ToolAgent**: `ToolAgent` in `src/sciread/agent/tool_agent.py`
+**Multi-Agent CoordinateAgent**: `CoordinateAgent` in `src/sciread/agent/coordinate_agent.py`
 - Coordinates multiple expert sub-agents for comprehensive analysis
 - Expert agents: metadata extraction, methodology analysis, experiments evaluation, etc.
 - Intelligent analysis planning based on document structure
 - Comprehensive report synthesis from sub-agent results
 - Built-in debug logging with detailed interaction traces
 
-**Single DocumentAgent**: `DocumentAgent` in `src/sciread/agent/document_agent.py`
+**Single SimpleAgent**: `SimpleAgent` in `src/sciread/agent/simple_agent.py`
 - Simple, single-agent analysis for basic document processing
 - Configurable analysis tasks and prompts
 - Direct LLM interaction for straightforward analysis needs
@@ -102,11 +105,18 @@ The `agent` module provides a complete LLM-driven analysis system:
 - Dynamic analysis strategy adaptation
 - Custom task execution with reasoning steps
 - Progress tracking and loop control
+- Unified implementation with integrated Pydantic models
+
+**Prompt Organization**: All prompts are organized in `src/sciread/agent/prompts/`
+- `prompts/simple.py` - SimpleAgent system prompts and templates
+- `prompts/coordinate.py` - CoordinateAgent expert agent prompts and planning templates
+- `prompts/react.py` - ReActAgent system prompts and formatting functions
+- Centralized prompt management for easy maintenance and updates
 
 **Debug Logging**: All agents support detailed debug logging
 - Enable with `LOG_LEVEL=DEBUG` environment variable
 - Shows detailed prompts, outputs, and agent interactions
-- Example: `LOG_LEVEL=DEBUG python -msciread tool paper.pdf`
+- Example: `LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf`
 
 #### Document Processing System
 The `document` module provides a complete pipeline for processing academic papers:
@@ -376,9 +386,9 @@ doc = builder.from_file("custom.ext")
 The sciread package provides a comprehensive command-line interface with three analysis modes:
 
 ```bash
-# Tool mode - Multi-agent comprehensive analysis (recommended for academic papers)
-python -msciread tool paper.pdf
-python -msciread tool paper.pdf deepseek/reasoner
+# Coordinate mode - Multi-agent comprehensive analysis (recommended for academic papers)
+python -msciread coordinate paper.pdf
+python -msciread coordinate paper.pdf deepseek/reasoner
 
 # Simple mode - Single agent basic analysis
 python -msciread simple paper.pdf
@@ -394,7 +404,7 @@ python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loop
 
 ```bash
 # Enable debug logging to see all agent interactions
-LOG_LEVEL=DEBUG python -msciread tool paper.pdf
+LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf
 
 # Debug logging works with all modes
 LOG_LEVEL=DEBUG python -msciread simple paper.pdf

@@ -27,25 +27,25 @@ from ..document.document import Document
 from ..document.models import Chunk
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .prompts import CONTROLLER_INSTRUCTIONS
-from .prompts import EXPERIMENTS_SYSTEM_PROMPT
-from .prompts import FUTURE_DIRECTIONS_SYSTEM_PROMPT
-from .prompts import METADATA_EXTRACTION_SYSTEM_PROMPT
-from .prompts import METHODOLOGY_SYSTEM_PROMPT
-from .prompts import PREVIOUS_METHODS_SYSTEM_PROMPT
-from .prompts import RESEARCH_QUESTIONS_SYSTEM_PROMPT
-from .prompts import SYNTHESIS_SYSTEM_PROMPT
-from .prompts import build_analysis_planning_prompt
-from .prompts import build_experiments_analysis_prompt
-from .prompts import build_future_directions_analysis_prompt
-from .prompts import build_generic_analysis_prompt
-from .prompts import build_metadata_analysis_prompt
-from .prompts import build_methodology_analysis_prompt
-from .prompts import build_previous_methods_analysis_prompt
-from .prompts import build_report_synthesis_prompt
-from .prompts import build_research_questions_analysis_prompt
-from .text_processor import clean_academic_text
-from .text_processor import remove_references_section
+from .prompts.coordinate import CONTROLLER_INSTRUCTIONS
+from .prompts.coordinate import EXPERIMENTS_SYSTEM_PROMPT
+from .prompts.coordinate import FUTURE_DIRECTIONS_SYSTEM_PROMPT
+from .prompts.coordinate import METADATA_EXTRACTION_SYSTEM_PROMPT
+from .prompts.coordinate import METHODOLOGY_SYSTEM_PROMPT
+from .prompts.coordinate import PREVIOUS_METHODS_SYSTEM_PROMPT
+from .prompts.coordinate import RESEARCH_QUESTIONS_SYSTEM_PROMPT
+from .prompts.coordinate import SYNTHESIS_SYSTEM_PROMPT
+from .prompts.coordinate import build_analysis_planning_prompt
+from .prompts.coordinate import build_experiments_analysis_prompt
+from .prompts.coordinate import build_future_directions_analysis_prompt
+from .prompts.coordinate import build_generic_analysis_prompt
+from .prompts.coordinate import build_metadata_analysis_prompt
+from .prompts.coordinate import build_methodology_analysis_prompt
+from .prompts.coordinate import build_previous_methods_analysis_prompt
+from .prompts.coordinate import build_report_synthesis_prompt
+from .prompts.coordinate import build_research_questions_analysis_prompt
+from .text_utils import clean_academic_text
+from .text_utils import remove_references as remove_references_func
 
 # Pydantic models for structured results
 
@@ -347,7 +347,7 @@ class ExpertAgent:
 
         # Process text
         if remove_references:
-            content = remove_references_section(content)
+            content = remove_references_func(content)
 
         if clean_text:
             content = clean_academic_text(content)
@@ -432,7 +432,7 @@ AGENT_CONFIGS = {
 }
 
 
-class ToolAgent:
+class CoordinateAgent:
     """Controller agent for coordinating expert sub-agents in academic paper analysis.
 
     This controller agent uses programmatic agent hand-off to coordinate multiple
@@ -450,7 +450,7 @@ class ToolAgent:
         max_retries: int = 3,
         timeout: float = 300.0,
     ):
-        """Initialize the ToolAgent controller.
+        """Initialize the CoordinateAgent controller.
 
         Args:
             model: Model identifier for the LLM provider
@@ -470,7 +470,7 @@ class ToolAgent:
             self.model_identifier = getattr(model, "model_name", "unknown")
 
         self.logger.info(
-            f"Initialized ToolAgent controller with model: {self.model_identifier}"
+            f"Initialized CoordinateAgent controller with model: {self.model_identifier}"
         )
 
         # Controller agent for planning and synthesis
@@ -483,7 +483,7 @@ class ToolAgent:
             retries=self.max_retries,
         )
 
-        self.logger.info("ToolAgent controller initialized successfully")
+        self.logger.info("CoordinateAgent controller initialized successfully")
 
     def _create_expert_agent(self, analysis_type: str) -> ExpertAgent:
         """Create an expert agent instance based on configuration.
@@ -691,7 +691,7 @@ class ToolAgent:
         """
         if not document.source_path or document.source_path.suffix.lower() != ".pdf":
             raise ValueError(
-                "ToolAgent only supports PDF files. "
+                "CoordinateAgent only supports PDF files. "
                 f"Got: {document.source_path.suffix if document.source_path else 'unknown file type'}. "
                 "Please provide a PDF document."
             )
@@ -1199,7 +1199,7 @@ class ToolAgent:
             self.logger.debug(f"[synthesis_agent] ERROR: {str(e)} - Prompt ({len(prompt)} chars): {prompt_preview}")
             return f"Report synthesis failed: {e}. Please try again."
 
-    async def analyze_document(
+    async def analyze(
         self,
         document: Document,
         custom_plan: Optional[AnalysisPlan] = None,
@@ -1340,5 +1340,5 @@ class ToolAgent:
             raise
 
     def __repr__(self) -> str:
-        """String representation of the ToolAgent."""
-        return f"ToolAgent(model={self.model_identifier})"
+        """String representation of the CoordinateAgent."""
+        return f"CoordinateAgent(model={self.model_identifier})"

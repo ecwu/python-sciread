@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from .agent import DocumentAgent, remove_references_section, ToolAgent, analyze_document_with_react
+from .agent import SimpleAgent, remove_references, CoordinateAgent, analyze_document_with_react
 from .document import Document, DocumentFactory
 from .logging_config import get_logger
 
@@ -43,7 +43,7 @@ async def main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
         raise FileNotFoundError(f"Document file not found: {document_file_path}")
 
     # Create an agent
-    agent = DocumentAgent(model, max_retries=3, timeout=300.0)
+    agent = SimpleAgent(model, max_retries=3, timeout=300.0)
 
     # Load the document file using the document loading system
     # Use to_markdown=False for agent mode to keep traditional text extraction
@@ -60,7 +60,7 @@ async def main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
         raise ValueError(error_msg)
 
     # Test the reference removal function
-    cleaned_text = remove_references_section(doc.text)
+    cleaned_text = remove_references(doc.text)
     logger.info(f"Text after reference removal: {len(cleaned_text)} characters")
 
     # Define the task prompt (same as in test_agent.py)
@@ -74,7 +74,7 @@ Here are some important constraints:
 
     logger.info("Starting document analysis...")
     try:
-        result = await agent.analyze_document(
+        result = await agent.analyze(
             document=doc,
             task_prompt=task_prompt,
             remove_references=True,
@@ -107,9 +107,9 @@ def run_main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
 async def comprehensive_analysis(
     pdf_file_path: str, model: str = "deepseek/deepseek-chat"
 ):
-    """Comprehensive document analysis using the multi-agent ToolAgent system.
+    """Comprehensive document analysis using the multi-agent CoordinateAgent system.
 
-    This function uses the ToolAgent with multiple expert sub-agents to provide
+    This function uses the CoordinateAgent with multiple expert sub-agents to provide
     a detailed analysis of academic papers, including metadata extraction,
     methodology analysis, experiments evaluation, and future directions.
 
@@ -126,7 +126,7 @@ async def comprehensive_analysis(
         Exception: If the analysis fails
     """
     logger.info(
-        f"Starting comprehensive analysis with ToolAgent for file: {pdf_file_path}"
+        f"Starting comprehensive analysis with CoordinateAgent for file: {pdf_file_path}"
     )
 
     # Check if file exists
@@ -134,10 +134,10 @@ async def comprehensive_analysis(
         raise FileNotFoundError(f"PDF file not found: {pdf_file_path}")
 
     # Create the multi-agent system
-    logger.debug(f"Creating ToolAgent with model: {model}")
-    tool_agent = ToolAgent(model)
+    logger.debug(f"Creating CoordinateAgent with model: {model}")
+    coordinate_agent = CoordinateAgent(model)
 
-    # Load the PDF file with to_markdown=True for ToolAgent
+    # Load the PDF file with to_markdown=True for CoordinateAgent
     logger.debug(f"Loading document from file: {pdf_file_path}")
     doc = Document.from_file(pdf_file_path, to_markdown=True, auto_split=True)
     logger.debug(f"Document created from PDF: {pdf_file_path}")
@@ -181,10 +181,10 @@ async def comprehensive_analysis(
         raise ValueError("Failed to load PDF: no text content extracted")
 
     # Run comprehensive analysis
-    logger.info("Starting comprehensive document analysis with ToolAgent...")
+    logger.info("Starting comprehensive document analysis with CoordinateAgent...")
     logger.debug(f"Analyzing document with {len(doc.chunks)} chunks using {len(section_names)} sections")
     try:
-        result = await tool_agent.analyze_document(doc)
+        result = await coordinate_agent.analyze(doc)
 
         logger.info("Comprehensive analysis completed successfully!")
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")

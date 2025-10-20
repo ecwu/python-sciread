@@ -5,61 +5,67 @@ The agents can process academic papers and generate comprehensive reports
 based on document content and custom prompts.
 
 Main Interface:
-    DocumentAgent - Main agent class for document analysis
-    ToolAgent - Multi-agent controller with expert sub-agents
+    SimpleAgent - Simple agent class for basic document analysis
+    CoordinateAgent - Multi-agent controller with expert sub-agents
     ReActAgent - Reasoning and Acting agent for iterative analysis
 
 Example Usage:
-    from sciread.agent import DocumentAgent, ToolAgent
+    from sciread.agent import SimpleAgent, CoordinateAgent, ReActAgent
     from sciread.document import Document
 
     # Create a simple agent
-    agent = DocumentAgent("deepseek/deepseek-chat")
+    agent = SimpleAgent("deepseek/deepseek-chat")
 
     # Create a multi-agent system
-    tool_agent = ToolAgent("deepseek/deepseek-chat")
+    coordinate_agent = CoordinateAgent("deepseek/deepseek-chat")
+
+    # Create a ReAct agent
+    react_agent = ReActAgent("deepseek/deepseek-chat")
 
     # Process a document (automatically loaded and split)
     doc = Document.from_file("paper.pdf", to_markdown=True)
 
     # Generate analysis report with simple agent
-    result = await agent.analyze_document(doc, "Summarize this paper")
+    result = await agent.analyze(doc, "Summarize this paper")
 
     # Generate comprehensive analysis with multi-agent system
-    comprehensive_result = await tool_agent.analyze_document(doc)
+    comprehensive_result = await coordinate_agent.analyze(doc)
+
+    # Generate iterative analysis with ReAct agent
+    react_result = await react_agent.analyze_document(doc, "What are the main contributions?")
 """
 
-from .document_agent import DocumentAgent
-from .document_agent import DocumentAnalysisResult
-from .react_agent import ReActAgent
-from .react_agent import analyze_document_with_react
-from .react_agent import load_and_process_document
-from .react_agent import get_initial_sections
-from .react_agent import format_status_summary
-from .react_models import ReActAgentInput
-from .react_models import ReActAgentOutput
-from .text_processor import remove_references_section
-from .tool_agent import ToolAgent
-from .tool_agent import MetadataExtractionResult
-from .tool_agent import PreviousMethodsResult
-from .tool_agent import ResearchQuestionsResult
-from .tool_agent import MethodologyResult
-from .tool_agent import ExperimentResult
-from .tool_agent import FutureDirectionsResult
-from .tool_agent import AnalysisPlan
-from .tool_agent import ComprehensiveAnalysisResult
+# New agent imports
+from .simple_agent import SimpleAgent, SimpleAnalysisResult
+from .coordinate_agent import CoordinateAgent
+from .react_agent import ReActAgent, analyze_document_with_react, load_and_process_document, get_initial_sections, format_status_summary
+from .text_utils import remove_references
+
+# CoordinateAgent result models
+from .coordinate_agent import (
+    MetadataExtractionResult,
+    PreviousMethodsResult,
+    ResearchQuestionsResult,
+    MethodologyResult,
+    ExperimentResult,
+    FutureDirectionsResult,
+    AnalysisPlan,
+    ComprehensiveAnalysisResult,
+)
+
+# ReActAgent models
+from .react_agent import ReActAgentInput, ReActAgentOutput
 
 __all__ = [
-    "DocumentAgent",
-    "DocumentAnalysisResult",
+    # Agent classes
+    "SimpleAgent",
+    "CoordinateAgent",
     "ReActAgent",
-    "analyze_document_with_react",
-    "load_and_process_document",
-    "get_initial_sections",
-    "format_status_summary",
-    "ReActAgentInput",
-    "ReActAgentOutput",
-    "ToolAgent",
+
+    # Result classes
+    "SimpleAnalysisResult",
+
+    # CoordinateAgent result models
     "MetadataExtractionResult",
     "PreviousMethodsResult",
     "ResearchQuestionsResult",
@@ -68,8 +74,18 @@ __all__ = [
     "FutureDirectionsResult",
     "AnalysisPlan",
     "ComprehensiveAnalysisResult",
-    "remove_references_section",
+
+    # ReActAgent functions and models
+    "analyze_document_with_react",
+    "load_and_process_document",
+    "get_initial_sections",
+    "format_status_summary",
+    "ReActAgentInput",
+    "ReActAgentOutput",
+
+    # Text utilities
+    "remove_references",
 ]
 
 # Version of the agent module
-__version__ = "1.0.0"
+__version__ = "2.0.0"

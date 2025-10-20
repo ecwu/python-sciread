@@ -8,7 +8,7 @@ import re
 from typing import Optional
 
 
-def remove_references_section(text: str, reference_keywords: Optional[list[str]] = None) -> str:
+def remove_references(text: str, reference_keywords: Optional[list[str]] = None) -> str:
     """Remove text after the reference section in academic papers.
 
     This function attempts to identify where the reference section begins
@@ -176,3 +176,5 @@ def extract_document_metadata(text: str) -> dict[str, str]:
         metadata['abstract'] = ' '.join(abstract_lines)
 
     return metadata
+
+
