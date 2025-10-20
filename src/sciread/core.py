@@ -1,4 +1,3 @@
-import asyncio
 from pathlib import Path
 
 from .agent import CoordinateAgent
@@ -89,21 +88,6 @@ Here are some important constraints:
     except Exception as e:
         logger.error(f"Analysis failed: {e}")
         raise
-
-
-def run_main(document_file_path: str, model: str = "deepseek/deepseek-chat"):
-    """Run the main function synchronously.
-
-    This is a wrapper around the async main function for use in synchronous contexts.
-
-    Args:
-        document_file_path: Path to the document file to process (PDF or TXT)
-        model: Model identifier for the LLM provider
-
-    Returns:
-        Analysis result as a string
-    """
-    return asyncio.run(main(document_file_path, model))
 
 
 async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
@@ -204,26 +188,6 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
     except Exception as e:
         logger.error(f"Comprehensive analysis failed: {e}")
         raise
-
-
-def run_comprehensive_analysis(
-    pdf_file_path: str,
-    model: str = "deepseek/deepseek-chat",
-):
-    """Run comprehensive analysis synchronously.
-
-    This is a wrapper around the async comprehensive_analysis function for use in synchronous contexts.
-
-    Args:
-        pdf_file_path: Path to the PDF file to process
-        model: Model identifier for the LLM provider
-
-    Returns:
-        ComprehensiveAnalysisResult object containing all sub-agent analyses
-        and a synthesized final report
-    """
-    result = asyncio.run(comprehensive_analysis(pdf_file_path, model))
-    return result
 
 
 def run_react_analysis(document_file: str, task: str, model: str = "deepseek-chat", max_loops: int = 8, show_progress: bool = True):

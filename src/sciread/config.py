@@ -216,9 +216,6 @@ class ScireadConfig(BaseSettings):
         """Get configuration for a specific splitter."""
         if splitter_name == "regex_section":
             return self.document_splitters.regex_section
-        elif splitter_name == "regex":
-            # Backward compatibility - map to regex_section
-            return self.document_splitters.regex_section
         elif splitter_name == "topic_flow":
             return self.document_splitters.topic_flow
         else:

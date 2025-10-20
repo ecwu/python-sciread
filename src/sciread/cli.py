@@ -16,13 +16,14 @@ Why does this file exist, and why not put this in __main__?
 """
 
 import argparse
+import asyncio
 import sys
 
 import logfire
 
+from .core import comprehensive_analysis
 from .core import compute
-from .core import run_comprehensive_analysis
-from .core import run_main
+from .core import main
 from .core import run_react_analysis
 from .logging_config import logger
 
@@ -144,7 +145,7 @@ MODELS:
         logger.info(f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}")
 
         try:
-            result = run_comprehensive_analysis(args.pdf_file, args.model)
+            result = asyncio.run(comprehensive_analysis(args.pdf_file, args.model))
 
             print("=" * 60)
             print("COMPREHENSIVE ANALYSIS RESULT:")
@@ -154,9 +155,6 @@ MODELS:
             print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
             print(f"Successful Agents: {result.execution_summary['successful_agents']}")
             print(f"Failed Agents: {result.execution_summary['failed_agents']}")
-
-            if hasattr(result, "interaction_log"):
-                print(f"Interactions Logged: {len(result.interaction_log)}")
 
             print()
             print("FINAL REPORT:")
@@ -196,7 +194,7 @@ MODELS:
         logger.info(f"Running simple mode with file: {args.document_file}, model: {args.model}")
 
         try:
-            result = run_main(args.document_file, args.model)
+            result = asyncio.run(main(args.document_file, args.model))
             print("=" * 50)
             print("ANALYSIS RESULT:")
             print("=" * 50)

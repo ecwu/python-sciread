@@ -141,7 +141,10 @@ class ModelFactory:
 
 
 def get_model(model_identifier: str, **kwargs: Any) -> Union[OpenAIChatModel, AnthropicModel]:
-    """Convenience function to get a model instance.
+    """Get a model instance.
+
+    This is the main public interface for creating LLM model instances.
+    The function uses a factory pattern to create models from different providers.
 
     Args:
         model_identifier: Model identifier in format "provider/model" or just "model"
@@ -154,7 +157,7 @@ def get_model(model_identifier: str, **kwargs: Any) -> Union[OpenAIChatModel, An
         >>> model = get_model("deepseek/deepseek-chat")
         >>> model = get_model("zhipu/glm-4.6")
         >>> model = get_model("ollama/qwen3:4b")
-        >>> # Use default provider
+        >>> # Use default provider for known models
         >>> model = get_model("deepseek-chat")
     """
     return ModelFactory.create_model(model_identifier, **kwargs)

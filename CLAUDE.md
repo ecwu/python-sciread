@@ -77,9 +77,9 @@ src/sciread/
 ```
 
 ### Key Components
-- **Core Function**: `compute()` in `src/sciread/core.py` - main entry point for analysis operations
-- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, coordinate, react)
-- **Package Interface**: `__init__.py` exports the `compute` function as the main API
+- **Core Functions**: `main()`, `comprehensive_analysis()`, `run_react_analysis()` in `src/sciread/core.py` - main async-first analysis operations
+- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, coordinate, react) using direct async calls
+- **Package Interface**: `__init__.py` exports core async functions and utilities as the main API
 - **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
 - **Document Module**: `document/` provides comprehensive document processing capabilities
 - **Agent Module**: `agent/` provides LLM-driven document analysis agents
@@ -130,7 +130,7 @@ The `document` module provides a complete pipeline for processing academic paper
 
 **Document Creation and Management**: `DocumentBuilder` and `DocumentFactory` in `src/sciread/document/document_builder.py`
 - **DocumentBuilder**: Builder pattern for custom document processing pipelines
-- **DocumentFactory**: Factory methods for creating documents from files or text
+- **DocumentFactory**: Static factory methods for creating documents from files or text
 - Support for external clients (Mineru, Ollama) and custom processing components
 
 **Core Data Models** in `src/sciread/document/models.py`:
@@ -310,6 +310,7 @@ class MyClass:
 - The document module provides a complete foundation for LLM-driven paper analysis
 - All components follow modern Python practices with type hints and comprehensive error handling
 - The architecture is designed to be extensible for new file formats and processing strategies
+- The codebase uses an async-first design pattern throughout the core modules
 
 ### Document Module Usage Examples
 
