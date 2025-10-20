@@ -1124,8 +1124,7 @@ class CoordinateAgent:
                 self.logger.info("Generated automatic analysis plan")
 
             # Step 4: Display and log the plan
-            plan_display = self.display_analysis_plan(analysis_plan, section_names)
-            # print(plan_display)  # Show user the plan
+            # print(self.display_analysis_plan(analysis_plan, section_names))  # Show user the plan
             self._log_analysis_plan(analysis_plan, section_names)
 
             # Step 5: Execute sub-agents

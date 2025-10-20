@@ -268,7 +268,6 @@ class SemanticSplitter(BaseSplitter):
                         confidence = self.confidence_scores.get(pattern_name, 0.7)
                         for match in pattern.finditer(text):
                             # Extract section number and title
-                            section_number = match.group(1)
                             section_title = match.group(2).strip()
                             section_name = self._clean_section_name(section_title)
                             split_points.append((match.start(), pattern_name, confidence, section_name))
@@ -295,7 +294,7 @@ class SemanticSplitter(BaseSplitter):
         chunks = []
         prev_pos = 0
 
-        for _i, (pos, element_type, confidence, section_name) in enumerate(split_points):
+        for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:

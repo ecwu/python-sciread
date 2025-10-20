@@ -61,29 +61,24 @@ from .simple_agent import SimpleAnalysisResult
 from .text_utils import remove_references
 
 __all__ = [
-    # Agent classes
-    "SimpleAgent",
-    "CoordinateAgent",
-    "ReActAgent",
-    # Result classes
-    "SimpleAnalysisResult",
-    # CoordinateAgent result models
-    "MetadataExtractionResult",
-    "PreviousMethodsResult",
-    "ResearchQuestionsResult",
-    "MethodologyResult",
-    "ExperimentResult",
-    "FutureDirectionsResult",
     "AnalysisPlan",
     "ComprehensiveAnalysisResult",
-    # ReActAgent functions and models
-    "analyze_document_with_react",
-    "load_and_process_document",
-    "get_initial_sections",
-    "format_status_summary",
+    "CoordinateAgent",
+    "ExperimentResult",
+    "FutureDirectionsResult",
+    "MetadataExtractionResult",
+    "MethodologyResult",
+    "PreviousMethodsResult",
+    "ReActAgent",
     "ReActAgentInput",
     "ReActAgentOutput",
-    # Text utilities
+    "ResearchQuestionsResult",
+    "SimpleAgent",
+    "SimpleAnalysisResult",
+    "analyze_document_with_react",
+    "format_status_summary",
+    "get_initial_sections",
+    "load_and_process_document",
     "remove_references",
 ]
 

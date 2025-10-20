@@ -523,7 +523,7 @@ def main():
 
         for encoding in encodings_to_try:
             try:
-                with open(file_path, encoding=encoding) as f:
+                with Path(file_path).open(encoding=encoding) as f:
                     text = f.read()
                 print(f"Successfully read file with {encoding} encoding")
                 break

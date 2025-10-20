@@ -212,7 +212,7 @@ class MarkdownSplitter(BaseSplitter):
         chunks = []
         prev_pos = 0
 
-        for _i, (pos, element_type, confidence, section_name) in enumerate(split_points):
+        for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:

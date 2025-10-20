@@ -137,7 +137,7 @@ def extract_document_metadata(text: str) -> dict[str, str]:
     lines = text.split("\n")[:50]  # Check first 50 lines for metadata
 
     # Try to find title (usually first or second non-empty line, often all caps or title case)
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         line = line.strip()
         if len(line) > 10 and len(line) < 200:  # Reasonable title length
             # Skip if it looks like an author line (contains "University", "Institute", etc.)
@@ -147,7 +147,7 @@ def extract_document_metadata(text: str) -> dict[str, str]:
             break
 
     # Try to find authors (look for lines with names after title)
-    for i, line in enumerate(lines[1:20], 1):  # Check lines 2-20
+    for _i, line in enumerate(lines[1:20], 1):  # Check lines 2-20
         line = line.strip()
         if line and len(line) < 100:  # Reasonable author line length
             # Common author patterns

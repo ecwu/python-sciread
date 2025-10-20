@@ -2,6 +2,7 @@
 
 import pytest
 
+from sciread.document import Document
 from sciread.document.splitters.regex_section_splitter import RegexSectionSplitter
 
 
@@ -124,7 +125,6 @@ Another substantial piece of content that describes the methodology used in this
 
     def test_document_level_filtering(self):
         """Test that Document class handles confidence threshold filtering."""
-        from sciread.document import Document
 
         text = """Abstract
 

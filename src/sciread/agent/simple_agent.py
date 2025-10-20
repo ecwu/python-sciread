@@ -145,9 +145,9 @@ class SimpleAgent:
             self.logger.info("Document analysis completed successfully")
             return result.output
 
-        except asyncio.TimeoutError:
+        except asyncio.TimeoutError as err:
             self.logger.error(f"Document analysis timed out after {self.timeout} seconds")
-            raise TimeoutError(f"Document analysis timed out after {self.timeout} seconds")
+            raise TimeoutError(f"Document analysis timed out after {self.timeout} seconds") from err
 
         except Exception as e:
             self.logger.error(f"Document analysis failed: {e}")

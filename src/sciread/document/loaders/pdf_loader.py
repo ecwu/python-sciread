@@ -7,6 +7,7 @@ from typing import Optional
 import pdfplumber
 import pypdf
 
+from ...config import get_config
 from ...logging_config import get_logger
 from ..external_clients import MineruClient
 from .base import BaseLoader
@@ -49,8 +50,6 @@ class PdfLoader(BaseLoader):
                 try:
                     if not self.mineru_client:
                         # Try to create MineruClient from config
-                        from ...config import get_config
-
                         config = get_config()
                         mineru_token = config.get_mineru_token()
                         if not mineru_token:
