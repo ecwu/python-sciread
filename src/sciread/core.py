@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from .agent import CoordinateAgent
+from .agent import DiscussionAgent
 from .agent import SimpleAgent
 from .agent import analyze_document_with_react
 from .agent import remove_references
@@ -221,4 +222,97 @@ def run_react_analysis(document_file: str, task: str, model: str = "deepseek-cha
 
     except Exception as e:
         logger.error(f"ReAct analysis failed: {e}")
+        raise
+
+
+async def discussion_analysis(document_file_path: str, model: str = "deepseek-chat"):
+    """Discussion-based document analysis using multi-agent personality system.
+
+    This function uses the DiscussionAgent with multiple personality-driven agents
+    to analyze academic papers through interactive discussion, questioning, and
+    consensus-building processes.
+
+    Args:
+        document_file_path: Path to the document file to process (PDF or TXT)
+        model: Model identifier for the LLM provider (default: "deepseek-chat")
+
+    Returns:
+        DiscussionResult object containing insights from all personality agents,
+        consensus points, divergent views, and final synthesized analysis
+
+    Raises:
+        FileNotFoundError: If the document file is not found
+        Exception: If the analysis fails
+    """
+    logger.info(f"Starting discussion-based analysis with DiscussionAgent for file: {document_file_path}")
+
+    # Check if file exists
+    if not Path(document_file_path).exists():
+        raise FileNotFoundError(f"Document file not found: {document_file_path}")
+
+    # Create the discussion-based multi-agent system
+    logger.debug(f"Creating DiscussionAgent with model: {model}")
+    discussion_agent = DiscussionAgent(model)
+
+    # Load the document file with to_markdown=True for better text processing
+    logger.debug(f"Loading document from file: {document_file_path}")
+    doc = Document.from_file(document_file_path, to_markdown=True, auto_split=True)
+    logger.debug(f"Document created from file: {document_file_path}")
+    logger.debug(f"Document loaded successfully: {len(doc.text)} characters")
+    logger.debug(f"Document split into {len(doc.chunks)} chunks")
+
+    # Extract and log section information
+    section_names = doc.get_section_names()
+    logger.debug(f"Discovered {len(section_names)} sections: {section_names}")
+
+    # Display document information to user
+    print("\n📋 Document Analysis - Discussion Mode")
+    print(f"Document: {doc.metadata.title or 'Untitled'}")
+    print(f"Total Content: {len(doc.text)} characters")
+    print(f"Chunks: {len(doc.chunks)}")
+
+    if section_names:
+        print(f"Sections: {len(section_names)} main sections identified")
+        print("Available sections for analysis:")
+        for i, section_name in enumerate(section_names[:10], 1):  # Show first 10
+            print(f"  {i}. {section_name.title()}")
+        if len(section_names) > 10:
+            print(f"  ... and {len(section_names) - 10} more sections")
+    else:
+        print("Sections: No named sections found - analyzing as continuous text")
+    print()
+
+    # Check if document was loaded successfully
+    if not doc.text.strip():
+        raise ValueError("Failed to load document: no text content extracted")
+
+    # Display information about the discussion agents
+    from .agent.models.discussion_models import AgentPersonality
+    print("🤖 Discussion Agents:")
+    for personality in AgentPersonality:
+        role_name = personality.value.replace('_', ' ').title()
+        print(f"  • {role_name} - Analyzes from their unique perspective")
+    print()
+
+    # Run discussion-based analysis
+    logger.info("Starting discussion-based document analysis with multiple personality agents...")
+    logger.info("Agents will engage in discussion, questioning, and consensus-building")
+
+    try:
+        print("🔄 Starting multi-agent discussion analysis...")
+        print("This may take several minutes as agents collaborate and build consensus...")
+        print()
+
+        result = await discussion_agent.analyze_document(doc)
+
+        logger.info("Discussion-based analysis completed successfully!")
+        logger.info(f"Analysis completed with confidence score: {result.confidence_score:.2f}")
+        logger.info(f"Total insights generated: {len(result.final_insights)}")
+        logger.info(f"Consensus points identified: {len(result.consensus_points)}")
+        logger.info(f"Divergent views noted: {len(result.divergent_views)}")
+
+        return result
+
+    except Exception as e:
+        logger.error(f"Discussion-based analysis failed: {e}")
         raise

@@ -23,6 +23,7 @@ import logfire
 
 from .core import comprehensive_analysis
 from .core import compute
+from .core import discussion_analysis
 from .core import main
 from .core import run_react_analysis
 from .logging_config import logger
@@ -53,6 +54,8 @@ MODES:
          (metadata, methodology, experiments, future directions)
   react  - Uses ReAct agent for intelligent iterative analysis
          with reasoning and acting pattern
+  discussion - Uses DiscussionAgent with multiple personality-driven agents
+         for collaborative analysis through discussion and consensus-building
 
 DEBUG LOGGING:
   Set log level to DEBUG to see detailed agent interactions, prompts,
@@ -66,6 +69,8 @@ EXAMPLES:
   python -msciread react paper.pdf
   python -msciread react paper.pdf "What are the main contributions?"
   python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
+  python -msciread discussion paper.pdf
+  python -msciread discussion paper.pdf deepseek-reasoner
 
 MODELS:
   deepseek/deepseek-chat     (default)
@@ -84,7 +89,9 @@ MODELS:
         help="Single agent analysis",
         description="Use a single SimpleAgent for basic analysis",
     )
-    simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    simple_parser.add_argument(
+        "document_file", help="Path to the document file to analyze (PDF or TXT)"
+    )
     simple_parser.add_argument(
         "--model",
         default="deepseek/deepseek-chat",
@@ -110,7 +117,9 @@ MODELS:
         help="ReAct agent iterative analysis",
         description="Use ReAct agent for intelligent iterative analysis with reasoning and acting pattern",
     )
-    react_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    react_parser.add_argument(
+        "document_file", help="Path to the document file to analyze (PDF or TXT)"
+    )
     react_parser.add_argument(
         "task",
         nargs="?",
@@ -135,6 +144,21 @@ MODELS:
         help="Hide progress display during analysis",
     )
 
+    # Discussion mode parser
+    discussion_parser = subparsers.add_parser(
+        "discussion",
+        help="Multi-agent discussion-based analysis",
+        description="Use multiple personality-driven agents for collaborative analysis through discussion and consensus-building",
+    )
+    discussion_parser.add_argument(
+        "document_file", help="Path to the document file to analyze (PDF or TXT)"
+    )
+    discussion_parser.add_argument(
+        "--model",
+        default="deepseek/deepseek-chat",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+    )
+
     # Parse arguments (skip the script name)
     args = parser.parse_args(argv[1:])
 
@@ -142,7 +166,9 @@ MODELS:
 
     # Handle different commands
     if args.command == "coordinate":
-        logger.info(f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}")
+        logger.info(
+            f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}"
+        )
 
         try:
             result = asyncio.run(comprehensive_analysis(args.pdf_file, args.model))
@@ -152,7 +178,9 @@ MODELS:
             print("=" * 60)
             print(f"Analysis Plan: {result.analysis_plan.reasoning}")
             print(f"Total Execution Time: {result.total_execution_time:.2f} seconds")
-            print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
+            print(
+                f"Agents Executed: {result.execution_summary['total_agents_executed']}"
+            )
             print(f"Successful Agents: {result.execution_summary['successful_agents']}")
             print(f"Failed Agents: {result.execution_summary['failed_agents']}")
 
@@ -175,7 +203,11 @@ MODELS:
 
         try:
             result = run_react_analysis(
-                args.document_file, args.task, model=args.model, max_loops=args.max_loops, show_progress=not args.no_progress
+                args.document_file,
+                args.task,
+                model=args.model,
+                max_loops=args.max_loops,
+                show_progress=not args.no_progress,
             )
             # The final report is already printed if show_progress=True
             if args.no_progress:
@@ -191,7 +223,9 @@ MODELS:
             return 1
 
     elif args.command == "simple":
-        logger.info(f"Running simple mode with file: {args.document_file}, model: {args.model}")
+        logger.info(
+            f"Running simple mode with file: {args.document_file}, model: {args.model}"
+        )
 
         try:
             result = asyncio.run(main(args.document_file, args.model))
@@ -203,6 +237,74 @@ MODELS:
             return 0
         except Exception as e:
             logger.error(f"Simple analysis failed: {e}")
+            print(f"Error: {e}")
+            return 1
+
+    elif args.command == "discussion":
+        logger.info(
+            f"Running discussion mode with file: {args.document_file}, model: {args.model}"
+        )
+
+        try:
+            result = asyncio.run(discussion_analysis(args.document_file, args.model))
+
+            print("=" * 80)
+            print("DISCUSSION-BASED ANALYSIS RESULT:")
+            print("=" * 80)
+            print(f"Document: {result.document_title}")
+            print(f"Overall Confidence: {result.confidence_score:.2f}")
+            print(f"Total Insights: {len(result.final_insights)}")
+            print(f"Consensus Points: {len(result.consensus_points)}")
+            print(f"Divergent Views: {len(result.divergent_views)}")
+
+            if result.discussion_metadata:
+                print("\nDiscussion Metadata:")
+                for key, value in result.discussion_metadata.items():
+                    if key != "error":
+                        print(f"  {key.replace('_', ' ').title()}: {value}")
+
+            print()
+            print("ANALYSIS SUMMARY:")
+            print(result.summary)
+
+            if result.key_contributions:
+                print()
+                print("KEY CONTRIBUTIONS:")
+                for i, contribution in enumerate(result.key_contributions, 1):
+                    print(f"  {i}. {contribution}")
+
+            if result.significance:
+                print()
+                print("SIGNIFICANCE ASSESSMENT:")
+                print(result.significance)
+
+            if result.consensus_points:
+                print()
+                print("CONSENSUS POINTS:")
+                for i, point in enumerate(result.consensus_points, 1):
+                    print(f"  {i}. {point.topic} (Strength: {point.strength:.2f})")
+                    print(
+                        f"     {point.content[:200]}{'...' if len(point.content) > 200 else ''}"
+                    )
+                    print(f"     Supporting agents: {point.supporting_agents}")
+                    if i < len(result.consensus_points):
+                        print()
+
+            if result.divergent_views:
+                print()
+                print("DIVERGENT VIEWS:")
+                for i, view in enumerate(result.divergent_views, 1):
+                    print(f"  {i}. {view.topic} (Held by: {view.holding_agent})")
+                    print(
+                        f"     {view.content[:200]}{'...' if len(view.content) > 200 else ''}"
+                    )
+                    if i < len(result.divergent_views):
+                        print()
+
+            print("=" * 80)
+            return 0
+        except Exception as e:
+            logger.error(f"Discussion analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 
