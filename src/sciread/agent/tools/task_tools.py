@@ -1,20 +1,52 @@
 """Task execution tools for multi-agent discussion system."""
 
-from typing import Dict, Any, Optional, List
 from datetime import datetime
+from typing import Any
+from typing import Dict
 
-from ..personality_agents import PersonalityAgent, create_personality_agent
-from ...document import Document
 from ...logging_config import get_logger
-from ..models.discussion_models import (
-    AgentPersonality,
-    AgentInsight,
-    Question,
-    Response,
-)
-from ..models.task_models import Task, TaskResult, TaskType
+from ..models.discussion_models import AgentPersonality
+from ..models.task_models import Task
+from ..models.task_models import TaskResult
+from ..models.task_models import TaskType
+from ..personality_agents import PersonalityAgent
+from ..personality_agents import create_personality_agent
 
 logger = get_logger(__name__)
+
+# Global cache for personality agents to maintain chat history
+AGENT_CACHE: Dict[str, PersonalityAgent] = {}
+
+
+def get_cached_agent(personality: AgentPersonality, model_name: str = "deepseek-chat") -> PersonalityAgent:
+    """Get cached agent instance or create new one if not exists."""
+    if personality is None:
+        raise ValueError("Personality cannot be None")
+
+    cache_key = f"{personality.value}_{model_name}"
+
+    if cache_key not in AGENT_CACHE:
+        logger.debug(f"Creating new agent instance for {personality.value} with model {model_name}")
+        AGENT_CACHE[cache_key] = create_personality_agent(personality, model_name)
+    else:
+        logger.debug(f"Reusing cached agent for {personality.value} with model {model_name}")
+
+    return AGENT_CACHE[cache_key]
+
+
+def clear_agent_cache():
+    """Clear all cached agent instances."""
+    global AGENT_CACHE
+    AGENT_CACHE.clear()
+    logger.info("Agent cache cleared")
+
+
+def get_agent_cache_status() -> Dict[str, Any]:
+    """Get current agent cache status for debugging."""
+    return {
+        "cache_size": len(AGENT_CACHE),
+        "cached_agents": list(AGENT_CACHE.keys()),
+    }
 
 
 async def generate_insights_tool(task: Task) -> TaskResult:
@@ -34,7 +66,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
         if isinstance(personality, str):
             personality = AgentPersonality(personality)
 
-        agent = create_personality_agent(
+        agent = get_cached_agent(
             personality, task.context.get("model_name", "deepseek-chat")
         )
 
@@ -69,7 +101,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now() - start_time).total_seconds()
-        error_msg = f"Insight generation failed: {str(e)}"
+        error_msg = f"Insight generation failed: {e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -105,7 +137,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
             to_agent = AgentPersonality(to_agent)
 
         # Create agent
-        agent = create_personality_agent(
+        agent = get_cached_agent(
             from_agent, task.context.get("model_name", "deepseek-chat")
         )
 
@@ -169,7 +201,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now() - start_time).total_seconds()
-        error_msg = f"Question generation failed: {str(e)}"
+        error_msg = f"Question generation failed: {e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -202,7 +234,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(personality)
 
         # Create agent
-        agent = create_personality_agent(
+        agent = get_cached_agent(
             personality, task.context.get("model_name", "deepseek-chat")
         )
 
@@ -239,7 +271,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now() - start_time).total_seconds()
-        error_msg = f"Answer generation failed: {str(e)}"
+        error_msg = f"Answer generation failed: {e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -272,7 +304,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(personality)
 
         # Create agent
-        agent = create_personality_agent(
+        agent = get_cached_agent(
             personality, task.context.get("model_name", "deepseek-chat")
         )
 
@@ -304,7 +336,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now() - start_time).total_seconds()
-        error_msg = f"Convergence evaluation failed: {str(e)}"
+        error_msg = f"Convergence evaluation failed: {e!s}"
         logger.error(error_msg)
 
         return TaskResult(

@@ -522,3 +522,16 @@ class DiscussionAgent:
         current_idx = phase_order.index(self.discussion_state.current_phase)
         if current_idx < len(phase_order) - 1:
             self.discussion_state.current_phase = phase_order[current_idx + 1]
+
+    def clear_agent_cache(self):
+        """Clear all cached agent instances to free memory or reset discussion."""
+        from .tools.task_tools import clear_agent_cache
+        clear_agent_cache()
+        logger.info("DiscussionAgent: Cleared all cached agent instances")
+
+    def get_agent_cache_status(self) -> dict:
+        """Get current agent cache status for debugging."""
+        from .tools.task_tools import get_agent_cache_status
+        status = get_agent_cache_status()
+        logger.info(f"DiscussionAgent: Cache status - {status}")
+        return status

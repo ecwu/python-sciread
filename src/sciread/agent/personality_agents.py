@@ -1,22 +1,24 @@
 """Personality-based agents for multi-agent discussion system."""
 
-import asyncio
-from typing import Dict, List, Any, Optional
-import json
 import re
 import uuid
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
+from pydantic_ai.messages import ModelMessage
 
-from ..llm_provider import get_model
 from ..document import Document
-from .models.discussion_models import AgentPersonality, AgentInsight, Question, Response
-from .models.task_models import Task, TaskResult, TaskType
-from .prompts.personalities import (
-    get_personality_system_prompt,
-    build_insight_generation_prompt,
-)
+from ..llm_provider import get_model
 from ..logging_config import get_logger
+from .models.discussion_models import AgentInsight
+from .models.discussion_models import AgentPersonality
+from .models.discussion_models import Question
+from .models.discussion_models import Response
+from .prompts.personalities import build_insight_generation_prompt
+from .prompts.personalities import get_personality_system_prompt
 
 logger = get_logger(__name__)
 
@@ -35,6 +37,20 @@ class PersonalityAgent:
             self.model, system_prompt=get_personality_system_prompt(personality)
         )
         self.logger = get_logger(f"{__name__}.{personality.value}")
+        self.message_history: list[ModelMessage] = []
+
+    async def _run_with_history(self, prompt: str):
+        """Run agent with message history persistence."""
+        if self.message_history:
+            # Continue existing conversation
+            result = await self.agent.run(prompt, message_history=self.message_history)
+        else:
+            # Start new conversation
+            result = await self.agent.run(prompt)
+
+        # Update history with all messages from this run
+        self.message_history = result.all_messages()
+        return result
 
     async def generate_insights(
         self, document: Document, discussion_context: Dict[str, Any]
@@ -74,8 +90,8 @@ class PersonalityAgent:
                 discussion_context=discussion_context,
             )
 
-            # Execute the agent
-            result = await self.agent.run(prompt)
+            # Execute the agent with history
+            result = await self._run_with_history(prompt)
 
             # Parse the response to extract insights
             insights = self._parse_insights_response(result.output, document)
@@ -116,7 +132,7 @@ Respond with ONLY the section names you want to read, one per line, exactly as t
 Select sections that will help you provide the most valuable insights from your unique perspective.
 """
 
-            result = await self.agent.run(prompt)
+            result = await self._run_with_history(prompt)
 
             # Parse section names from response
             selected = []
@@ -239,7 +255,7 @@ When you choose `Decision: skip`, you must set `Question: None`, `Priority: 0.0`
 When you choose `Decision: ask`, craft one precise question that reflects your personality and advances the dialogue.
 """
 
-            result = await self.agent.run(prompt)
+            result = await self._run_with_history(prompt)
             parsed = self._parse_question_response(
                 result.output, target_insight, target_agent
             )
@@ -325,7 +341,7 @@ Confidence: [0.0-1.0 confidence in your response]
 ```
 """
 
-            result = await self.agent.run(prompt)
+            result = await self._run_with_history(prompt)
             parsed = self._parse_answer_response(result.output, question)
 
             if parsed:
@@ -376,7 +392,7 @@ Recommendations: [Any suggestions for next steps]
 ```
 """
 
-            result = await self.agent.run(prompt)
+            result = await self._run_with_history(prompt)
             evaluation = self._parse_convergence_evaluation(result.output)
 
             self.logger.info(
