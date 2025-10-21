@@ -109,15 +109,39 @@ async def ask_question_tool(task: Task) -> TaskResult:
             from_agent, task.context.get("model_name", "deepseek-chat")
         )
 
-        # Ask question
-        question = await agent.ask_question(
+        # Ask question (may return a question object or a skip decision)
+        question_decision = await agent.ask_question(
             target_insight, to_agent, discussion_context
         )
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
+        if (
+            isinstance(question_decision, dict)
+            and question_decision.get("decision") == "skip"
+        ):
+            logger.debug(
+                f"{from_agent.value} skipped questioning {to_agent.value}: {question_decision.get('reason', 'no reason provided')}"
+            )
+            return TaskResult(
+                task_id=task.task_id,
+                success=True,
+                execution_time=execution_time,
+                questions=[],
+                confidence=0.0,
+                metadata={
+                    "from_agent": from_agent.value,
+                    "to_agent": to_agent.value,
+                    "decision": "skip",
+                    "reason": question_decision.get("reason"),
+                },
+                notes=["No question needed for this insight."],
+            )
+
+        question = question_decision
+
         if question:
-            logger.info(
+            logger.debug(
                 f"Generated question from {from_agent.value} to {to_agent.value}"
             )
             return TaskResult(
@@ -259,7 +283,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
-        logger.info(
+        logger.debug(
             f"{personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}"
         )
 

@@ -200,7 +200,7 @@ Select sections that will help you provide the most valuable insights from your 
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
         discussion_context: Dict[str, Any],
-    ) -> Optional[Question]:
+    ) -> Optional[Any]:
         """Ask a question about another agent's insight."""
         try:
             self.logger.info(
@@ -208,7 +208,7 @@ Select sections that will help you provide the most valuable insights from your 
             )
 
             prompt = f"""
-As a {self.personality.value.replace('_', ' ').title()}, review the following insight from {target_agent.value.replace('_', ' ').title()} and formulate a thoughtful question:
+As a {self.personality.value.replace('_', ' ').title()}, review the following insight from {target_agent.value.replace('_', ' ').title()} and decide whether a follow-up question is truly necessary.
 
 **Target Insight:**
 {target_insight.content}
@@ -220,19 +220,23 @@ As a {self.personality.value.replace('_', ' ').title()}, review the following in
 Current Phase: {discussion_context.get('phase', 'questioning')}
 Questions Asked So Far: {discussion_context.get('total_questions', 0)}
 
-**Your Task:**
-Formulate ONE high-quality question that:
-1. Reflects your personality's perspective and concerns
-2. Challenges, clarifies, or extends the target insight
-3. Is specific and actionable
-4. Encourages deeper analysis or reflection
+**Before deciding to ask anything, reflect on:**
+- Does this insight contain unresolved risks, contradictions, or missing evidence from your perspective?
+- Would asking a question materially change the shared understanding or convergence?
+- Have similar questions already been asked in this discussion?
 
-Provide your response in this format:
+Only ask a question if it will meaningfully advance the discussion. If the insight already satisfies your concerns, choose to skip.
+
+Provide your response in *exactly* this format:
 ```
-Question: [Your specific question]
-Priority: [0.0-1.0 importance score]
-Type: [clarification/challenge/extension]
+Decision: [ask|skip]
+Reason: [brief justification for your decision from your personality's viewpoint]
+Question: [your specific question or "None" if skipping]
+Priority: [0.0-1.0 importance score, use 0.0 when skipping]
+Type: [clarification/challenge/extension/none]
 ```
+When you choose `Decision: skip`, you must set `Question: None`, `Priority: 0.0`, and `Type: none`.
+When you choose `Decision: ask`, craft one precise question that reflects your personality and advances the dialogue.
 """
 
             result = await self.agent.run(prompt)
@@ -240,11 +244,21 @@ Type: [clarification/challenge/extension]
                 result.output, target_insight, target_agent
             )
 
-            if parsed:
+            if not parsed:
+                return None
+
+            if parsed.get("decision") == "skip":
                 self.logger.info(
+                    f"{self.personality.value} chose to skip questioning {target_agent.value}: {parsed.get('reason', 'no reason provided')}"
+                )
+                return parsed
+
+            question_obj = parsed.get("question")
+            if question_obj:
+                self.logger.debug(
                     f"Generated question from {self.personality.value} to {target_agent.value}"
                 )
-            return parsed
+            return question_obj
 
         except Exception as e:
             self.logger.error(
@@ -333,7 +347,7 @@ Confidence: [0.0-1.0 confidence in your response]
     ) -> Dict[str, Any]:
         """Evaluate if the discussion has reached convergence."""
         try:
-            self.logger.info(f"{self.personality.value} evaluating convergence")
+            self.logger.debug(f"{self.personality.value} evaluating convergence")
 
             prompt = f"""
 As a {self.personality.value.replace('_', ' ').title()}, evaluate whether the discussion has reached sufficient convergence:
@@ -488,30 +502,71 @@ Recommendations: [Any suggestions for next steps]
         response: str,
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
-    ) -> Optional[Question]:
-        """Parse response to create a Question object."""
+    ) -> Optional[Dict[str, Any]]:
+        """Parse LLM output into a structured decision about questioning."""
         try:
-            question_match = re.search(r"Question:\s*(.+)", response, re.IGNORECASE)
-            priority_match = re.search(
-                r"Priority:\s*([0-9.]+)", response, re.IGNORECASE
-            )
-            type_match = re.search(r"Type:\s*(\w+)", response, re.IGNORECASE)
+            fields: Dict[str, str] = {}
+            current_key: Optional[str] = None
 
-            if question_match:
-                return Question(
-                    question_id=str(uuid.uuid4()),
-                    from_agent=self.personality,
-                    to_agent=target_agent,
-                    content=question_match.group(1).strip(),
-                    target_insight=target_insight.content[
-                        :50
-                    ],  # Use first 50 chars as ID
-                    question_type=(
-                        type_match.group(1).strip() if type_match else "clarification"
-                    ),
-                    priority=float(priority_match.group(1)) if priority_match else 0.5,
-                    requires_response=True,
-                )
+            for raw_line in response.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    current_key = key.strip().lower()
+                    fields[current_key] = value.strip()
+                elif current_key:
+                    # Allow the model to spill into the next line; keep it compact
+                    fields[current_key] = f"{fields[current_key]} {line}"
+
+            decision = fields.get("decision", "ask").lower()
+            reason = fields.get("reason", "").strip()
+            question_text = fields.get("question", "").strip()
+            priority_raw = fields.get("priority", "").strip()
+            question_type = fields.get("type", "").strip() or "clarification"
+
+            try:
+                priority = float(priority_raw) if priority_raw else 0.0
+            except ValueError:
+                priority = 0.0
+
+            skip_requested = decision == "skip" or question_text.lower() in {
+                "none",
+                "no",
+                "n/a",
+            }
+
+            if skip_requested:
+                return {
+                    "decision": "skip",
+                    "reason": reason or "No further clarification needed.",
+                    "question": None,
+                    "priority": 0.0,
+                    "type": "none",
+                }
+
+            if not question_text:
+                return None
+
+            question_obj = Question(
+                question_id=str(uuid.uuid4()),
+                from_agent=self.personality,
+                to_agent=target_agent,
+                content=question_text,
+                target_insight=target_insight.content[:50],  # Use first 50 chars as ID
+                question_type=question_type if question_type else "clarification",
+                priority=min(max(priority, 0.0), 1.0) or 0.5,
+                requires_response=True,
+            )
+
+            return {
+                "decision": "ask",
+                "reason": reason,
+                "question": question_obj,
+                "priority": question_obj.priority,
+                "type": question_obj.question_type,
+            }
         except Exception as e:
             self.logger.error(f"Error parsing question response: {e}")
             return None

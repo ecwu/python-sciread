@@ -166,7 +166,7 @@ MODELS:
 
     # Handle different commands
     if args.command == "coordinate":
-        logger.info(
+        logger.debug(
             f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}"
         )
 
@@ -197,7 +197,7 @@ MODELS:
 
     elif args.command == "react":
         task_display = args.task[:100] + "..." if len(args.task) > 100 else args.task
-        logger.info(
+        logger.debug(
             f"Running react mode with file: {args.document_file}, task: {task_display}, model: {args.model}, max_loops: {args.max_loops}, show_progress: {not args.no_progress}"
         )
 
@@ -223,7 +223,7 @@ MODELS:
             return 1
 
     elif args.command == "simple":
-        logger.info(
+        logger.debug(
             f"Running simple mode with file: {args.document_file}, model: {args.model}"
         )
 
@@ -241,7 +241,7 @@ MODELS:
             return 1
 
     elif args.command == "discussion":
-        logger.info(
+        logger.debug(
             f"Running discussion mode with file: {args.document_file}, model: {args.model}"
         )
 
@@ -333,8 +333,5 @@ MODELS:
             return 1
 
     else:
-        # Default compute behavior (no command specified)
-        result = compute(argv[1:])
-        logger.info(f"Compute result: {result}")
-        print(result)
-        return 0
+        parser.print_help()
+        return 1
