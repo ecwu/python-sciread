@@ -278,14 +278,37 @@ MODELS:
                 print("SIGNIFICANCE ASSESSMENT:")
                 print(result.significance)
 
+            if result.final_insights:
+                print()
+                print("FINAL INSIGHTS FROM DISCUSSION:")
+                for i, insight in enumerate(result.final_insights, 1):
+                    print(
+                        f"  {i}. From {insight.agent_id} (Confidence: {insight.confidence:.2f}, Importance: {insight.importance_score:.2f})"
+                    )
+                    # Print full content with proper indentation for multi-line text
+                    content_lines = insight.content.split("\n")
+                    for line in content_lines:
+                        print(f"     {line}")
+                    if insight.supporting_evidence:
+                        print("     Supporting Evidence:")
+                        for evidence in insight.supporting_evidence:
+                            print(f"       - {evidence}")
+                    if insight.related_sections:
+                        print(
+                            f"     Related Sections: {', '.join(insight.related_sections)}"
+                        )
+                    if i < len(result.final_insights):
+                        print()
+
             if result.consensus_points:
                 print()
                 print("CONSENSUS POINTS:")
                 for i, point in enumerate(result.consensus_points, 1):
                     print(f"  {i}. {point.topic} (Strength: {point.strength:.2f})")
-                    print(
-                        f"     {point.content[:200]}{'...' if len(point.content) > 200 else ''}"
-                    )
+                    # Print full content with proper indentation for multi-line text
+                    content_lines = point.content.split("\n")
+                    for line in content_lines:
+                        print(f"     {line}")
                     print(f"     Supporting agents: {point.supporting_agents}")
                     if i < len(result.consensus_points):
                         print()
@@ -295,9 +318,10 @@ MODELS:
                 print("DIVERGENT VIEWS:")
                 for i, view in enumerate(result.divergent_views, 1):
                     print(f"  {i}. {view.topic} (Held by: {view.holding_agent})")
-                    print(
-                        f"     {view.content[:200]}{'...' if len(view.content) > 200 else ''}"
-                    )
+                    # Print full content with proper indentation for multi-line text
+                    content_lines = view.content.split("\n")
+                    for line in content_lines:
+                        print(f"     {line}")
                     if i < len(result.divergent_views):
                         print()
 
