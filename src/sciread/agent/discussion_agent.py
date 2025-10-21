@@ -195,6 +195,7 @@ class DiscussionAgent:
                 priority=TaskPriority.HIGH,
                 assigned_to=personality,
                 timeout_seconds=180,  # 3 minutes
+                context={"model_name": self.model_name},
             )
             tasks.append(task_id)
 
@@ -248,6 +249,7 @@ class DiscussionAgent:
                             priority=TaskPriority.MEDIUM,
                             assigned_to=from_personality,
                             timeout_seconds=120,  # 2 minutes
+                            context={"model_name": self.model_name},
                         )
                         question_tasks.append(task_id)
 
@@ -295,6 +297,7 @@ class DiscussionAgent:
                     priority=TaskPriority.HIGH,
                     assigned_to=question.to_agent,
                     timeout_seconds=180,  # 3 minutes
+                    context={"model_name": self.model_name},
                 )
                 response_tasks.append(task_id)
 
@@ -339,6 +342,7 @@ class DiscussionAgent:
                 priority=TaskPriority.MEDIUM,
                 assigned_to=personality,
                 timeout_seconds=120,  # 2 minutes
+                context={"model_name": self.model_name},
             )
             convergence_tasks.append(task_id)
 

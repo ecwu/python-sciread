@@ -75,6 +75,7 @@ class TaskQueueManager:
         depends_on: Optional[List[str]] = None,
         timeout_seconds: Optional[int] = None,
         max_retries: int = 3,
+        context: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Create and add a new task to a queue."""
         task = Task(
@@ -83,6 +84,7 @@ class TaskQueueManager:
             assigned_to=assigned_to,
             created_by=created_by,
             parameters=parameters,
+            context=context or {},
             depends_on=depends_on or [],
             timeout_seconds=timeout_seconds,
             max_retries=max_retries,
