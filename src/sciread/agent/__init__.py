@@ -42,18 +42,22 @@ Example Usage:
     discussion_result = await discussion_agent.analyze_document(doc)
 """
 
-# New agent imports
-from .coordinate_agent import AnalysisPlan
-from .coordinate_agent import ComprehensiveAnalysisResult
+# Agent classes
 from .coordinate_agent import CoordinateAgent
-from .coordinate_agent import ExperimentResult
-from .coordinate_agent import FutureDirectionsResult
+from .simple_agent import SimpleAgent
 
-# CoordinateAgent result models
-from .coordinate_agent import MetadataExtractionResult
-from .coordinate_agent import MethodologyResult
-from .coordinate_agent import PreviousMethodsResult
-from .coordinate_agent import ResearchQuestionsResult
+# CoordinateAgent models - now imported from models folder
+from .models.coordinate_models import AnalysisPlan
+from .models.coordinate_models import ComprehensiveAnalysisResult
+from .models.coordinate_models import ExperimentResult
+from .models.coordinate_models import FutureDirectionsResult
+from .models.coordinate_models import MetadataExtractionResult
+from .models.coordinate_models import MethodologyResult
+from .models.coordinate_models import PreviousMethodsResult
+from .models.coordinate_models import ResearchQuestionsResult
+
+# SimpleAgent models - now imported from models folder
+from .models.simple_models import SimpleAnalysisResult
 
 # Discussion system imports
 from .discussion_agent import DiscussionAgent
@@ -68,16 +72,16 @@ from .models.task_models import (
     Task, TaskType, TaskPriority, TaskStatus, TaskResult, TaskQueue
 )
 
-# ReActAgent models
+# ReActAgent and utility functions
 from .react_agent import ReActAgent
-from .react_agent import ReActAgentInput
-from .react_agent import ReActAgentOutput
 from .react_agent import analyze_document_with_react
 from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
-from .simple_agent import SimpleAgent
-from .simple_agent import SimpleAnalysisResult
+
+# ReActAgent models - now imported from models folder
+from .models.react_models import ReActAgentInput
+from .models.react_models import ReActAgentOutput
 from .text_utils import remove_references
 
 __all__ = [

@@ -2,11 +2,20 @@
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 from uuid import uuid4
-from pydantic import BaseModel, Field
 
-from .discussion_models import AgentPersonality, AgentInsight, Question, Response
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import Field
+
+from .discussion_models import AgentInsight
+from .discussion_models import AgentPersonality
+from .discussion_models import Question
+from .discussion_models import Response
 
 
 class TaskType(str, Enum):
@@ -45,25 +54,45 @@ class TaskStatus(str, Enum):
 class Task(BaseModel):
     """Represents a task to be executed by an agent."""
 
-    task_id: str = Field(default_factory=lambda: str(uuid4()), description="Unique task identifier")
+    task_id: str = Field(
+        default_factory=lambda: str(uuid4()), description="Unique task identifier"
+    )
     task_type: TaskType = Field(..., description="Type of task")
-    priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="Task priority")
-    status: TaskStatus = Field(default=TaskStatus.PENDING, description="Current task status")
+    priority: TaskPriority = Field(
+        default=TaskPriority.MEDIUM, description="Task priority"
+    )
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING, description="Current task status"
+    )
 
     # Task assignment
-    assigned_to: Optional[AgentPersonality] = Field(None, description="Agent assigned to this task")
-    created_by: Optional[AgentPersonality] = Field(None, description="Agent that created this task")
+    assigned_to: Optional[AgentPersonality] = Field(
+        None, description="Agent assigned to this task"
+    )
+    created_by: Optional[AgentPersonality] = Field(
+        None, description="Agent that created this task"
+    )
 
     # Task parameters
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
-    context: Dict[str, Any] = Field(default_factory=dict, description="Additional context for the task")
+    parameters: Dict[str, Any] = Field(
+        default_factory=dict, description="Task-specific parameters"
+    )
+    context: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional context for the task"
+    )
 
     # Dependencies and relationships
-    depends_on: List[str] = Field(default_factory=list, description="Task IDs this task depends on")
-    related_tasks: List[str] = Field(default_factory=list, description="Related task IDs")
+    depends_on: List[str] = Field(
+        default_factory=list, description="Task IDs this task depends on"
+    )
+    related_tasks: List[str] = Field(
+        default_factory=list, description="Related task IDs"
+    )
 
     # Timing
-    created_at: datetime = Field(default_factory=datetime.now, description="Task creation time")
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="Task creation time"
+    )
     assigned_at: Optional[datetime] = Field(None, description="Task assignment time")
     started_at: Optional[datetime] = Field(None, description="Task start time")
     completed_at: Optional[datetime] = Field(None, description="Task completion time")
@@ -76,10 +105,11 @@ class Task(BaseModel):
 
     # Results
     result: Optional["TaskResult"] = Field(None, description="Task execution result")
-    error_message: Optional[str] = Field(None, description="Error message if task failed")
+    error_message: Optional[str] = Field(
+        None, description="Error message if task failed"
+    )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class TaskResult(BaseModel):
@@ -87,22 +117,37 @@ class TaskResult(BaseModel):
 
     task_id: str = Field(..., description="ID of the task this result belongs to")
     success: bool = Field(..., description="Whether the task was successful")
-    execution_time: float = Field(..., description="Time taken to execute the task in seconds")
+    execution_time: float = Field(
+        ..., description="Time taken to execute the task in seconds"
+    )
 
     # Task-specific results
-    insights: List[AgentInsight] = Field(default_factory=list, description="Generated insights")
-    questions: List[Question] = Field(default_factory=list, description="Generated questions")
-    responses: List[Response] = Field(default_factory=list, description="Generated responses")
+    insights: List[AgentInsight] = Field(
+        default_factory=list, description="Generated insights"
+    )
+    questions: List[Question] = Field(
+        default_factory=list, description="Generated questions"
+    )
+    responses: List[Response] = Field(
+        default_factory=list, description="Generated responses"
+    )
     analysis_result: Optional[str] = Field(None, description="General analysis result")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
-    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the result")
-    notes: List[str] = Field(default_factory=list, description="Additional notes about the result")
-    timestamp: datetime = Field(default_factory=datetime.now, description="Result timestamp")
+    metadata: Dict[str, Any] = Field(
+        default_factory=dict, description="Additional result metadata"
+    )
+    confidence: float = Field(
+        ..., ge=0.0, le=1.0, description="Confidence in the result"
+    )
+    notes: List[str] = Field(
+        default_factory=list, description="Additional notes about the result"
+    )
+    timestamp: datetime = Field(
+        default_factory=datetime.now, description="Result timestamp"
+    )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
 
 class TaskQueue(BaseModel):
@@ -112,24 +157,43 @@ class TaskQueue(BaseModel):
     description: Optional[str] = Field(None, description="Description of this queue")
 
     # Task storage
-    pending_tasks: List[Task] = Field(default_factory=list, description="Tasks waiting to be executed")
-    active_tasks: List[Task] = Field(default_factory=list, description="Tasks currently being executed")
-    completed_tasks: List[Task] = Field(default_factory=list, description="Completed tasks")
+    pending_tasks: List[Task] = Field(
+        default_factory=list, description="Tasks waiting to be executed"
+    )
+    active_tasks: List[Task] = Field(
+        default_factory=list, description="Tasks currently being executed"
+    )
+    completed_tasks: List[Task] = Field(
+        default_factory=list, description="Completed tasks"
+    )
     failed_tasks: List[Task] = Field(default_factory=list, description="Failed tasks")
 
     # Queue metadata
-    created_at: datetime = Field(default_factory=datetime.now, description="Queue creation time")
-    last_activity: datetime = Field(default_factory=datetime.now, description="Last activity time")
-    total_tasks_created: int = Field(default=0, description="Total number of tasks created")
-    total_tasks_completed: int = Field(default=0, description="Total number of tasks completed")
+    created_at: datetime = Field(
+        default_factory=datetime.now, description="Queue creation time"
+    )
+    last_activity: datetime = Field(
+        default_factory=datetime.now, description="Last activity time"
+    )
+    total_tasks_created: int = Field(
+        default=0, description="Total number of tasks created"
+    )
+    total_tasks_completed: int = Field(
+        default=0, description="Total number of tasks completed"
+    )
 
     # Configuration
-    max_concurrent_tasks: int = Field(default=10, description="Maximum concurrent tasks")
-    default_priority: TaskPriority = Field(default=TaskPriority.MEDIUM, description="Default task priority")
-    auto_retry_failed_tasks: bool = Field(default=True, description="Whether to automatically retry failed tasks")
+    max_concurrent_tasks: int = Field(
+        default=10, description="Maximum concurrent tasks"
+    )
+    default_priority: TaskPriority = Field(
+        default=TaskPriority.MEDIUM, description="Default task priority"
+    )
+    auto_retry_failed_tasks: bool = Field(
+        default=True, description="Whether to automatically retry failed tasks"
+    )
 
-    class Config:
-        use_enum_values = True
+    model_config = ConfigDict(use_enum_values=True)
 
     def add_task(self, task: Task) -> str:
         """Add a new task to the queue."""
@@ -144,15 +208,12 @@ class TaskQueue(BaseModel):
         # Sort pending tasks by priority and creation time
         sorted_tasks = sorted(
             self.pending_tasks,
-            key=lambda t: (
-                _priority_to_value(t.priority),
-                t.created_at
-            ),
-            reverse=True
+            key=lambda t: (_priority_to_value(t.priority), t.created_at),
+            reverse=True,
         )
 
         for task in sorted_tasks:
-            if (task.assigned_to is None or task.assigned_to == agent_personality):
+            if task.assigned_to is None or task.assigned_to == agent_personality:
                 # Check if dependencies are satisfied
                 if self._are_dependencies_satisfied(task):
                     return task
@@ -222,7 +283,12 @@ class TaskQueue(BaseModel):
 
     def get_task_status(self, task_id: str) -> Optional[TaskStatus]:
         """Get the status of a specific task."""
-        for task_list in [self.pending_tasks, self.active_tasks, self.completed_tasks, self.failed_tasks]:
+        for task_list in [
+            self.pending_tasks,
+            self.active_tasks,
+            self.completed_tasks,
+            self.failed_tasks,
+        ]:
             for task in task_list:
                 if task.task_id == task_id:
                     return task.status

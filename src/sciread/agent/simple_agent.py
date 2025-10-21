@@ -9,7 +9,6 @@ from typing import Any
 from typing import Optional
 from typing import Union
 
-from pydantic import BaseModel
 from pydantic_ai import Agent
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -17,16 +16,11 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from ..document.document import Document
 from ..llm_provider import get_model
 from ..logging_config import get_logger
+from .models.simple_models import SimpleAnalysisResult
 from .prompts.simple import DEFAULT_SYSTEM_PROMPT
 from .prompts.simple import build_analysis_prompt
 from .text_utils import clean_academic_text
 from .text_utils import remove_references as remove_references_func
-
-
-class SimpleAnalysisResult(BaseModel):
-    """Result of simple document analysis."""
-
-    report: str
 
 
 class SimpleAgent:
