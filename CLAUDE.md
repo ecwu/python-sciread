@@ -6,6 +6,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 This is a Python package called `sciread` designed to understand papers with LLM-driven agents. It provides comprehensive document processing capabilities including loading academic papers from various formats, intelligent text splitting, and chunk-based processing for LLM analysis.
 
+## When to Use Context7
+
+Always use context7 when I need code generation, setup or configuration steps, or library/API documentation. This means you should automatically use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
+
 ## Common Development Commands
 
 ### Testing

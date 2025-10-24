@@ -5,11 +5,10 @@ using pydantic-ai framework and the existing LLM provider infrastructure.
 """
 
 import asyncio
-from typing import Any
-from typing import Optional
-from typing import Union
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Union
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -21,6 +20,18 @@ from .prompts.simple import DEFAULT_SYSTEM_PROMPT
 from .prompts.simple import build_analysis_prompt
 from .text_utils import clean_academic_text
 from .text_utils import remove_references as remove_references_func
+
+
+@dataclass
+class AnalysisDeps:
+    """Dependencies for SimpleAgent analysis operations."""
+
+    document: Document
+    task_prompt: str
+    include_metadata: bool = True
+    remove_references: bool = True
+    clean_text: bool = True
+    additional_context: Dict[str, Any] = field(default_factory=dict)
 
 
 class SimpleAgent:
@@ -61,14 +72,68 @@ class SimpleAgent:
 
         self.system_prompt = system_prompt or DEFAULT_SYSTEM_PROMPT
 
-        # Create the pydantic-ai agent
+        # Create the pydantic-ai agent with dependencies
         self.agent = Agent(
             model=self.model,
-            system_prompt=self.system_prompt,
+            deps_type=AnalysisDeps,
             retries=max_retries,
         )
 
-        self.logger.info("SimpleAgent initialized successfully")
+        # Add context-aware system prompt
+        @self.agent.system_prompt
+        async def get_system_prompt(ctx: RunContext[AnalysisDeps]) -> str:
+            """Generate system prompt with document context."""
+            deps = ctx.deps
+
+            # Process the document text based on dependencies
+            if deps.document.chunks:
+                text = deps.document.get_full_text()
+            else:
+                text = deps.document.text
+
+            if not text or not text.strip():
+                raise ValueError("Document has no text content to analyze")
+
+            # Process text based on dependencies
+            if deps.remove_references:
+                text = remove_references_func(text)
+                self.logger.debug("Removed reference section from document text")
+
+            if deps.clean_text:
+                text = clean_academic_text(text)
+                self.logger.debug("Cleaned document text for better processing")
+
+            # Build the full prompt
+            document_metadata = None
+            if deps.include_metadata and deps.document:
+                document_metadata = {
+                    "source_path": (
+                        str(deps.document.source_path)
+                        if deps.document.source_path
+                        else None
+                    ),
+                    "title": (
+                        deps.document.metadata.title
+                        if deps.document.metadata.title
+                        else None
+                    ),
+                    "author": (
+                        deps.document.metadata.author
+                        if deps.document.metadata.author
+                        else None
+                    ),
+                }
+
+            full_prompt = build_analysis_prompt(
+                text=text,
+                task_prompt=deps.task_prompt,
+                document_metadata=document_metadata,
+                **deps.additional_context,
+            )
+
+            return f"{self.system_prompt}\n\n{full_prompt}"
+
+        self.logger.debug("SimpleAgent initialized successfully")
 
     async def analyze(
         self,
@@ -92,56 +157,38 @@ class SimpleAgent:
         Returns:
             Generated analysis report as a string
         """
-        self.logger.info(f"Starting document analysis for: {document.source_path or 'text document'}")
-
-        # Get document text
-        if document.chunks:
-            text = document.get_full_text()
-        else:
-            text = document.text
-
-        if not text or not text.strip():
-            self.logger.error("Document has no text content to analyze")
-            raise ValueError("Document has no text content to analyze")
-
-        # Process text
-        if remove_references:
-            text = remove_references_func(text)
-            self.logger.debug("Removed reference section from document text")
-
-        if clean_text:
-            text = clean_academic_text(text)
-            self.logger.debug("Cleaned document text for better processing")
-
-        # Build the full prompt
-        document_metadata = None
-        if include_metadata and document:
-            document_metadata = {
-                "source_path": str(document.source_path) if document.source_path else None,
-                "title": document.metadata.title if document.metadata.title else None,
-                "author": document.metadata.author if document.metadata.author else None,
-            }
-
-        full_prompt = build_analysis_prompt(
-            text=text,
-            task_prompt=task_prompt,
-            document_metadata=document_metadata,
-            **kwargs,
+        self.logger.debug(
+            f"Starting document analysis for: {document.source_path or 'text document'}"
         )
 
-        # Execute analysis
+        # Create dependencies object
+        deps = AnalysisDeps(
+            document=document,
+            task_prompt=task_prompt,
+            include_metadata=include_metadata,
+            remove_references=remove_references,
+            clean_text=clean_text,
+            additional_context=kwargs,
+        )
+
+        # Execute analysis with RunContext
         try:
-            self.logger.info("Executing document analysis with pydantic-ai agent")
             result = await asyncio.wait_for(
-                self.agent.run(full_prompt),
+                self.agent.run("Analyze the document according to the task", deps=deps),
                 timeout=self.timeout,
             )
-            self.logger.info("Document analysis completed successfully")
+            self.logger.info(
+                f"Document analysis completed successfully. Total characters in report: {len(result.output)}"
+            )
             return result.output
 
         except asyncio.TimeoutError as err:
-            self.logger.error(f"Document analysis timed out after {self.timeout} seconds")
-            raise TimeoutError(f"Document analysis timed out after {self.timeout} seconds") from err
+            self.logger.error(
+                f"Document analysis timed out after {self.timeout} seconds"
+            )
+            raise TimeoutError(
+                f"Document analysis timed out after {self.timeout} seconds"
+            ) from err
 
         except Exception as e:
             self.logger.error(f"Document analysis failed: {e}")

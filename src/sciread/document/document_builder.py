@@ -45,7 +45,13 @@ class DocumentBuilder:
         self.ollama_client = ollama_client
         self.mineru_client = mineru_client
 
-    def from_file(self, file_path: Union[str, Path], to_markdown: bool = False, auto_split: bool = True, **split_kwargs) -> "Document":
+    def from_file(
+        self,
+        file_path: Union[str, Path],
+        to_markdown: bool = False,
+        auto_split: bool = True,
+        **split_kwargs,
+    ) -> "Document":
         """
         Create a Document from a file path.
 
@@ -61,7 +67,9 @@ class DocumentBuilder:
         from .document import Document  # Import here to avoid circular imports
 
         path = Path(file_path)
-        self.logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
+        self.logger.debug(
+            f"Creating document from file: {path} (to_markdown={to_markdown})"
+        )
 
         # Initialize default loader if none provided
         if self.loader is None:
@@ -82,14 +90,18 @@ class DocumentBuilder:
 
         # Update processing state
         doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note(f"Document loaded using {self.loader.loader_name}")
+        doc.processing_state.add_note(
+            f"Document loaded using {self.loader.loader_name}"
+        )
 
         # Add any warnings to processing state
         for warning in load_result.warnings:
             doc.processing_state.add_note(f"Warning: {warning}")
             self.logger.warning(f"Document loading warning: {warning}")
 
-        self.logger.info(f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters")
+        self.logger.debug(
+            f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters"
+        )
 
         # Auto-split if requested
         if auto_split:
@@ -98,7 +110,12 @@ class DocumentBuilder:
         return doc
 
     def from_text(
-        self, text: str, metadata: Optional[DocumentMetadata] = None, auto_split: bool = True, is_markdown: bool = False, **split_kwargs
+        self,
+        text: str,
+        metadata: Optional[DocumentMetadata] = None,
+        auto_split: bool = True,
+        is_markdown: bool = False,
+        **split_kwargs,
     ) -> "Document":
         """
         Create a Document from raw text.
@@ -153,7 +170,9 @@ class DocumentBuilder:
 
             raise ValueError(f"Unsupported file format: {suffix}")
 
-    def _split_document(self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs) -> None:
+    def _split_document(
+        self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs
+    ) -> None:
         """
         Split document into chunks.
 
@@ -170,16 +189,18 @@ class DocumentBuilder:
         if active_splitter is None:
             active_splitter = self._create_default_splitter(doc)
 
-        self.logger.info(f"Splitting document using {active_splitter.splitter_name}")
-
         # Split the text
         chunks = active_splitter.split(doc.text)
         doc._chunks = chunks
         doc._split = True
         doc.processing_state.update_timestamp("split")
-        doc.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
+        doc.processing_state.add_note(
+            f"Document split using {active_splitter.splitter_name}"
+        )
 
-        self.logger.info(f"Document split into {len(chunks)} chunks")
+        self.logger.info(
+            f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}"
+        )
 
     def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
         """Create appropriate splitter based on document content."""
