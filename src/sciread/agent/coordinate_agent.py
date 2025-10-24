@@ -13,12 +13,11 @@ duplication and improve maintainability.
 """
 
 import asyncio
-from typing import Any
-from typing import Optional
-from typing import Union
+from dataclasses import dataclass, field
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -54,186 +53,70 @@ from .prompts.coordinate import build_research_questions_analysis_prompt
 from .text_utils import clean_academic_text
 from .text_utils import remove_references as remove_references_func
 
-# Generic expert agent implementation
+
+# Dependency classes for RunContext-based coordination
+
+@dataclass
+class CoordinateDeps:
+    """Main dependencies for coordinate agent analysis."""
+    document: Document
+    custom_plan: Optional[AnalysisPlan] = None
+    max_retries: int = 3
+    timeout: float = 300.0
 
 
-class ExpertAgent:
-    """Generic expert agent that can be configured for different analysis types.
-
-    This replaces the six redundant expert agent classes with a single configurable
-    class that takes system_prompt, output_type, and agent_name as parameters.
-    """
-
-    def __init__(
-        self,
-        agent_name: str,
-        system_prompt: str,
-        output_type: type[BaseModel],
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        max_retries: int = 3,
-        timeout: float = 120.0,
-    ):
-        """Initialize the generic expert agent.
-
-        Args:
-            agent_name: Name identifier for logging (e.g., "metadata_extractor")
-            system_prompt: System prompt defining the agent's expertise and behavior
-            output_type: Pydantic model class for structured output
-            model: Model identifier or instance for the LLM provider
-            max_retries: Maximum number of retries for failed requests
-            timeout: Timeout in seconds for analysis operations
-        """
-        self.logger = get_logger(__name__)
-        self.agent_name = agent_name
-        self.system_prompt = system_prompt
-        self.max_retries = max_retries
-        self.timeout = timeout
-
-        # Initialize model
-        if isinstance(model, str):
-            self.model = get_model(model)
-            self.model_identifier = model
-        else:
-            self.model = model
-            self.model_identifier = getattr(model, "model_name", "unknown")
-
-        # Create the pydantic-ai agent with provided configuration
-        self.agent = Agent(
-            model=self.model,
-            system_prompt=system_prompt,
-            output_type=output_type,
-            retries=self.max_retries,
-        )
-
-        self.logger.info(
-            f"Initialized {agent_name} agent with model: {self.model_identifier}"
-        )
-
-    def _log_interaction(self, prompt: str, output: str, error: Optional[str] = None):
-        """Log interaction for this agent using debug logging."""
-
-        prompt_length = len(prompt)
-        output_length = len(output) if output else 0
-
-        # Log detailed debug information
-        if error:
-            self.logger.debug(f"[{self.agent_name}] ERROR: {error}")
-
-        # Log prompt preview (first 200 chars)
-        prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-        self.logger.debug(
-            f"[{self.agent_name}] Prompt ({prompt_length} chars): {prompt_preview}"
-        )
-
-        # Log output preview (first 200 chars)
-        if output:
-            output_preview = output[:200] + "..." if len(output) > 200 else output
-            self.logger.debug(
-                f"[{self.agent_name}] Output ({output_length} chars): {output_preview}"
-            )
-        else:
-            self.logger.debug(f"[{self.agent_name}] No output generated")
-
-    async def analyze(
-        self,
-        content: str,
-        remove_references: bool = True,
-        clean_text: bool = True,
-    ) -> BaseModel:
-        """Analyze content using the agent's specific expertise.
-
-        Args:
-            content: Text content to analyze (decoupled from Document object)
-            remove_references: Whether to remove references section
-            clean_text: Whether to clean academic text
-
-        Returns:
-            Structured result as defined by the agent's output_type
-        """
-        self.logger.info(f"Starting {self.agent_name} analysis")
-
-        if not content or not content.strip():
-            raise ValueError("No content provided for analysis")
-
-        # Process text
-        if remove_references:
-            content = remove_references_func(content)
-
-        if clean_text:
-            content = clean_academic_text(content)
-
-        # Build prompt with the agent's specific analysis focus
-        prompt = self._build_analysis_prompt(content)
-
-        try:
-            result = await asyncio.wait_for(
-                self.agent.run(prompt),
-                timeout=self.timeout,
-            )
-            self.logger.info(f"{self.agent_name} analysis completed successfully")
-            self._log_interaction(prompt, str(result.output))
-            return result.output
-
-        except asyncio.TimeoutError:
-            self.logger.error(
-                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
-            )
-            self._log_interaction(prompt, "", f"TimeoutError: {self.timeout} seconds")
-            raise TimeoutError(
-                f"{self.agent_name} analysis timed out after {self.timeout} seconds"
-            ) from None
-
-        except Exception as e:
-            self.logger.error(f"{self.agent_name} analysis failed: {e}")
-            self._log_interaction(prompt, "", str(e))
-            raise
-
-    def _build_analysis_prompt(self, content: str) -> str:
-        """Build the analysis prompt (can be overridden for custom prompts)."""
-        return build_generic_analysis_prompt(content)
+@dataclass
+class ExpertAgentDeps:
+    """Dependencies for individual expert agents."""
+    document: Document
+    analysis_type: str
+    sections_to_analyze: list[str] = field(default_factory=list)
+    analysis_plan: Optional[AnalysisPlan] = None
 
 
-# Agent configuration definitions
+@dataclass
+class SynthesisDeps:
+    """Dependencies for report synthesis."""
+    document: Document
+    analysis_plan: AnalysisPlan
+    sub_agent_results: dict[str, Any]
+    paper_title: str = ""
 
 
-AGENT_CONFIGS = {
+# Expert agent configuration for RunContext-based execution
+
+EXPERT_AGENT_CONFIG = {
     "metadata": {
-        "agent_name": "metadata_extractor",
         "system_prompt": METADATA_EXTRACTION_SYSTEM_PROMPT,
         "output_type": MetadataExtractionResult,
         "timeout": 60.0,
         "prompt_builder": build_metadata_analysis_prompt,
     },
     "previous_methods": {
-        "agent_name": "previous_methods",
         "system_prompt": PREVIOUS_METHODS_SYSTEM_PROMPT,
         "output_type": PreviousMethodsResult,
         "timeout": 120.0,
         "prompt_builder": build_previous_methods_analysis_prompt,
     },
     "research_questions": {
-        "agent_name": "research_questions",
         "system_prompt": RESEARCH_QUESTIONS_SYSTEM_PROMPT,
         "output_type": ResearchQuestionsResult,
         "timeout": 120.0,
         "prompt_builder": build_research_questions_analysis_prompt,
     },
     "methodology": {
-        "agent_name": "methodology",
         "system_prompt": METHODOLOGY_SYSTEM_PROMPT,
         "output_type": MethodologyResult,
         "timeout": 120.0,
         "prompt_builder": build_methodology_analysis_prompt,
     },
     "experiments": {
-        "agent_name": "experiments",
         "system_prompt": EXPERIMENTS_SYSTEM_PROMPT,
         "output_type": ExperimentResult,
         "timeout": 120.0,
         "prompt_builder": build_experiments_analysis_prompt,
     },
     "future_directions": {
-        "agent_name": "future_directions",
         "system_prompt": FUTURE_DIRECTIONS_SYSTEM_PROMPT,
         "output_type": FutureDirectionsResult,
         "timeout": 120.0,
@@ -283,47 +166,90 @@ class CoordinateAgent:
             f"Initialized CoordinateAgent controller with model: {self.model_identifier}"
         )
 
-        # Controller agent for planning and synthesis
-        controller_instructions = CONTROLLER_INSTRUCTIONS
-
-        self.controller_agent = Agent(
+        # Create main coordinate agent with dependencies and structured output
+        self.coordinate_agent = Agent(
             model=self.model,
-            instructions=controller_instructions,
+            deps_type=CoordinateDeps,
             output_type=AnalysisPlan,
             retries=self.max_retries,
         )
 
+        # Add context-aware planning system prompt
+        @self.coordinate_agent.system_prompt
+        async def planning_system_prompt(ctx: RunContext[CoordinateDeps]) -> str:
+            """Generate system prompt for analysis planning."""
+            deps = ctx.deps
+
+            # Simple abstract extraction for now
+            abstract = ""
+            if deps.document.chunks:
+                # Look for abstract in first few chunks
+                for chunk in deps.document.chunks[:3]:
+                    if chunk.content and ("abstract" in chunk.content.lower()[:200]):
+                        abstract = chunk.content[:500]
+                        break
+                if not abstract and deps.document.chunks:
+                    abstract = deps.document.chunks[0].content[:500]
+
+            section_names = deps.document.get_section_names()
+
+            # Build planning prompt and combine with controller instructions
+            planning_prompt = build_analysis_planning_prompt(abstract, section_names)
+            return f"{CONTROLLER_INSTRUCTIONS}\n\n{planning_prompt}"
+
         self.logger.debug("CoordinateAgent controller initialized successfully")
 
-    def _create_expert_agent(self, analysis_type: str) -> ExpertAgent:
-        """Create an expert agent instance based on configuration.
+    def _create_expert_agent(self, analysis_type: str) -> Agent[ExpertAgentDeps, BaseModel]:
+        """Create an expert agent instance using RunContext.
 
         Args:
             analysis_type: Type of analysis (e.g., "metadata", "methodology")
 
         Returns:
-            Configured ExpertAgent instance
+            Configured Agent instance with RunContext
         """
-        if analysis_type not in AGENT_CONFIGS:
+        if analysis_type not in EXPERT_AGENT_CONFIG:
             raise ValueError(f"Unknown analysis type: {analysis_type}")
 
-        config = AGENT_CONFIGS[analysis_type]
+        config = EXPERT_AGENT_CONFIG[analysis_type]
 
-        # Override the default _build_analysis_prompt method if custom prompt builder provided
-        class ConfiguredExpertAgent(ExpertAgent):
-            def _build_analysis_prompt(self, content: str) -> str:
-                if "prompt_builder" in config:
-                    return config["prompt_builder"](content)
-                return super()._build_analysis_prompt(content)
-
-        agent = ConfiguredExpertAgent(
-            agent_name=config["agent_name"],
-            system_prompt=config["system_prompt"],
-            output_type=config["output_type"],
+        # Create expert agent with RunContext support
+        agent = Agent(
             model=self.model,
-            max_retries=self.max_retries,
-            timeout=config["timeout"],
+            deps_type=ExpertAgentDeps,
+            output_type=config["output_type"],
+            retries=self.max_retries,
         )
+
+        # Add context-aware system prompt
+        @agent.system_prompt
+        async def expert_system_prompt(ctx: RunContext[ExpertAgentDeps]) -> str:
+            """Generate system prompt for expert analysis."""
+            deps = ctx.deps
+
+            # Extract content for analysis
+            if deps.sections_to_analyze:
+                # Use specific sections
+                content_parts = []
+                for section_name in deps.sections_to_analyze:
+                    sections = deps.document.get_sections_by_name([section_name])
+                    if sections:
+                        content_parts.extend([section.content for section in sections])
+                content = "\n\n".join(content_parts)
+            else:
+                # Use full document
+                content = deps.document.get_full_text()
+
+            # Process content
+            if content:
+                content = remove_references_func(content)
+                content = clean_academic_text(content)
+
+            # Build analysis prompt using the appropriate prompt builder
+            if "prompt_builder" in config:
+                return config["prompt_builder"](content)
+            else:
+                return build_generic_analysis_prompt(content)
 
         return agent
 
@@ -584,17 +510,20 @@ class CoordinateAgent:
         return ""
 
     async def plan_analysis(
-        self, abstract: str, section_names: list[str]
+        self, document: Document, section_names: list[str]
     ) -> AnalysisPlan:
-        """Plan which sub-agents to use based on abstract analysis and available sections.
+        """Plan which sub-agents to use based on document analysis and available sections.
 
         Args:
-            abstract: Abstract text to analyze (may be actual abstract or first chunks of document)
+            document: Document to analyze
             section_names: List of available sections in the document
 
         Returns:
             AnalysisPlan with selected sub-agents, sections, and reasoning
         """
+        # Extract abstract from document
+        abstract = self.extract_abstract(document)
+
         self.logger.info(
             f"Planning analysis based on abstract ({len(abstract) if abstract else 0} chars) and {len(section_names)} available sections"
         )
@@ -626,9 +555,12 @@ class CoordinateAgent:
             )
             self.logger.debug(f"Controller agent model: {self.model_identifier}")
 
-            # Run the controller agent to generate analysis plan
+            # Create dependencies for planning
+            deps = CoordinateDeps(document=document)
+
+            # Run the coordinate agent to generate analysis plan
             result = await asyncio.wait_for(
-                self.controller_agent.run(prompt),
+                self.coordinate_agent.run("Generate analysis plan", deps=deps),
                 timeout=self.timeout,
             )
 
@@ -776,17 +708,11 @@ class CoordinateAgent:
         # Dynamically create and dispatch tasks based on analysis plan
         for plan_field, agent_key, result_key, sections_field in analysis_tasks:
             if getattr(analysis_plan, plan_field):
-                # Determine content for analysis
+                # Determine sections for analysis
                 if agent_key == "metadata":
                     # Special case: metadata uses first 3 chunks
-                    metadata_chunks = (
-                        document.chunks[:3]
-                        if len(document.chunks) >= 3
-                        else document.chunks
-                    )
-                    content = " ".join([chunk.content for chunk in metadata_chunks])
                     sections_analyzed[result_key] = [
-                        f"First {len(metadata_chunks)} chunks"
+                        f"First {min(3, len(document.chunks))} chunks"
                     ]
                 else:
                     # Use planned sections or full document
@@ -794,20 +720,12 @@ class CoordinateAgent:
                     if sections:
                         # Deduplicate sections within this agent
                         deduplicated_sections = self._deduplicate_sections(sections)
-                        filtered_chunks = document.get_sections_by_name(
-                            deduplicated_sections
-                        )
-                        content = " ".join([chunk.content for chunk in filtered_chunks])
                         sections_analyzed[result_key] = deduplicated_sections
                         self.logger.debug(
                             f"{agent_key} agent using specific sections: {deduplicated_sections}"
                         )
                     else:
-                        # Use full document content
-                        if document.chunks:
-                            content = document.get_full_text()
-                        else:
-                            content = document.text
+                        # Use all sections
                         sections_analyzed[result_key] = ["All sections"]
                         self.logger.warning(
                             f"{agent_key} agent: No sections specified, using 'All sections' fallback. This may result in less focused analysis."
@@ -815,9 +733,17 @@ class CoordinateAgent:
 
                 # Create agent and task dynamically
                 agent = self._create_expert_agent(agent_key)
+
+                # Create dependencies for this expert agent
+                expert_deps = ExpertAgentDeps(
+                    document=document,
+                    analysis_type=agent_key,
+                    sections_to_analyze=sections_analyzed[result_key] if result_key in sections_analyzed else [],
+                )
+
                 task = asyncio.create_task(
                     self._safe_execute_agent(
-                        agent.analyze(content),
+                        agent.run("Execute expert analysis", deps=expert_deps),
                         agent_key,
                     )
                 )
@@ -855,7 +781,9 @@ class CoordinateAgent:
     async def _safe_execute_agent(self, coro, agent_name: str):
         """Safely execute an agent with error handling."""
         try:
-            return await coro
+            result = await coro
+            # Extract the actual output from AgentRunResult
+            return result.output
         except Exception as e:
             self.logger.error(f"Agent {agent_name} execution failed: {e}")
             raise
@@ -866,7 +794,7 @@ class CoordinateAgent:
         sub_agent_results: dict[str, Any],
         document: Document,
     ) -> str:
-        """Synthesize final comprehensive report from sub-agent results.
+        """Synthesize final comprehensive report from sub-agent results using RunContext.
 
         Args:
             analysis_plan: The analysis plan that was executed
@@ -876,10 +804,7 @@ class CoordinateAgent:
         Returns:
             Comprehensive synthesized report
         """
-        self.logger.info("Synthesizing final report from sub-agent results")
-        self.logger.debug(
-            f"synthesize_report received sub_agent_results type: {type(sub_agent_results)}"
-        )
+        self.logger.info("Synthesizing final report from sub-agent results using RunContext")
         if not isinstance(sub_agent_results, dict):
             self.logger.error(
                 f"ERROR: sub_agent_results is not a dict! Type: {type(sub_agent_results)}, Content: {str(sub_agent_results)[:500]}"
@@ -1085,15 +1010,12 @@ class CoordinateAgent:
             section_names = document.get_section_names()
             self.logger.debug(f"Found {len(section_names)} sections: {section_names}")
 
-            # Step 2: Extract abstract
-            abstract = self.extract_abstract(document)
-
-            # Step 3: Plan analysis (use custom plan if provided)
+            # Step 2: Plan analysis (use custom plan if provided)
             if custom_plan:
                 analysis_plan = custom_plan
                 self.logger.info("Using custom analysis plan")
             else:
-                analysis_plan = await self.plan_analysis(abstract, section_names)
+                analysis_plan = await self.plan_analysis(document, section_names)
                 self.logger.info("Generated automatic analysis plan")
 
             # Step 4: Display and log the plan
