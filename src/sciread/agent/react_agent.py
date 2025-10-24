@@ -5,9 +5,11 @@ iterative document analysis using pydantic-ai framework.
 """
 
 import traceback
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import List
 
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 
 from ..document import Document
 from ..llm_provider import get_model
@@ -19,10 +21,26 @@ from .prompts.react import format_agent_prompt
 logger = get_logger(__name__)
 
 
+@dataclass
+class ReActDeps:
+    """Dependencies for ReActAgent iterative analysis."""
+
+    document: Document
+    task: str
+    max_loops: int = 8
+    show_progress: bool = True
+    current_sections: List[str] = field(default_factory=list)
+    processed_sections: List[str] = field(default_factory=list)
+    current_report: str = ""
+    loop_count: int = 0
+
+
 # ReAct agent implementation
 
 
-def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
+def load_and_process_document(
+    file_path: str | Path, to_markdown: bool = True
+) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -38,7 +56,9 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
+    logger.info(
+        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
+    )
     logger.info(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -118,13 +138,20 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{chunk.content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.info(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
+    logger.debug(
+        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
+    )
 
     return combined_content
 
 
 def analyze_document_with_react(
-    document_file: str, task: str, model: str = "deepseek-chat", max_loops: int = 8, to_markdown: bool = True, show_progress: bool = True
+    document_file: str,
+    task: str,
+    model: str = "deepseek-chat",
+    max_loops: int = 8,
+    to_markdown: bool = True,
+    show_progress: bool = True,
 ) -> str:
     """Analyze a document using the ReAct agent.
 
@@ -145,7 +172,9 @@ def analyze_document_with_react(
     """
     logger.info(f"Starting ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
+    logger.info(
+        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
+    )
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -158,7 +187,7 @@ def analyze_document_with_react(
     agent = ReActAgent(model=model, max_loops=max_loops)
     result = agent.analyze_document(document, task, show_progress=show_progress)
 
-    logger.info("ReAct analysis completed successfully!")
+    logger.debug("ReAct analysis completed successfully!")
     return result
 
 
@@ -182,57 +211,49 @@ class ReActAgent:
         self.model = get_model(model)
         self.model_identifier = model
 
-        # State management
-        self.current_report = ""
-        self.processed_sections: list[str] = []
-        self.loop_count = 0
-
-        # Create the pydantic-ai agent
-        self.agent = self._create_agent()
-
-        self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
-
-    def _format_agent_prompt(
-        self,
-        task: str,
-        available_sections: list[str],
-        status: str,
-        section_content: str,
-        current_report: str,
-        processed_sections: list[str],
-    ) -> str:
-        """Format the agent prompt with all necessary information.
-
-        Args:
-            task: The original analysis task
-            available_sections: List of all available section names
-            status: Current status summary
-            section_content: Content of sections to analyze
-            current_report: Current cumulative report
-            processed_sections: List of already processed sections
-
-        Returns:
-            Formatted prompt string for the agent
-        """
-        return format_agent_prompt(
-            task=task,
-            available_sections=available_sections,
-            status=status,
-            section_content=section_content,
-            current_report=current_report,
-            processed_sections=processed_sections,
-        )
-
-    def _create_agent(self) -> Agent[str, ReActAgentOutput]:
-        """Create and configure the pydantic-ai agent for ReAct analysis."""
-        return Agent(
+        # Create the pydantic-ai agent with dependencies
+        self.agent = Agent(
             model=self.model,
-            system_prompt=SYSTEM_PROMPT,
+            deps_type=ReActDeps,
             output_type=ReActAgentOutput,
         )
 
-    def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> str:
-        """Main analysis method that orchestrates the ReAct loop.
+        # Add context-aware system prompt
+        @self.agent.system_prompt
+        async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
+            """Generate system prompt with current analysis state."""
+            deps = ctx.deps
+
+            # Format status summary
+            status = (
+                f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
+            )
+
+            # Get content for current sections
+            section_content = ""
+            if deps.current_sections:
+                section_content = get_section_content(
+                    deps.document, deps.current_sections
+                )
+
+            # Format the agent prompt with all necessary information
+            return format_agent_prompt(
+                task=deps.task,
+                available_sections=deps.document.get_section_names(),
+                status=status,
+                section_content=section_content,
+                current_report=deps.current_report,
+                processed_sections=deps.processed_sections.copy(),
+            )
+
+        self.logger.info(
+            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
+        )
+
+    def analyze_document(
+        self, document: Document, task: str, show_progress: bool = True
+    ) -> str:
+        """Main analysis method that orchestrates the ReAct loop using RunContext.
 
         Args:
             document: Processed document with natural markdown sections
@@ -244,121 +265,104 @@ class ReActAgent:
         """
         self.logger.info(f"Starting ReAct analysis for task: {task[:100]}...")
 
-        # Reset state
-        self.current_report = ""
-        self.processed_sections = []
-        self.loop_count = 0
+        # Create dependencies with initial state
+        deps = ReActDeps(
+            document=document,
+            task=task,
+            max_loops=self.max_loops,
+            show_progress=show_progress,
+            current_sections=get_initial_sections(document),
+        )
 
-        # Get initial sections (abstract + introduction)
-        current_sections = get_initial_sections(document)
+        # Main ReAct loop with RunContext
+        while deps.loop_count < deps.max_loops:
+            deps.loop_count += 1
 
-        # Main ReAct loop
-        while self.loop_count < self.max_loops:
-            self.loop_count += 1
-
-            # Get content for current sections
-            section_content = get_section_content(document, current_sections)
-
-            # Format status summary
-            status = format_status_summary("Analyzing sections", self.loop_count, self.max_loops)
-
-            # Prepare input for the agent as a formatted string
-            input_prompt = self._format_agent_prompt(
-                task=task,
-                available_sections=document.get_section_names(),
-                status=status,
-                section_content=section_content,
-                current_report=self.current_report,
-                processed_sections=self.processed_sections.copy(),
+            self.logger.info(
+                f"Loop {deps.loop_count}/{deps.max_loops}: Analyzing sections: {deps.current_sections}"
             )
 
-            self.logger.info(f"Loop {self.loop_count}/{self.max_loops}: Analyzing sections: {current_sections}")
-
-            # Run the agent
             try:
-                self.logger.debug("Running agent with string prompt")
-                result = self.agent.run_sync(input_prompt)
-                self.logger.debug(f"Agent result type: {type(result)}")
-                # Access the structured output from AgentRunResult
+                # Run the agent with current dependencies
+                self.logger.debug("Running agent with RunContext")
+                result = self.agent.run_sync("Execute analysis iteration", deps=deps)
                 agent_output = result.output
 
-                self.logger.debug(f"Agent response: should_stop={agent_output.should_stop}, next_sections={agent_output.next_sections}")
-            except Exception as e:
-                self.logger.error(f"Agent execution failed in loop {self.loop_count}: {e}")
-                self.logger.error(f"Exception type: {type(e)}")
+                self.logger.debug(
+                    f"Agent response: should_stop={agent_output.should_stop}, next_sections={agent_output.next_sections}"
+                )
 
+                # Print reasoning for this iteration if show_progress is enabled
+                if deps.show_progress:
+                    print(f"\n--- Loop {deps.loop_count}/{deps.max_loops} ---")
+                    print(f"Sections analyzed: {', '.join(deps.current_sections)}")
+                    print(f"Reasoning: {agent_output.reasoning}")
+                    if agent_output.should_stop:
+                        print("Decision: STOP - Analysis complete")
+                    else:
+                        print(
+                            f"Next sections to read: {', '.join(agent_output.next_sections) if agent_output.next_sections else 'None'}"
+                        )
+                    print("-" * 50)
+
+                # Update state directly in dependencies
+                if agent_output.report_section.strip():
+                    if deps.current_report:
+                        deps.current_report += "\n\n"
+                    deps.current_report += agent_output.report_section
+
+                # Mark sections as processed
+                for section in deps.current_sections:
+                    if section not in deps.processed_sections:
+                        deps.processed_sections.append(section)
+
+                # Check if agent wants to stop
+                if agent_output.should_stop:
+                    self.logger.info(
+                        f"Agent chose to stop after loop {deps.loop_count}: {agent_output.reasoning}"
+                    )
+                    break
+
+                # Determine next sections
+                next_sections = [
+                    s
+                    for s in agent_output.next_sections
+                    if s not in deps.processed_sections
+                ]
+
+                if not next_sections:
+                    self.logger.info(
+                        "No new sections to analyze (all selected sections already processed)"
+                    )
+                    break
+
+                deps.current_sections = next_sections
+
+            except Exception as e:
+                self.logger.error(
+                    f"Agent execution failed in loop {deps.loop_count}: {e}"
+                )
+                self.logger.error(f"Exception type: {type(e)}")
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break
 
-            # Print reasoning for this iteration if show_progress is enabled
-            if show_progress:
-                print(f"\n--- Loop {self.loop_count}/{self.max_loops} ---")
-                print(f"Sections analyzed: {', '.join(current_sections)}")
-                print(f"Reasoning: {agent_output.reasoning}")
-                if agent_output.should_stop:
-                    print("Decision: STOP - Analysis complete")
-                else:
-                    print(f"Next sections to read: {', '.join(agent_output.next_sections) if agent_output.next_sections else 'None'}")
-                print("-" * 50)
-
-            # Update state
-            self._update_state(agent_output, current_sections)
-
-            # Check if agent wants to stop
-            if agent_output.should_stop:
-                self.logger.info(f"Agent chose to stop after loop {self.loop_count}: {agent_output.reasoning}")
-                break
-
-            # Determine next sections
-            next_sections = agent_output.next_sections
-
-            # Filter out already processed sections
-            next_sections = [s for s in next_sections if s not in self.processed_sections]
-
-            if not next_sections:
-                self.logger.info("No new sections to analyze (all selected sections already processed)")
-                break
-
-            current_sections = next_sections
-
-        self.logger.info(f"ReAct analysis completed after {self.loop_count} loops")
+        self.logger.info(f"ReAct analysis completed after {deps.loop_count} loops")
 
         # Log and print the final report
-        if self.current_report:
-            self.logger.info("Final analysis report generated")
-            self.logger.info(f"Report length: {len(self.current_report)} characters")
+        if deps.current_report:
+            self.logger.info(f"Report length: {len(deps.current_report)} characters")
 
             # Print the final report to console
             print("\n" + "=" * 80)
             print("FINAL ANALYSIS REPORT")
             print("=" * 80)
-            print(self.current_report)
+            print(deps.current_report)
             print("=" * 80)
         else:
             self.logger.warning("No final report generated")
             print("\nWarning: No analysis report was generated")
 
-        return self.current_report
-
-    def _update_state(self, agent_output: ReActAgentOutput, current_sections: list[str]) -> None:
-        """Update agent state after each iteration.
-
-        Args:
-            agent_output: Output from the agent
-            current_sections: Sections that were just analyzed
-        """
-        # Add new content to the report
-        if agent_output.report_section.strip():
-            if self.current_report:
-                self.current_report += "\n\n"
-            self.current_report += agent_output.report_section
-
-        # Mark sections as processed
-        for section in current_sections:
-            if section not in self.processed_sections:
-                self.processed_sections.append(section)
-
-        self.logger.debug(f"State updated: processed sections={self.processed_sections}, report length={len(self.current_report)}")
+        return deps.current_report
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""
