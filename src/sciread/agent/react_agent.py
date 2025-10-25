@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, ModelRetry
 
 from ..document import Document
 from ..llm_provider import get_model
@@ -29,6 +29,16 @@ class ReActDeps:
     task: str
     max_loops: int = 8
     show_progress: bool = True
+    current_sections: List[str] = field(default_factory=list)
+    processed_sections: List[str] = field(default_factory=list)
+    current_report: str = ""
+    loop_count: int = 0
+
+
+@dataclass
+class ReActState:
+    """State management for ReAct analysis using message history."""
+
     current_sections: List[str] = field(default_factory=list)
     processed_sections: List[str] = field(default_factory=list)
     current_report: str = ""
@@ -196,7 +206,7 @@ class ReActAgent:
 
     This agent implements the Reasoning and Acting pattern to analyze documents
     by iteratively reading sections, making decisions about what to read next,
-    and building a comprehensive report.
+    and building a comprehensive report using native message history.
     """
 
     def __init__(self, model: str = "deepseek-chat", max_loops: int = 8):
@@ -211,14 +221,14 @@ class ReActAgent:
         self.model = get_model(model)
         self.model_identifier = model
 
-        # Create the pydantic-ai agent with dependencies
+        # Create the pydantic-ai agent with dependencies and structured output
         self.agent = Agent(
             model=self.model,
             deps_type=ReActDeps,
             output_type=ReActAgentOutput,
         )
 
-        # Add context-aware system prompt
+        # Add context-aware system prompt with better error handling
         @self.agent.system_prompt
         async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
             """Generate system prompt with current analysis state."""
@@ -235,6 +245,11 @@ class ReActAgent:
                 section_content = get_section_content(
                     deps.document, deps.current_sections
                 )
+                if not section_content.strip():
+                    raise ModelRetry(
+                        f"No content found for sections: {deps.current_sections}. "
+                        "Please select different sections or provide more specific guidance."
+                    )
 
             # Format the agent prompt with all necessary information
             return format_agent_prompt(
@@ -253,7 +268,7 @@ class ReActAgent:
     def analyze_document(
         self, document: Document, task: str, show_progress: bool = True
     ) -> str:
-        """Main analysis method that orchestrates the ReAct loop using RunContext.
+        """Main analysis method that orchestrates the ReAct loop using native message history.
 
         Args:
             document: Processed document with natural markdown sections
@@ -265,27 +280,39 @@ class ReActAgent:
         """
         self.logger.info(f"Starting ReAct analysis for task: {task[:100]}...")
 
-        # Create dependencies with initial state
-        deps = ReActDeps(
-            document=document,
-            task=task,
-            max_loops=self.max_loops,
-            show_progress=show_progress,
-            current_sections=get_initial_sections(document),
-        )
+        # Initialize analysis state
+        state = ReActState()
+        state.current_sections = get_initial_sections(document)
+        message_history = []
 
-        # Main ReAct loop with RunContext
-        while deps.loop_count < deps.max_loops:
-            deps.loop_count += 1
+        # Main ReAct loop with message history
+        while state.loop_count < self.max_loops:
+            state.loop_count += 1
 
             self.logger.info(
-                f"Loop {deps.loop_count}/{deps.max_loops}: Analyzing sections: {deps.current_sections}"
+                f"Loop {state.loop_count}/{self.max_loops}: Analyzing sections: {state.current_sections}"
             )
 
             try:
-                # Run the agent with current dependencies
-                self.logger.debug("Running agent with RunContext")
-                result = self.agent.run_sync("Execute analysis iteration", deps=deps)
+                # Create dependencies for this iteration
+                deps = ReActDeps(
+                    document=document,
+                    task=task,
+                    max_loops=self.max_loops,
+                    show_progress=show_progress,
+                    current_sections=state.current_sections,
+                    processed_sections=state.processed_sections,
+                    current_report=state.current_report,
+                    loop_count=state.loop_count,
+                )
+
+                # Run the agent with message history for context persistence
+                self.logger.debug("Running agent with message history")
+                result = self.agent.run_sync(
+                    "Execute analysis iteration",
+                    deps=deps,
+                    message_history=message_history
+                )
                 agent_output = result.output
 
                 self.logger.debug(
@@ -293,9 +320,9 @@ class ReActAgent:
                 )
 
                 # Print reasoning for this iteration if show_progress is enabled
-                if deps.show_progress:
-                    print(f"\n--- Loop {deps.loop_count}/{deps.max_loops} ---")
-                    print(f"Sections analyzed: {', '.join(deps.current_sections)}")
+                if show_progress:
+                    print(f"\n--- Loop {state.loop_count}/{self.max_loops} ---")
+                    print(f"Sections analyzed: {', '.join(state.current_sections)}")
                     print(f"Reasoning: {agent_output.reasoning}")
                     if agent_output.should_stop:
                         print("Decision: STOP - Analysis complete")
@@ -305,21 +332,24 @@ class ReActAgent:
                         )
                     print("-" * 50)
 
-                # Update state directly in dependencies
+                # Update state
                 if agent_output.report_section.strip():
-                    if deps.current_report:
-                        deps.current_report += "\n\n"
-                    deps.current_report += agent_output.report_section
+                    if state.current_report:
+                        state.current_report += "\n\n"
+                    state.current_report += agent_output.report_section
 
                 # Mark sections as processed
-                for section in deps.current_sections:
-                    if section not in deps.processed_sections:
-                        deps.processed_sections.append(section)
+                for section in state.current_sections:
+                    if section not in state.processed_sections:
+                        state.processed_sections.append(section)
+
+                # Update message history with this iteration
+                message_history.extend(result.new_messages())
 
                 # Check if agent wants to stop
                 if agent_output.should_stop:
                     self.logger.info(
-                        f"Agent chose to stop after loop {deps.loop_count}: {agent_output.reasoning}"
+                        f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}"
                     )
                     break
 
@@ -327,7 +357,7 @@ class ReActAgent:
                 next_sections = [
                     s
                     for s in agent_output.next_sections
-                    if s not in deps.processed_sections
+                    if s not in state.processed_sections
                 ]
 
                 if not next_sections:
@@ -336,33 +366,33 @@ class ReActAgent:
                     )
                     break
 
-                deps.current_sections = next_sections
+                state.current_sections = next_sections
 
             except Exception as e:
                 self.logger.error(
-                    f"Agent execution failed in loop {deps.loop_count}: {e}"
+                    f"Agent execution failed in loop {state.loop_count}: {e}"
                 )
                 self.logger.error(f"Exception type: {type(e)}")
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break
 
-        self.logger.info(f"ReAct analysis completed after {deps.loop_count} loops")
+        self.logger.info(f"ReAct analysis completed after {state.loop_count} loops")
 
         # Log and print the final report
-        if deps.current_report:
-            self.logger.info(f"Report length: {len(deps.current_report)} characters")
+        if state.current_report:
+            self.logger.info(f"Report length: {len(state.current_report)} characters")
 
             # Print the final report to console
             print("\n" + "=" * 80)
             print("FINAL ANALYSIS REPORT")
             print("=" * 80)
-            print(deps.current_report)
+            print(state.current_report)
             print("=" * 80)
         else:
             self.logger.warning("No final report generated")
             print("\nWarning: No analysis report was generated")
 
-        return deps.current_report
+        return state.current_report
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""

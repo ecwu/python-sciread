@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from typing import Any, Optional, Union
 
 from pydantic import BaseModel
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, ModelRetry
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -174,7 +174,7 @@ class CoordinateAgent:
             retries=self.max_retries,
         )
 
-        # Add context-aware planning system prompt
+        # Add context-aware planning system prompt with better error handling
         @self.coordinate_agent.system_prompt
         async def planning_system_prompt(ctx: RunContext[CoordinateDeps]) -> str:
             """Generate system prompt for analysis planning."""
@@ -192,6 +192,13 @@ class CoordinateAgent:
                     abstract = deps.document.chunks[0].content[:500]
 
             section_names = deps.document.get_section_names()
+
+            # Validate document has content
+            if not abstract and not section_names:
+                raise ModelRetry(
+                    "Document appears to have no extractable content or sections. "
+                    "Please ensure the document is properly processed and contains readable text."
+                )
 
             # Build planning prompt and combine with controller instructions
             planning_prompt = build_analysis_planning_prompt(abstract, section_names)
@@ -221,7 +228,7 @@ class CoordinateAgent:
             retries=self.max_retries,
         )
 
-        # Add context-aware system prompt
+        # Add context-aware system prompt with better error handling
         @agent.system_prompt
         async def expert_system_prompt(ctx: RunContext[ExpertAgentDeps]) -> str:
             """Generate system prompt for expert analysis."""
@@ -240,10 +247,23 @@ class CoordinateAgent:
                 # Use full document
                 content = deps.document.get_full_text()
 
+            # Validate content is available
+            if not content or not content.strip():
+                raise ModelRetry(
+                    f"No content found for {deps.analysis_type} analysis. "
+                    "Please check document sections and try again."
+                )
+
             # Process content
-            if content:
-                content = remove_references_func(content)
-                content = clean_academic_text(content)
+            content = remove_references_func(content)
+            content = clean_academic_text(content)
+
+            # Validate processed content
+            if not content or not content.strip():
+                raise ModelRetry(
+                    f"Content processing failed for {deps.analysis_type} analysis. "
+                    "The document may lack substantial content after processing."
+                )
 
             # Build analysis prompt using the appropriate prompt builder
             if "prompt_builder" in config:
@@ -794,7 +814,7 @@ class CoordinateAgent:
         sub_agent_results: dict[str, Any],
         document: Document,
     ) -> str:
-        """Synthesize final comprehensive report from sub-agent results using RunContext.
+        """Synthesize final comprehensive report from sub-agent results using native patterns.
 
         Args:
             analysis_plan: The analysis plan that was executed
@@ -804,7 +824,7 @@ class CoordinateAgent:
         Returns:
             Comprehensive synthesized report
         """
-        self.logger.info("Synthesizing final report from sub-agent results using RunContext")
+        self.logger.info("Synthesizing final report from sub-agent results using native patterns")
         if not isinstance(sub_agent_results, dict):
             self.logger.error(
                 f"ERROR: sub_agent_results is not a dict! Type: {type(sub_agent_results)}, Content: {str(sub_agent_results)[:500]}"
@@ -824,91 +844,33 @@ class CoordinateAgent:
                 if hasattr(metadata_result, "title") and metadata_result.title:
                     paper_title = metadata_result.title
 
-        # Build synthesis prompt with structured format requirements
-        prompt_parts = [
-            "You are an expert academic research analyst tasked with creating a comprehensive, coherent report from multiple expert analyses of an academic paper.",
-            "",
-            "REPORT STRUCTURE REQUIREMENTS:",
-            "1. Title: Always start with the exact paper title followed by ' - Comprehensive Report'",
-            "2. Metadata Section: Include a clear metadata section with article information in list or table format",
-            "3. Content Sections: Create well-organized content sections based on the available analyses",
-            "4. Focus: Write directly about the paper content without mentioning agents, tools, or analysis processes",
-            "",
-            "PAPER INFORMATION:",
-            f"Paper Title: {paper_title}",
-            f"Source: {document.source_path or 'text document'}",
+        # Validate we have successful analyses to synthesize
+        successful_analyses = [
+            name for name, result in sub_agent_results.items()
+            if result.get("success", False) and name != "_sections_analyzed"
         ]
 
-        abstract = self.extract_abstract(document)
-        if abstract:
-            prompt_parts.append(f"Abstract: {abstract[:500]}...")
+        if not successful_analyses:
+            self.logger.error("No successful analyses available for synthesis")
+            return "No successful analyses available for report synthesis. Please try again with different settings."
 
-        prompt_parts.extend(
-            [
-                "",
-                "AVAILABLE ANALYSES:",
-            ]
+        # Create synthesis agent with dependency support for validation
+        synthesis_agent = Agent(
+            model=self.model,
+            deps_type=dict,
+            system_prompt=SYNTHESIS_SYSTEM_PROMPT,
+            retries=self.max_retries,
         )
 
-        # Add results from successful agents
-        for agent_name, result_data in sub_agent_results.items():
-            if result_data.get("success", False):
-                result = result_data["result"]
-                prompt_parts.extend(
-                    [f"{agent_name.upper()} ANALYSIS:", str(result), ""]
-                )
-            else:
-                prompt_parts.extend(
-                    [
-                        f"{agent_name.upper()} ANALYSIS:",
-                        f"Analysis failed: {result_data.get('error', 'Unknown error')}",
-                        "",
-                    ]
-                )
+        # Add context-aware system prompt for synthesis validation
+        @synthesis_agent.system_prompt
+        async def synthesis_system_prompt(ctx: RunContext[dict]) -> str:
+            """Generate synthesis system prompt with analysis context."""
+            # The successful_analyses validation happens before calling the agent
+            # This decorator provides access to context if needed
+            return SYNTHESIS_SYSTEM_PROMPT
 
-        prompt_parts.extend(
-            [
-                "",
-                "SYNTHESIS INSTRUCTIONS:",
-                "Create a comprehensive academic paper analysis report with the following structure:",
-                "",
-                "REPORT FORMAT:",
-                "[Exact Paper Title] - Comprehensive Report",
-                "",
-                "## Paper Information",
-                "- **Title:** [Paper title]",
-                "- **Authors:** [List of authors]",
-                "- **Affiliations:** [Author affiliations]",
-                "- **Venue:** [Journal/Conference/ArXiv]",
-                "- **Year:** [Publication year]",
-                "",
-                "## Main Content Sections",
-                "After the metadata section, start with appropriate, natural section titles such as:",
-                "## Introduction and Research Context",
-                "## Research Questions and Contributions",
-                "## Methodology",
-                "## Experiments and Results",
-                "## Discussion and Analysis",
-                "## Limitations and Future Work",
-                "## Conclusions and Implications",
-                "",
-                "Choose and order sections based on what's most relevant to the paper. Use only the sections that have meaningful content.",
-                "",
-                "WRITING GUIDELINES:",
-                "1. Use the exact paper title followed by ' - Comprehensive Report' as the main title",
-                "2. Include a comprehensive metadata section with all available bibliographic information",
-                "3. Focus exclusively on the paper's content, findings, and contributions",
-                "4. DO NOT mention agents, tools, sub-agents, analysis processes, or methodologies used to create the report",
-                "5. Write in a professional academic tone suitable for researchers",
-                "6. Integrate insights from all available analyses into coherent sections",
-                "7. Be comprehensive but maintain readability and logical flow",
-                "8. If certain analyses failed, focus on the available information without noting the gaps",
-                "9. Use natural, descriptive section titles that readers would expect in an academic paper",
-                "",
-                "Please provide a thorough, well-structured academic analysis report based on all available information.",
-            ]
-        )
-
+        # Build synthesis prompt with structured format requirements
         prompt = build_report_synthesis_prompt(
             paper_title=paper_title,
             source_path=(
@@ -918,16 +880,9 @@ class CoordinateAgent:
             sub_agent_results=sub_agent_results,
         )
 
-        # Create synthesis agent
-        synthesis_agent = Agent(
-            model=self.model,
-            system_prompt=SYNTHESIS_SYSTEM_PROMPT,
-            retries=self.max_retries,
-        )
-
         try:
             result = await asyncio.wait_for(
-                synthesis_agent.run(prompt),
+                synthesis_agent.run(prompt, deps={"successful_analyses": successful_analyses}),
                 timeout=self.timeout,
             )
             self.logger.info("Report synthesis completed successfully")
