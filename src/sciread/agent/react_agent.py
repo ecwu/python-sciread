@@ -5,17 +5,19 @@ iterative document analysis using pydantic-ai framework.
 """
 
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from dataclasses import field
 from pathlib import Path
 from typing import List
 
-from pydantic_ai import Agent, RunContext, ModelRetry
+from pydantic_ai import Agent
+from pydantic_ai import ModelRetry
+from pydantic_ai import RunContext
 
 from ..document import Document
 from ..llm_provider import get_model
 from ..logging_config import get_logger
 from .models.react_models import ReActAgentOutput
-from .prompts.react import SYSTEM_PROMPT
 from .prompts.react import format_agent_prompt
 
 logger = get_logger(__name__)
@@ -48,9 +50,7 @@ class ReActState:
 # ReAct agent implementation
 
 
-def load_and_process_document(
-    file_path: str | Path, to_markdown: bool = True
-) -> Document:
+def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -66,9 +66,7 @@ def load_and_process_document(
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(
-        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
-    )
+    logger.info(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
     logger.info(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -148,9 +146,7 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{chunk.content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.debug(
-        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
-    )
+    logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
 
@@ -182,9 +178,7 @@ def analyze_document_with_react(
     """
     logger.info(f"Starting ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(
-        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
-    )
+    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -235,16 +229,12 @@ class ReActAgent:
             deps = ctx.deps
 
             # Format status summary
-            status = (
-                f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
-            )
+            status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
 
             # Get content for current sections
             section_content = ""
             if deps.current_sections:
-                section_content = get_section_content(
-                    deps.document, deps.current_sections
-                )
+                section_content = get_section_content(deps.document, deps.current_sections)
                 if not section_content.strip():
                     raise ModelRetry(
                         f"No content found for sections: {deps.current_sections}. "
@@ -261,13 +251,9 @@ class ReActAgent:
                 processed_sections=deps.processed_sections.copy(),
             )
 
-        self.logger.info(
-            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
-        )
+        self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
 
-    def analyze_document(
-        self, document: Document, task: str, show_progress: bool = True
-    ) -> str:
+    def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> str:
         """Main analysis method that orchestrates the ReAct loop using native message history.
 
         Args:
@@ -289,9 +275,7 @@ class ReActAgent:
         while state.loop_count < self.max_loops:
             state.loop_count += 1
 
-            self.logger.info(
-                f"Loop {state.loop_count}/{self.max_loops}: Analyzing sections: {state.current_sections}"
-            )
+            self.logger.info(f"Loop {state.loop_count}/{self.max_loops}: Analyzing sections: {state.current_sections}")
 
             try:
                 # Create dependencies for this iteration
@@ -308,16 +292,10 @@ class ReActAgent:
 
                 # Run the agent with message history for context persistence
                 self.logger.debug("Running agent with message history")
-                result = self.agent.run_sync(
-                    "Execute analysis iteration",
-                    deps=deps,
-                    message_history=message_history
-                )
+                result = self.agent.run_sync("Execute analysis iteration", deps=deps, message_history=message_history)
                 agent_output = result.output
 
-                self.logger.debug(
-                    f"Agent response: should_stop={agent_output.should_stop}, next_sections={agent_output.next_sections}"
-                )
+                self.logger.debug(f"Agent response: should_stop={agent_output.should_stop}, next_sections={agent_output.next_sections}")
 
                 # Print reasoning for this iteration if show_progress is enabled
                 if show_progress:
@@ -327,9 +305,7 @@ class ReActAgent:
                     if agent_output.should_stop:
                         print("Decision: STOP - Analysis complete")
                     else:
-                        print(
-                            f"Next sections to read: {', '.join(agent_output.next_sections) if agent_output.next_sections else 'None'}"
-                        )
+                        print(f"Next sections to read: {', '.join(agent_output.next_sections) if agent_output.next_sections else 'None'}")
                     print("-" * 50)
 
                 # Update state
@@ -348,30 +324,20 @@ class ReActAgent:
 
                 # Check if agent wants to stop
                 if agent_output.should_stop:
-                    self.logger.info(
-                        f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}"
-                    )
+                    self.logger.info(f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}")
                     break
 
                 # Determine next sections
-                next_sections = [
-                    s
-                    for s in agent_output.next_sections
-                    if s not in state.processed_sections
-                ]
+                next_sections = [s for s in agent_output.next_sections if s not in state.processed_sections]
 
                 if not next_sections:
-                    self.logger.info(
-                        "No new sections to analyze (all selected sections already processed)"
-                    )
+                    self.logger.info("No new sections to analyze (all selected sections already processed)")
                     break
 
                 state.current_sections = next_sections
 
             except Exception as e:
-                self.logger.error(
-                    f"Agent execution failed in loop {state.loop_count}: {e}"
-                )
+                self.logger.error(f"Agent execution failed in loop {state.loop_count}: {e}")
                 self.logger.error(f"Exception type: {type(e)}")
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break

@@ -91,9 +91,7 @@ Here are some important constraints:
         raise
 
 
-async def comprehensive_analysis(
-    pdf_file_path: str, model: str = "deepseek/deepseek-chat"
-):
+async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deepseek-chat"):
     """Comprehensive document analysis using the multi-agent CoordinateAgent system.
 
     This function uses the CoordinateAgent with multiple expert sub-agents to provide
@@ -112,9 +110,7 @@ async def comprehensive_analysis(
         FileNotFoundError: If the PDF file is not found
         Exception: If the analysis fails
     """
-    logger.info(
-        f"Starting comprehensive analysis with CoordinateAgent for file: {pdf_file_path}"
-    )
+    logger.info(f"Starting comprehensive analysis with CoordinateAgent for file: {pdf_file_path}")
 
     # Check if file exists
     if not Path(pdf_file_path).exists():
@@ -141,12 +137,8 @@ async def comprehensive_analysis(
         print(f"Found {len(section_names)} main sections:")
         for i, section_name in enumerate(section_names, 1):
             section_chunks = doc.get_sections_by_name([section_name])
-            section_word_count = sum(
-                len(chunk.content.split()) for chunk in section_chunks
-            )
-            print(
-                f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)"
-            )
+            section_word_count = sum(len(chunk.content.split()) for chunk in section_chunks)
+            print(f"  {i}. {section_name.title()} ({len(section_chunks)} chunks, ~{section_word_count} words)")
         print()
 
         # Log section chunk distribution
@@ -159,9 +151,7 @@ async def comprehensive_analysis(
         print("\n📋 Document Structure Analysis")
         print("No named sections found - document will be analyzed as continuous text")
         print()
-        logger.info(
-            "No named sections found - document will be analyzed as continuous text"
-        )
+        logger.info("No named sections found - document will be analyzed as continuous text")
 
     # Check if document was loaded successfully
     if not doc.text.strip():
@@ -169,20 +159,14 @@ async def comprehensive_analysis(
 
     # Run comprehensive analysis
     logger.info("Starting comprehensive document analysis with CoordinateAgent...")
-    logger.debug(
-        f"Analyzing document with {len(doc.chunks)} chunks using {len(section_names)} sections"
-    )
+    logger.debug(f"Analyzing document with {len(doc.chunks)} chunks using {len(section_names)} sections")
     try:
         result = await coordinate_agent.analyze(doc)
 
         logger.info("Comprehensive analysis completed successfully!")
         logger.info(f"Total execution time: {result.total_execution_time:.2f} seconds")
-        logger.info(
-            f"Agents executed: {result.execution_summary['total_agents_executed']}"
-        )
-        logger.info(
-            f"Successful agents: {result.execution_summary['successful_agents']}"
-        )
+        logger.info(f"Agents executed: {result.execution_summary['total_agents_executed']}")
+        logger.info(f"Successful agents: {result.execution_summary['successful_agents']}")
         logger.debug(f"Final report length: {len(result.final_report)} characters")
 
         # Log section analysis summary if available
@@ -190,21 +174,15 @@ async def comprehensive_analysis(
             plan = result.analysis_plan
             logger.info("Section-based analysis summary:")
             if plan.previous_methods_sections:
-                logger.info(
-                    f"  Previous methods sections: {plan.previous_methods_sections}"
-                )
+                logger.info(f"  Previous methods sections: {plan.previous_methods_sections}")
             if plan.research_questions_sections:
-                logger.info(
-                    f"  Research questions sections: {plan.research_questions_sections}"
-                )
+                logger.info(f"  Research questions sections: {plan.research_questions_sections}")
             if plan.methodology_sections:
                 logger.info(f"  Methodology sections: {plan.methodology_sections}")
             if plan.experiments_sections:
                 logger.info(f"  Experiments sections: {plan.experiments_sections}")
             if plan.future_directions_sections:
-                logger.info(
-                    f"  Future directions sections: {plan.future_directions_sections}"
-                )
+                logger.info(f"  Future directions sections: {plan.future_directions_sections}")
 
         return result
 
@@ -238,9 +216,7 @@ def run_react_analysis(
     """
     logger.info(f"Starting ReAct analysis with file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(
-        f"Configuration: model={model}, max_loops={max_loops}, show_progress={show_progress}"
-    )
+    logger.info(f"Configuration: model={model}, max_loops={max_loops}, show_progress={show_progress}")
 
     try:
         result = analyze_document_with_react(
@@ -279,9 +255,7 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
         FileNotFoundError: If the document file is not found
         Exception: If the analysis fails
     """
-    logger.info(
-        f"Starting discussion-based analysis with DiscussionAgent for file: {document_file_path}"
-    )
+    logger.info(f"Starting discussion-based analysis with DiscussionAgent for file: {document_file_path}")
 
     # Check if file exists
     if not Path(document_file_path).exists():
@@ -333,24 +307,18 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     print()
 
     # Run discussion-based analysis
-    logger.info(
-        "Starting discussion-based document analysis with multiple personality agents..."
-    )
+    logger.info("Starting discussion-based document analysis with multiple personality agents...")
     logger.info("Agents will engage in discussion, questioning, and consensus-building")
 
     try:
         print("🔄 Starting multi-agent discussion analysis...")
-        print(
-            "This may take several minutes as agents collaborate and build consensus..."
-        )
+        print("This may take several minutes as agents collaborate and build consensus...")
         print()
 
         result = await discussion_agent.analyze_document(doc)
 
         logger.info("Discussion-based analysis completed successfully!")
-        logger.info(
-            f"Analysis completed with confidence score: {result.confidence_score:.2f}"
-        )
+        logger.info(f"Analysis completed with confidence score: {result.confidence_score:.2f}")
         logger.info(f"Total insights generated: {len(result.final_insights)}")
         logger.info(f"Consensus points identified: {len(result.consensus_points)}")
         logger.info(f"Divergent views noted: {len(result.divergent_views)}")

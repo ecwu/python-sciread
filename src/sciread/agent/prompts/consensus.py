@@ -1,8 +1,5 @@
 """Consensus building prompts for multi-agent discussion system."""
 
-from typing import Dict, List, Any
-
-
 CONSENSUS_BUILDER_SYSTEM_PROMPT = """You are an expert Consensus Builder for academic research analysis. Your role is to synthesize insights from multiple expert agents into a balanced, comprehensive assessment of a research paper.
 
 Your core responsibilities:
@@ -232,7 +229,7 @@ def build_summary_synthesis_prompt(
     iterations: int,
     convergence_score: float,
     total_insights: int,
-    total_qa: int
+    total_qa: int,
 ) -> str:
     """Build prompt for creating comprehensive summary."""
     return SUMMARY_SYNTHESIS_PROMPT.format(
@@ -244,7 +241,7 @@ def build_summary_synthesis_prompt(
         iterations=iterations,
         convergence_score=convergence_score,
         total_insights=total_insights,
-        total_qa=total_qa
+        total_qa=total_qa,
     )
 
 
@@ -255,7 +252,7 @@ def build_significance_assessment_prompt(
     convergence_score: float,
     strong_consensus_count: int,
     divergent_view_count: int,
-    expert_perspectives: str
+    expert_perspectives: str,
 ) -> str:
     """Build prompt for assessing paper significance."""
     return SIGNIFICANCE_ASSESSMENT_PROMPT.format(
@@ -265,35 +262,29 @@ def build_significance_assessment_prompt(
         convergence_score=convergence_score,
         strong_consensus_count=strong_consensus_count,
         divergent_view_count=divergent_view_count,
-        expert_perspectives=expert_perspectives
+        expert_perspectives=expert_perspectives,
     )
 
 
 def build_contribution_extraction_prompt(
-    document_title: str,
-    top_insights: str,
-    consensus_contributions: str,
-    expert_value_assessments: str
+    document_title: str, top_insights: str, consensus_contributions: str, expert_value_assessments: str
 ) -> str:
     """Build prompt for extracting key contributions."""
     return CONTRIBUTION_EXTRACTION_PROMPT.format(
         document_title=document_title,
         top_insights=top_insights,
         consensus_contributions=consensus_contributions,
-        expert_value_assessments=expert_value_assessments
+        expert_value_assessments=expert_value_assessments,
     )
 
 
 def build_divergent_view_analysis_prompt(
-    document_title: str,
-    convergence_score: float,
-    divergent_views: str,
-    related_challenges: str
+    document_title: str, convergence_score: float, divergent_views: str, related_challenges: str
 ) -> str:
     """Build prompt for analyzing divergent views."""
     return DIVERGENT_VIEW_ANALYSIS_PROMPT.format(
         document_title=document_title,
         convergence_score=convergence_score,
         divergent_views=divergent_views,
-        related_challenges=related_challenges
+        related_challenges=related_challenges,
     )

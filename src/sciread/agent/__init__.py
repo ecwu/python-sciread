@@ -43,8 +43,11 @@ Example Usage:
 """
 
 # Agent classes
+from .consensus_builder import ConsensusBuilder
 from .coordinate_agent import CoordinateAgent
-from .simple_agent import SimpleAgent
+
+# Discussion system imports
+from .discussion_agent import DiscussionAgent
 
 # CoordinateAgent models - now imported from models folder
 from .models.coordinate_models import AnalysisPlan
@@ -55,22 +58,29 @@ from .models.coordinate_models import MetadataExtractionResult
 from .models.coordinate_models import MethodologyResult
 from .models.coordinate_models import PreviousMethodsResult
 from .models.coordinate_models import ResearchQuestionsResult
+from .models.discussion_models import AgentInsight
+from .models.discussion_models import AgentPersonality
+from .models.discussion_models import ConsensusPoint
+from .models.discussion_models import DiscussionResult
+from .models.discussion_models import DiscussionState
+from .models.discussion_models import DivergentView
+from .models.discussion_models import Question
+from .models.discussion_models import Response
+
+# ReActAgent models - now imported from models folder
+from .models.react_models import ReActAgentInput
+from .models.react_models import ReActAgentOutput
 
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
-
-# Discussion system imports
-from .discussion_agent import DiscussionAgent
-from .consensus_builder import ConsensusBuilder
-from .personality_agents import PersonalityAgent, create_personality_agent
-from .task_queue import TaskQueueManager
-from .models.discussion_models import (
-    AgentPersonality, DiscussionState, AgentInsight, Question, Response,
-    DiscussionResult, ConsensusPoint, DivergentView
-)
-from .models.task_models import (
-    Task, TaskType, TaskPriority, TaskStatus, TaskResult, TaskQueue
-)
+from .models.task_models import Task
+from .models.task_models import TaskPriority
+from .models.task_models import TaskQueue
+from .models.task_models import TaskResult
+from .models.task_models import TaskStatus
+from .models.task_models import TaskType
+from .personality_agents import PersonalityAgent
+from .personality_agents import create_personality_agent
 
 # ReActAgent and utility functions
 from .react_agent import ReActAgent
@@ -78,10 +88,8 @@ from .react_agent import analyze_document_with_react
 from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
-
-# ReActAgent models - now imported from models folder
-from .models.react_models import ReActAgentInput
-from .models.react_models import ReActAgentOutput
+from .simple_agent import SimpleAgent
+from .task_queue import TaskQueueManager
 from .text_utils import remove_references
 
 __all__ = [
@@ -100,14 +108,12 @@ __all__ = [
     "ResearchQuestionsResult",
     "SimpleAgent",
     "SimpleAnalysisResult",
-
     # New discussion system
     "DiscussionAgent",
     "ConsensusBuilder",
     "PersonalityAgent",
     "create_personality_agent",
     "TaskQueueManager",
-
     # Discussion models
     "AgentPersonality",
     "DiscussionState",
@@ -117,7 +123,6 @@ __all__ = [
     "DiscussionResult",
     "ConsensusPoint",
     "DivergentView",
-
     # Task models
     "Task",
     "TaskType",
@@ -125,7 +130,6 @@ __all__ = [
     "TaskStatus",
     "TaskResult",
     "TaskQueue",
-
     # Utility functions
     "analyze_document_with_react",
     "format_status_summary",

@@ -13,11 +13,16 @@ duplication and improve maintainability.
 """
 
 import asyncio
-from dataclasses import dataclass, field
-from typing import Any, Optional, Union
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Optional
+from typing import Union
 
 from pydantic import BaseModel
-from pydantic_ai import Agent, RunContext, ModelRetry
+from pydantic_ai import Agent
+from pydantic_ai import ModelRetry
+from pydantic_ai import RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
@@ -53,12 +58,13 @@ from .prompts.coordinate import build_research_questions_analysis_prompt
 from .text_utils import clean_academic_text
 from .text_utils import remove_references as remove_references_func
 
-
 # Dependency classes for RunContext-based coordination
+
 
 @dataclass
 class CoordinateDeps:
     """Main dependencies for coordinate agent analysis."""
+
     document: Document
     custom_plan: Optional[AnalysisPlan] = None
     max_retries: int = 3
@@ -68,6 +74,7 @@ class CoordinateDeps:
 @dataclass
 class ExpertAgentDeps:
     """Dependencies for individual expert agents."""
+
     document: Document
     analysis_type: str
     sections_to_analyze: list[str] = field(default_factory=list)
@@ -77,6 +84,7 @@ class ExpertAgentDeps:
 @dataclass
 class SynthesisDeps:
     """Dependencies for report synthesis."""
+
     document: Document
     analysis_plan: AnalysisPlan
     sub_agent_results: dict[str, Any]
@@ -162,9 +170,7 @@ class CoordinateAgent:
             self.model = model
             self.model_identifier = getattr(model, "model_name", "unknown")
 
-        self.logger.info(
-            f"Initialized CoordinateAgent controller with model: {self.model_identifier}"
-        )
+        self.logger.info(f"Initialized CoordinateAgent controller with model: {self.model_identifier}")
 
         # Create main coordinate agent with dependencies and structured output
         self.coordinate_agent = Agent(
@@ -249,10 +255,7 @@ class CoordinateAgent:
 
             # Validate content is available
             if not content or not content.strip():
-                raise ModelRetry(
-                    f"No content found for {deps.analysis_type} analysis. "
-                    "Please check document sections and try again."
-                )
+                raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
 
             # Process content
             content = remove_references_func(content)
@@ -273,9 +276,7 @@ class CoordinateAgent:
 
         return agent
 
-    def display_analysis_plan(
-        self, analysis_plan: AnalysisPlan, section_names: list[str]
-    ) -> str:
+    def display_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]) -> str:
         """Create a clear, readable display of the analysis plan.
 
         Args:
@@ -330,18 +331,14 @@ class CoordinateAgent:
                 if sections_field == "First 3 chunks (title, authors, abstract)":
                     sections_display = sections_field
                 else:
-                    sections = getattr(analysis_plan, sections_field) or [
-                        "All sections"
-                    ]
+                    sections = getattr(analysis_plan, sections_field) or ["All sections"]
                     if sections == ["All sections"]:
                         sections_display = f"All sections {YELLOW}⚠️  (fallback){RESET}"
                     else:
                         sections_display = f"{', '.join(sections)}"
 
                 # Combined display with colors
-                plan_display.append(
-                    f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}"
-                )
+                plan_display.append(f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}")
                 plan_display.append("")
 
         # Add reasoning section with color
@@ -389,19 +386,12 @@ class CoordinateAgent:
             )
 
         if analysis_plan.estimated_relevance_scores:
-            scores_text = ", ".join(
-                [
-                    f"{k}: {v:.2f}"
-                    for k, v in analysis_plan.estimated_relevance_scores.items()
-                ]
-            )
+            scores_text = ", ".join([f"{k}: {v:.2f}" for k, v in analysis_plan.estimated_relevance_scores.items()])
             plan_display.append(f"{CYAN}Relevance Scores: {scores_text}{RESET}")
 
         return "\n".join(plan_display)
 
-    def _create_filtered_document(
-        self, original_document: Document, chunks: list[Chunk]
-    ) -> Document:
+    def _create_filtered_document(self, original_document: Document, chunks: list[Chunk]) -> Document:
         """Create a new Document object containing only specified chunks.
 
         Args:
@@ -479,10 +469,7 @@ class CoordinateAgent:
         for section_name in section_names:
             section_lower = section_name.lower()
             # Check for abstract-like section names (handle noise like numbers)
-            if any(
-                keyword in section_lower
-                for keyword in ["abstract", "summary", "overview"]
-            ):
+            if any(keyword in section_lower for keyword in ["abstract", "summary", "overview"]):
                 abstract_section_names.append(section_name)
                 self.logger.debug(f"Found potential abstract section: '{section_name}'")
                 break  # Take the first match
@@ -491,12 +478,8 @@ class CoordinateAgent:
         if abstract_section_names:
             abstract_chunks = document.get_sections_by_name(abstract_section_names)
             if abstract_chunks:
-                abstract_content = " ".join(
-                    [chunk.content for chunk in abstract_chunks]
-                )
-                self.logger.info(
-                    f"Abstract extracted from semantic sections: {len(abstract_content)} characters"
-                )
+                abstract_content = " ".join([chunk.content for chunk in abstract_chunks])
+                self.logger.info(f"Abstract extracted from semantic sections: {len(abstract_content)} characters")
                 return abstract_content
 
         # Fallback: Use first two chunks as "abstract" for planning purposes
@@ -521,17 +504,13 @@ class CoordinateAgent:
         text = document.get_full_text() if document.chunks else document.text
         if text:
             fallback_text = text[:2000]
-            self.logger.warning(
-                "No abstract section found, using first 2000 chars of document as fallback for analysis planning"
-            )
+            self.logger.warning("No abstract section found, using first 2000 chars of document as fallback for analysis planning")
             return fallback_text
 
         self.logger.error("No abstract found and no text available in document")
         return ""
 
-    async def plan_analysis(
-        self, document: Document, section_names: list[str]
-    ) -> AnalysisPlan:
+    async def plan_analysis(self, document: Document, section_names: list[str]) -> AnalysisPlan:
         """Plan which sub-agents to use based on document analysis and available sections.
 
         Args:
@@ -549,9 +528,7 @@ class CoordinateAgent:
         )
 
         if not abstract or not abstract.strip():
-            self.logger.warning(
-                "Empty abstract provided, using default comprehensive analysis plan"
-            )
+            self.logger.warning("Empty abstract provided, using default comprehensive analysis plan")
             return AnalysisPlan(
                 analyze_metadata=True,
                 analyze_previous_methods=True,
@@ -570,9 +547,7 @@ class CoordinateAgent:
         prompt = build_analysis_planning_prompt(abstract, section_names)
 
         try:
-            self.logger.debug(
-                f"Calling controller agent with prompt length: {len(prompt)} chars"
-            )
+            self.logger.debug(f"Calling controller agent with prompt length: {len(prompt)} chars")
             self.logger.debug(f"Controller agent model: {self.model_identifier}")
 
             # Create dependencies for planning
@@ -585,43 +560,25 @@ class CoordinateAgent:
             )
 
             self.logger.info("Analysis plan created successfully")
-            self.logger.debug(
-                f"Result type: {type(result)}, Output type: {type(result.output)}"
-            )
+            self.logger.debug(f"Result type: {type(result)}, Output type: {type(result.output)}")
             # Log controller agent interaction at debug level
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            output_preview = (
-                str(result.output)[:200] + "..."
-                if len(str(result.output)) > 200
-                else str(result.output)
-            )
-            self.logger.debug(
-                f"[controller_agent] Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
-            self.logger.debug(
-                f"[controller_agent] Output ({len(str(result.output))} chars): {output_preview}"
-            )
+            output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
+            self.logger.debug(f"[controller_agent] Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[controller_agent] Output ({len(str(result.output))} chars): {output_preview}")
 
             # Validate that we got an actual plan, not empty defaults
             if not result.output.reasoning or not result.output.reasoning.strip():
-                self.logger.warning(
-                    "Controller agent returned plan with empty reasoning - may indicate generation issue"
-                )
+                self.logger.warning("Controller agent returned plan with empty reasoning - may indicate generation issue")
 
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(
-                f"Analysis planning timed out after {self.timeout} seconds"
-            )
+            self.logger.error(f"Analysis planning timed out after {self.timeout} seconds")
             # Log controller agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(
-                f"[controller_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
-            self.logger.error(
-                f"[controller_agent] Timeout after {self.timeout} seconds"
-            )
+            self.logger.debug(f"[controller_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.error(f"[controller_agent] Timeout after {self.timeout} seconds")
             # Return default plan
             return AnalysisPlan(
                 analyze_metadata=True,
@@ -642,9 +599,7 @@ class CoordinateAgent:
             self.logger.error(f"Analysis planning failed: {e}")
             # Log controller agent error
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(
-                f"[controller_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
+            self.logger.debug(f"[controller_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}")
             # Return default plan
             return AnalysisPlan(
                 analyze_metadata=True,
@@ -731,9 +686,7 @@ class CoordinateAgent:
                 # Determine sections for analysis
                 if agent_key == "metadata":
                     # Special case: metadata uses first 3 chunks
-                    sections_analyzed[result_key] = [
-                        f"First {min(3, len(document.chunks))} chunks"
-                    ]
+                    sections_analyzed[result_key] = [f"First {min(3, len(document.chunks))} chunks"]
                 else:
                     # Use planned sections or full document
                     sections = getattr(analysis_plan, sections_field)
@@ -741,9 +694,7 @@ class CoordinateAgent:
                         # Deduplicate sections within this agent
                         deduplicated_sections = self._deduplicate_sections(sections)
                         sections_analyzed[result_key] = deduplicated_sections
-                        self.logger.debug(
-                            f"{agent_key} agent using specific sections: {deduplicated_sections}"
-                        )
+                        self.logger.debug(f"{agent_key} agent using specific sections: {deduplicated_sections}")
                     else:
                         # Use all sections
                         sections_analyzed[result_key] = ["All sections"]
@@ -775,9 +726,7 @@ class CoordinateAgent:
 
         # Execute tasks in parallel
         self.logger.info(f"Executing {len(tasks)} sub-agents in parallel")
-        completed_tasks = await asyncio.gather(
-            *[task for _, task in tasks], return_exceptions=True
-        )
+        completed_tasks = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Process results
         for (agent_name, _), result in zip(tasks, completed_tasks):
@@ -789,9 +738,7 @@ class CoordinateAgent:
                 results[agent_name] = {"result": result, "success": True}
 
         execution_time = asyncio.get_event_loop().time() - start_time
-        self.logger.info(
-            f"Sub-agent execution completed in {execution_time:.2f} seconds"
-        )
+        self.logger.info(f"Sub-agent execution completed in {execution_time:.2f} seconds")
 
         # Add sections analyzed information to results
         results["_sections_analyzed"] = sections_analyzed
@@ -829,9 +776,7 @@ class CoordinateAgent:
             self.logger.error(
                 f"ERROR: sub_agent_results is not a dict! Type: {type(sub_agent_results)}, Content: {str(sub_agent_results)[:500]}"
             )
-            raise TypeError(
-                f"Expected dict for sub_agent_results, got {type(sub_agent_results)}"
-            )
+            raise TypeError(f"Expected dict for sub_agent_results, got {type(sub_agent_results)}")
 
         # Extract paper title for structured reporting
         paper_title = "Unknown Paper"
@@ -846,8 +791,7 @@ class CoordinateAgent:
 
         # Validate we have successful analyses to synthesize
         successful_analyses = [
-            name for name, result in sub_agent_results.items()
-            if result.get("success", False) and name != "_sections_analyzed"
+            name for name, result in sub_agent_results.items() if result.get("success", False) and name != "_sections_analyzed"
         ]
 
         if not successful_analyses:
@@ -873,9 +817,7 @@ class CoordinateAgent:
         # Build synthesis prompt with structured format requirements
         prompt = build_report_synthesis_prompt(
             paper_title=paper_title,
-            source_path=(
-                str(document.source_path) if document.source_path else "text document"
-            ),
+            source_path=(str(document.source_path) if document.source_path else "text document"),
             abstract=self.extract_abstract(document),
             sub_agent_results=sub_agent_results,
         )
@@ -888,28 +830,16 @@ class CoordinateAgent:
             self.logger.info("Report synthesis completed successfully")
             # Log synthesis agent interaction at debug level
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            output_preview = (
-                str(result.output)[:200] + "..."
-                if len(str(result.output)) > 200
-                else str(result.output)
-            )
-            self.logger.debug(
-                f"[synthesis_agent] Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
-            self.logger.debug(
-                f"[synthesis_agent] Output ({len(str(result.output))} chars): {output_preview}"
-            )
+            output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
+            self.logger.debug(f"[synthesis_agent] Prompt ({len(prompt)} chars): {prompt_preview}")
+            self.logger.debug(f"[synthesis_agent] Output ({len(str(result.output))} chars): {output_preview}")
             return result.output
 
         except asyncio.TimeoutError:
-            self.logger.error(
-                f"Report synthesis timed out after {self.timeout} seconds"
-            )
+            self.logger.error(f"Report synthesis timed out after {self.timeout} seconds")
             # Log synthesis agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(
-                f"[synthesis_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
+            self.logger.debug(f"[synthesis_agent] TimeoutError - Prompt ({len(prompt)} chars): {prompt_preview}")
             self.logger.error(f"[synthesis_agent] Timeout after {self.timeout} seconds")
             return f"Report synthesis timed out after {self.timeout} seconds. Please try again or use a shorter document."
 
@@ -917,9 +847,7 @@ class CoordinateAgent:
             self.logger.error(f"Report synthesis failed: {e}")
             # Log synthesis agent error
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
-            self.logger.debug(
-                f"[synthesis_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}"
-            )
+            self.logger.debug(f"[synthesis_agent] ERROR: {e!s} - Prompt ({len(prompt)} chars): {prompt_preview}")
             return f"Report synthesis failed: {e}. Please try again."
 
     async def analyze(
@@ -955,9 +883,7 @@ class CoordinateAgent:
         # Step 0: Validate PDF document
         self._validate_pdf_document(document)
 
-        self.logger.info(
-            f"Starting comprehensive document analysis: {document.source_path}"
-        )
+        self.logger.info(f"Starting comprehensive document analysis: {document.source_path}")
         start_time = asyncio.get_event_loop().time()
 
         try:
@@ -981,15 +907,11 @@ class CoordinateAgent:
             sub_agent_results = await self.execute_sub_agents(document, analysis_plan)
 
             # Step 6: Synthesize final report
-            self.logger.debug(
-                f"About to synthesize report, sub_agent_results type: {type(sub_agent_results)}"
-            )
+            self.logger.debug(f"About to synthesize report, sub_agent_results type: {type(sub_agent_results)}")
             self.logger.debug(
                 f"sub_agent_results keys: {list(sub_agent_results.keys()) if isinstance(sub_agent_results, dict) else 'Not a dict'}"
             )
-            final_report = await self.synthesize_report(
-                analysis_plan, sub_agent_results, document
-            )
+            final_report = await self.synthesize_report(analysis_plan, sub_agent_results, document)
 
             # Step 7: Build comprehensive result
             total_execution_time = asyncio.get_event_loop().time() - start_time
@@ -997,9 +919,7 @@ class CoordinateAgent:
             comprehensive_result = ComprehensiveAnalysisResult(
                 analysis_plan=analysis_plan,
                 metadata_result=(
-                    sub_agent_results.get("metadata", {}).get("result")
-                    if sub_agent_results.get("metadata", {}).get("success")
-                    else None
+                    sub_agent_results.get("metadata", {}).get("result") if sub_agent_results.get("metadata", {}).get("success") else None
                 ),
                 previous_methods_result=(
                     sub_agent_results.get("previous_methods", {}).get("result")
@@ -1027,22 +947,12 @@ class CoordinateAgent:
                     else None
                 ),
                 execution_summary={
-                    "total_agents_executed": len(sub_agent_results)
-                    - 1,  # Exclude _sections_analyzed
+                    "total_agents_executed": len(sub_agent_results) - 1,  # Exclude _sections_analyzed
                     "successful_agents": len(
-                        [
-                            r
-                            for name, r in sub_agent_results.items()
-                            if name != "_sections_analyzed" and r.get("success", False)
-                        ]
+                        [r for name, r in sub_agent_results.items() if name != "_sections_analyzed" and r.get("success", False)]
                     ),
                     "failed_agents": len(
-                        [
-                            r
-                            for name, r in sub_agent_results.items()
-                            if name != "_sections_analyzed"
-                            and not r.get("success", False)
-                        ]
+                        [r for name, r in sub_agent_results.items() if name != "_sections_analyzed" and not r.get("success", False)]
                     ),
                     "agent_results": {
                         name: {"success": data.get("success", False)}
@@ -1055,9 +965,7 @@ class CoordinateAgent:
                 sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
             )
 
-            self.logger.info(
-                f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds"
-            )
+            self.logger.info(f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds")
             return comprehensive_result
 
         except Exception as e:

@@ -1,23 +1,26 @@
 """Main discussion agent for multi-agent document analysis."""
 
 import asyncio
-from typing import Dict, List, Any, Optional, Set
-from datetime import datetime, timedelta
+from datetime import datetime
+from datetime import timedelta
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 
-from ..llm_provider import get_model
 from ..document import Document
-from .models.discussion_models import (
-    AgentPersonality,
-    DiscussionState,
-    DiscussionPhase,
-    DiscussionResult,
-)
-from .models.task_models import Task, TaskType, TaskPriority, TaskStatus, TaskQueue
-from .task_queue import TaskQueueManager
-from .tools.task_tools import get_task_tool
+from ..llm_provider import get_model
 from ..logging_config import get_logger
+from .models.discussion_models import AgentPersonality
+from .models.discussion_models import DiscussionPhase
+from .models.discussion_models import DiscussionResult
+from .models.discussion_models import DiscussionState
+from .models.task_models import TaskPriority
+from .models.task_models import TaskQueue
+from .models.task_models import TaskStatus
+from .models.task_models import TaskType
+from .task_queue import TaskQueueManager
 
 logger = get_logger(__name__)
 
@@ -60,31 +63,19 @@ class DiscussionAgent:
 
     def _register_task_tools(self):
         """Register all task tools with the task manager."""
-        from .tools.task_tools import (
-            generate_insights_tool,
-            ask_question_tool,
-            answer_question_tool,
-            evaluate_convergence_tool,
-        )
+        from .tools.task_tools import answer_question_tool
+        from .tools.task_tools import ask_question_tool
+        from .tools.task_tools import evaluate_convergence_tool
+        from .tools.task_tools import generate_insights_tool
 
-        self.task_manager.register_task_callback(
-            TaskType.GENERATE_INSIGHTS, generate_insights_tool
-        )
-        self.task_manager.register_task_callback(
-            TaskType.ASK_QUESTION, ask_question_tool
-        )
-        self.task_manager.register_task_callback(
-            TaskType.ANSWER_QUESTION, answer_question_tool
-        )
-        self.task_manager.register_task_callback(
-            TaskType.MONITOR_CONVERGENCE, evaluate_convergence_tool
-        )
+        self.task_manager.register_task_callback(TaskType.GENERATE_INSIGHTS, generate_insights_tool)
+        self.task_manager.register_task_callback(TaskType.ASK_QUESTION, ask_question_tool)
+        self.task_manager.register_task_callback(TaskType.ANSWER_QUESTION, answer_question_tool)
+        self.task_manager.register_task_callback(TaskType.MONITOR_CONVERGENCE, evaluate_convergence_tool)
 
     async def analyze_document(self, document: Document) -> DiscussionResult:
         """Main entry point for document analysis."""
-        logger.info(
-            f"Starting multi-agent discussion analysis for document: {document.metadata.title}"
-        )
+        logger.info(f"Starting multi-agent discussion analysis for document: {document.metadata.title}")
 
         try:
             # Initialize discussion
@@ -110,7 +101,7 @@ class DiscussionAgent:
             # Create error result
             return DiscussionResult(
                 document_title=document.metadata.title or "Untitled",
-                summary=f"Discussion analysis failed: {str(e)}",
+                summary=f"Discussion analysis failed: {e!s}",
                 key_contributions=[],
                 significance="Analysis failed",
                 confidence_score=0.0,
@@ -121,9 +112,7 @@ class DiscussionAgent:
     async def _initialize_discussion(self, document: Document):
         """Initialize discussion state and task queue."""
         # Create discussion queue
-        self.discussion_queue = self.task_manager.create_queue(
-            "main_discussion", "Main queue for multi-agent document discussion"
-        )
+        self.discussion_queue = self.task_manager.create_queue("main_discussion", "Main queue for multi-agent document discussion")
 
         # Initialize discussion state
         self.discussion_state = DiscussionState(
@@ -187,9 +176,7 @@ class DiscussionAgent:
                     "discussion_context": {
                         "phase": "initial_analysis",
                         "iteration": self.discussion_state.iteration_count,
-                        "total_insights": sum(
-                            len(insights) for insights in self.agent_insights.values()
-                        ),
+                        "total_insights": sum(len(insights) for insights in self.agent_insights.values()),
                     },
                 },
                 priority=TaskPriority.HIGH,
@@ -209,9 +196,7 @@ class DiscussionAgent:
         self.discussion_state.current_phase = DiscussionPhase.QUESTIONING
         self.discussion_state.iteration_count += 1
 
-        logger.info(
-            f"Initial analysis phase completed. Total insights: {sum(len(insights) for insights in self.agent_insights.values())}"
-        )
+        logger.info(f"Initial analysis phase completed. Total insights: {sum(len(insights) for insights in self.agent_insights.values())}")
 
     async def _run_questioning_phase(self):
         """Run questioning phase where agents ask questions about each other's insights."""
@@ -225,9 +210,7 @@ class DiscussionAgent:
                 continue
 
             # Select most important insights to question
-            top_insights = sorted(
-                insights, key=lambda i: i.importance_score, reverse=True
-            )[:2]
+            top_insights = sorted(insights, key=lambda i: i.importance_score, reverse=True)[:2]
 
             for insight in top_insights:
                 # Find agents to question (exclude the insight author)
@@ -266,9 +249,7 @@ class DiscussionAgent:
             # No questions generated, skip to convergence
             self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
-        logger.info(
-            f"Questioning phase completed. Questions generated: {len(self.all_questions)}"
-        )
+        logger.info(f"Questioning phase completed. Questions generated: {len(self.all_questions)}")
 
     async def _run_responding_phase(self):
         """Run responding phase where agents answer questions."""
@@ -279,9 +260,7 @@ class DiscussionAgent:
         # Create response tasks for unanswered questions
         for question in self.all_questions:
             # Check if this question has been answered
-            if not any(
-                resp.question_id == question.question_id for resp in self.all_responses
-            ):
+            if not any(resp.question_id == question.question_id for resp in self.all_responses):
                 task_id = self.task_manager.create_task(
                     queue_name="main_discussion",
                     task_type=TaskType.ANSWER_QUESTION,
@@ -310,9 +289,7 @@ class DiscussionAgent:
         # Update phase
         self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
-        logger.info(
-            f"Responding phase completed. Responses generated: {len(self.all_responses)}"
-        )
+        logger.info(f"Responding phase completed. Responses generated: {len(self.all_responses)}")
 
     async def _run_convergence_phase(self):
         """Run convergence evaluation phase."""
@@ -327,11 +304,7 @@ class DiscussionAgent:
                 task_type=TaskType.MONITOR_CONVERGENCE,
                 parameters={
                     "personality": personality,
-                    "all_insights": [
-                        insight
-                        for insights in self.agent_insights.values()
-                        for insight in insights
-                    ],
+                    "all_insights": [insight for insights in self.agent_insights.values() for insight in insights],
                     "all_questions": self.all_questions,
                     "all_responses": self.all_responses,
                     "discussion_context": {
@@ -358,12 +331,10 @@ class DiscussionAgent:
             logger.info(f"Convergence reached: {convergence_score:.2f}")
             self.discussion_state.current_phase = DiscussionPhase.CONSENSUS
         elif self.discussion_state.iteration_count >= self.max_iterations:
-            logger.info(f"Max iterations reached, proceeding to consensus")
+            logger.info("Max iterations reached, proceeding to consensus")
             self.discussion_state.current_phase = DiscussionPhase.CONSENSUS
         else:
-            logger.info(
-                f"Convergence not reached: {convergence_score:.2f}, continuing discussion"
-            )
+            logger.info(f"Convergence not reached: {convergence_score:.2f}, continuing discussion")
             self.discussion_state.current_phase = DiscussionPhase.QUESTIONING
             self.discussion_state.iteration_count += 1
 
@@ -397,9 +368,7 @@ class DiscussionAgent:
 
         return False
 
-    async def _wait_for_tasks_completion(
-        self, task_ids: List[str], timeout_minutes: int = 5
-    ):
+    async def _wait_for_tasks_completion(self, task_ids: List[str], timeout_minutes: int = 5):
         """Wait for specified tasks to complete."""
         if not task_ids:
             return
@@ -410,11 +379,7 @@ class DiscussionAgent:
         while datetime.now() - start_time < timeout:
             all_completed = True
             for task_id in task_ids:
-                status = (
-                    self.discussion_queue.get_task_status(task_id)
-                    if self.discussion_queue
-                    else None
-                )
+                status = self.discussion_queue.get_task_status(task_id) if self.discussion_queue else None
                 if status in [
                     TaskStatus.PENDING,
                     TaskStatus.ASSIGNED,
@@ -430,11 +395,7 @@ class DiscussionAgent:
 
         # Check for any failed tasks
         for task_id in task_ids:
-            status = (
-                self.discussion_queue.get_task_status(task_id)
-                if self.discussion_queue
-                else None
-            )
+            status = self.discussion_queue.get_task_status(task_id) if self.discussion_queue else None
             if status == TaskStatus.FAILED:
                 logger.warning(f"Task {task_id} failed")
 
@@ -488,11 +449,7 @@ class DiscussionAgent:
                 score = task.result.metadata.get("convergence_score", 0.5)
                 convergence_scores.append(score)
 
-        return (
-            sum(convergence_scores) / len(convergence_scores)
-            if convergence_scores
-            else 0.5
-        )
+        return sum(convergence_scores) / len(convergence_scores) if convergence_scores else 0.5
 
     async def _build_final_result(self, document: Document) -> DiscussionResult:
         """Build final discussion result."""
@@ -526,12 +483,14 @@ class DiscussionAgent:
     def clear_agent_cache(self):
         """Clear all cached agent instances to free memory or reset discussion."""
         from .tools.task_tools import clear_agent_cache
+
         clear_agent_cache()
         logger.info("DiscussionAgent: Cleared all cached agent instances")
 
     def get_agent_cache_status(self) -> dict:
         """Get current agent cache status for debugging."""
         from .tools.task_tools import get_agent_cache_status
+
         status = get_agent_cache_status()
         logger.info(f"DiscussionAgent: Cache status - {status}")
         return status

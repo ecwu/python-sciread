@@ -1,20 +1,23 @@
 """Task queue management system for multi-agent discussion."""
 
 import asyncio
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional, Callable, Awaitable
 from collections import defaultdict
+from datetime import datetime
+from datetime import timedelta
+from typing import Any
+from typing import Callable
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from .models.discussion_models import AgentPersonality
-from .models.task_models import (
-    Task,
-    TaskType,
-    TaskPriority,
-    TaskStatus,
-    TaskResult,
-    TaskQueue,
-)
 from ..logging_config import get_logger
+from .models.discussion_models import AgentPersonality
+from .models.task_models import Task
+from .models.task_models import TaskPriority
+from .models.task_models import TaskQueue
+from .models.task_models import TaskResult
+from .models.task_models import TaskStatus
+from .models.task_models import TaskType
 
 logger = get_logger(__name__)
 
@@ -91,9 +94,7 @@ class TaskQueueManager:
         )
         return self.add_task(queue_name, task)
 
-    def get_next_task_for_agent(
-        self, agent: AgentPersonality, queue_name: Optional[str] = None
-    ) -> Optional[Task]:
+    def get_next_task_for_agent(self, agent: AgentPersonality, queue_name: Optional[str] = None) -> Optional[Task]:
         """Get the next available task for a specific agent."""
         # If queue_name is specified, only check that queue
         if queue_name:
@@ -129,9 +130,7 @@ class TaskQueueManager:
             # Get the callback for this task type
             callback = self.task_callbacks.get(task.task_type)
             if not callback:
-                raise ValueError(
-                    f"No callback registered for task type '{task.task_type}'"
-                )
+                raise ValueError(f"No callback registered for task type '{task.task_type}'")
 
             # Execute the task with timeout
             timeout = task.timeout_seconds or 300  # Default 5 minutes
@@ -158,7 +157,7 @@ class TaskQueueManager:
             return result
 
         except Exception as e:
-            error_msg = f"Task execution failed: {str(e)}"
+            error_msg = f"Task execution failed: {e!s}"
             logger.error(f"Task {task.task_id} failed: {error_msg}")
 
             # Create failure result
@@ -176,9 +175,7 @@ class TaskQueueManager:
             self._record_task_execution(task, result, success=False)
             return result
 
-    def _record_task_execution(
-        self, task: Task, result: TaskResult, success: bool
-    ) -> None:
+    def _record_task_execution(self, task: Task, result: TaskResult, success: bool) -> None:
         """Record task execution in history."""
         self.task_execution_history.append(
             {
@@ -232,19 +229,13 @@ class TaskQueueManager:
                 for queue in self.queues.values():
                     # Get available tasks that can be executed
                     available_tasks = [
-                        task
-                        for task in queue.pending_tasks
-                        if task.assigned_to
-                        and self._are_dependencies_satisfied(queue, task)
+                        task for task in queue.pending_tasks if task.assigned_to and self._are_dependencies_satisfied(queue, task)
                     ]
 
                     # Execute tasks up to the concurrent limit
                     while (
-                        available_tasks
-                        and len(queue.active_tasks) < queue.max_concurrent_tasks
-                        and tasks_executed < 5
+                        available_tasks and len(queue.active_tasks) < queue.max_concurrent_tasks and tasks_executed < 5
                     ):  # Limit per iteration to prevent blocking
-
                         task = available_tasks.pop(0)
                         queue.assign_task(task.task_id, task.assigned_to)
 
@@ -280,24 +271,13 @@ class TaskQueueManager:
         status_counts = defaultdict(int)
         type_counts = defaultdict(int)
 
-        for task in (
-            queue.pending_tasks
-            + queue.active_tasks
-            + queue.completed_tasks
-            + queue.failed_tasks
-        ):
+        for task in queue.pending_tasks + queue.active_tasks + queue.completed_tasks + queue.failed_tasks:
             status_counts[task.status.value] += 1
             type_counts[task.task_type.value] += 1
 
         # Calculate average execution time
-        completed_times = [
-            task.result.execution_time
-            for task in queue.completed_tasks
-            if task.result and task.result.execution_time
-        ]
-        avg_execution_time = (
-            sum(completed_times) / len(completed_times) if completed_times else 0
-        )
+        completed_times = [task.result.execution_time for task in queue.completed_tasks if task.result and task.result.execution_time]
+        avg_execution_time = sum(completed_times) / len(completed_times) if completed_times else 0
 
         return {
             "name": queue.name,
@@ -307,9 +287,7 @@ class TaskQueueManager:
             "current_backlog": len(queue.pending_tasks),
             "active_tasks": len(queue.active_tasks),
             "failed_tasks": len(queue.failed_tasks),
-            "success_rate": (
-                queue.total_tasks_completed / max(1, queue.total_tasks_created)
-            ),
+            "success_rate": (queue.total_tasks_completed / max(1, queue.total_tasks_created)),
             "status_counts": dict(status_counts),
             "type_counts": dict(type_counts),
             "average_execution_time": avg_execution_time,
@@ -331,18 +309,14 @@ class TaskQueueManager:
             workload["active_tasks"] += queue.get_agent_workload(agent)
 
             # Pending assigned tasks
-            workload["pending_assigned"] += len(
-                [task for task in queue.pending_tasks if task.assigned_to == agent]
-            )
+            workload["pending_assigned"] += len([task for task in queue.pending_tasks if task.assigned_to == agent])
 
             # Completed today
             workload["completed_today"] += len(
                 [
                     task
                     for task in queue.completed_tasks
-                    if task.assigned_to == agent
-                    and task.completed_at
-                    and task.completed_at.date() == today
+                    if task.assigned_to == agent and task.completed_at and task.completed_at.date() == today
                 ]
             )
 
@@ -351,9 +325,7 @@ class TaskQueueManager:
                 [
                     task
                     for task in queue.failed_tasks
-                    if task.assigned_to == agent
-                    and task.completed_at
-                    and task.completed_at.date() == today
+                    if task.assigned_to == agent and task.completed_at and task.completed_at.date() == today
                 ]
             )
 
@@ -368,20 +340,10 @@ class TaskQueueManager:
             # Filter out old tasks
             original_counts = (len(queue.completed_tasks), len(queue.failed_tasks))
 
-            queue.completed_tasks = [
-                task
-                for task in queue.completed_tasks
-                if task.completed_at and task.completed_at > cutoff_date
-            ]
+            queue.completed_tasks = [task for task in queue.completed_tasks if task.completed_at and task.completed_at > cutoff_date]
 
-            queue.failed_tasks = [
-                task
-                for task in queue.failed_tasks
-                if task.completed_at and task.completed_at > cutoff_date
-            ]
+            queue.failed_tasks = [task for task in queue.failed_tasks if task.completed_at and task.completed_at > cutoff_date]
 
-            total_removed += (original_counts[0] - len(queue.completed_tasks)) + (
-                original_counts[1] - len(queue.failed_tasks)
-            )
+            total_removed += (original_counts[0] - len(queue.completed_tasks)) + (original_counts[1] - len(queue.failed_tasks))
 
         logger.info(f"Cleaned up {total_removed} old tasks from all queues")

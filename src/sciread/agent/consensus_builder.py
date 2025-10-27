@@ -1,25 +1,26 @@
 """Consensus builder for multi-agent discussion system."""
 
-from typing import Dict, List, Any, Optional, Set
-from datetime import datetime
 import re
 from collections import defaultdict
+from datetime import datetime
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
 
-from ..llm_provider import get_model
 from ..document import Document
-from .models.discussion_models import (
-    AgentPersonality,
-    DiscussionState,
-    AgentInsight,
-    Question,
-    Response,
-    DiscussionResult,
-    ConsensusPoint,
-    DivergentView,
-)
+from ..llm_provider import get_model
 from ..logging_config import get_logger
+from .models.discussion_models import AgentInsight
+from .models.discussion_models import AgentPersonality
+from .models.discussion_models import ConsensusPoint
+from .models.discussion_models import DiscussionResult
+from .models.discussion_models import DiscussionState
+from .models.discussion_models import DivergentView
+from .models.discussion_models import Question
+from .models.discussion_models import Response
 
 logger = get_logger(__name__)
 
@@ -53,29 +54,19 @@ class ConsensusBuilder:
             top_insights = self._extract_top_insights(agent_insights)
 
             # Identify consensus points
-            consensus_points = await self._identify_consensus_points(
-                agent_insights, questions, responses
-            )
+            consensus_points = await self._identify_consensus_points(agent_insights, questions, responses)
 
             # Identify divergent views
-            divergent_views = await self._identify_divergent_views(
-                agent_insights, questions, responses
-            )
+            divergent_views = await self._identify_divergent_views(agent_insights, questions, responses)
 
             # Generate summary and significance assessment
-            summary, significance = await self._generate_summary_and_significance(
-                document, top_insights, consensus_points, divergent_views
-            )
+            summary, significance = await self._generate_summary_and_significance(document, top_insights, consensus_points, divergent_views)
 
             # Extract key contributions
-            key_contributions = await self._extract_key_contributions(
-                document, top_insights, consensus_points
-            )
+            key_contributions = await self._extract_key_contributions(document, top_insights, consensus_points)
 
             # Calculate overall confidence
-            confidence_score = self._calculate_overall_confidence(
-                top_insights, consensus_points
-            )
+            confidence_score = self._calculate_overall_confidence(top_insights, consensus_points)
 
             # Build result
             result = DiscussionResult(
@@ -88,32 +79,18 @@ class ConsensusBuilder:
                 final_insights=top_insights,
                 confidence_score=confidence_score,
                 discussion_metadata={
-                    "total_iterations": (
-                        discussion_state.iteration_count if discussion_state else 0
-                    ),
-                    "final_phase": (
-                        discussion_state.current_phase
-                        if discussion_state
-                        else "unknown"
-                    ),
-                    "total_insights": sum(
-                        len(insights) for insights in agent_insights.values()
-                    ),
+                    "total_iterations": (discussion_state.iteration_count if discussion_state else 0),
+                    "final_phase": (discussion_state.current_phase if discussion_state else "unknown"),
+                    "total_insights": sum(len(insights) for insights in agent_insights.values()),
                     "total_questions": len(questions),
                     "total_responses": len(responses),
-                    "convergence_score": (
-                        discussion_state.convergence_score if discussion_state else 0.0
-                    ),
-                    "agent_insight_counts": {
-                        k.value: len(v) for k, v in agent_insights.items()
-                    },
+                    "convergence_score": (discussion_state.convergence_score if discussion_state else 0.0),
+                    "agent_insight_counts": {k.value: len(v) for k, v in agent_insights.items()},
                 },
                 completion_time=datetime.now(),
             )
 
-            self.logger.info(
-                f"Consensus building completed. Confidence: {confidence_score:.2f}"
-            )
+            self.logger.info(f"Consensus building completed. Confidence: {confidence_score:.2f}")
             return result
 
         except Exception as e:
@@ -121,7 +98,7 @@ class ConsensusBuilder:
             # Return minimal result on error
             return DiscussionResult(
                 document_title=document.metadata.title or "Untitled",
-                summary=f"Error building consensus: {str(e)}",
+                summary=f"Error building consensus: {e!s}",
                 key_contributions=[],
                 significance="Analysis failed",
                 confidence_score=0.0,
@@ -164,9 +141,7 @@ class ConsensusBuilder:
 
             for topic, insights in topic_groups.items():
                 # Check if there's consensus on this topic
-                consensus_data = await self._evaluate_topic_consensus(
-                    topic, insights, questions, responses
-                )
+                consensus_data = await self._evaluate_topic_consensus(topic, insights, questions, responses)
 
                 if consensus_data["has_consensus"]:
                     point = ConsensusPoint(
@@ -276,20 +251,10 @@ SIGNIFICANCE:
                 result.output,
                 re.DOTALL | re.IGNORECASE,
             )
-            significance_match = re.search(
-                r"SIGNIFICANCE:\s*(.+)", result.output, re.DOTALL | re.IGNORECASE
-            )
+            significance_match = re.search(r"SIGNIFICANCE:\s*(.+)", result.output, re.DOTALL | re.IGNORECASE)
 
-            summary = (
-                summary_match.group(1).strip()
-                if summary_match
-                else "Summary generation failed."
-            )
-            significance = (
-                significance_match.group(1).strip()
-                if significance_match
-                else "Significance assessment failed."
-            )
+            summary = summary_match.group(1).strip() if summary_match else "Summary generation failed."
+            significance = significance_match.group(1).strip() if significance_match else "Significance assessment failed."
 
             return summary, significance
 
@@ -321,32 +286,17 @@ SIGNIFICANCE:
                         "breakthrough",
                     ]
                 ):
-                    contributions.add(
-                        insight.content[:200] + "..."
-                        if len(insight.content) > 200
-                        else insight.content
-                    )
+                    contributions.add(insight.content[:200] + "..." if len(insight.content) > 200 else insight.content)
 
             # From consensus points
             for point in consensus_points:
-                if any(
-                    keyword in point.content.lower()
-                    for keyword in ["contribution", "novel", "innovation"]
-                ):
-                    contributions.add(
-                        point.content[:200] + "..."
-                        if len(point.content) > 200
-                        else point.content
-                    )
+                if any(keyword in point.content.lower() for keyword in ["contribution", "novel", "innovation"]):
+                    contributions.add(point.content[:200] + "..." if len(point.content) > 200 else point.content)
 
             # If no clear contributions, use top insights
             if not contributions and top_insights:
                 for insight in top_insights[:5]:
-                    contributions.add(
-                        insight.content[:200] + "..."
-                        if len(insight.content) > 200
-                        else insight.content
-                    )
+                    contributions.add(insight.content[:200] + "..." if len(insight.content) > 200 else insight.content)
 
             return list(contributions)
 
@@ -354,33 +304,23 @@ SIGNIFICANCE:
             self.logger.error(f"Error extracting key contributions: {e}")
             return []
 
-    def _calculate_overall_confidence(
-        self, top_insights: List[AgentInsight], consensus_points: List[ConsensusPoint]
-    ) -> float:
+    def _calculate_overall_confidence(self, top_insights: List[AgentInsight], consensus_points: List[ConsensusPoint]) -> float:
         """Calculate overall confidence in the analysis results."""
         if not top_insights:
             return 0.0
 
         # Average confidence from insights
-        insight_confidence = sum(insight.confidence for insight in top_insights) / len(
-            top_insights
-        )
+        insight_confidence = sum(insight.confidence for insight in top_insights) / len(top_insights)
 
         # Weight by consensus strength
-        consensus_weight = (
-            sum(point.strength for point in consensus_points)
-            / (len(consensus_points) + 1)
-            / 2
-        )
+        consensus_weight = sum(point.strength for point in consensus_points) / (len(consensus_points) + 1) / 2
 
         # Combined confidence
         overall_confidence = (insight_confidence * 0.7) + (consensus_weight * 0.3)
 
         return min(overall_confidence, 1.0)
 
-    def _group_insights_by_topic(
-        self, agent_insights: Dict[AgentPersonality, List[AgentInsight]]
-    ) -> Dict[str, List[AgentInsight]]:
+    def _group_insights_by_topic(self, agent_insights: Dict[AgentPersonality, List[AgentInsight]]) -> Dict[str, List[AgentInsight]]:
         """Group insights by topics/themes."""
         topic_groups = defaultdict(list)
 
@@ -397,33 +337,17 @@ SIGNIFICANCE:
         content_lower = content.lower()
 
         # Simple keyword-based topic extraction
-        if any(
-            keyword in content_lower
-            for keyword in ["method", "approach", "methodology"]
-        ):
+        if any(keyword in content_lower for keyword in ["method", "approach", "methodology"]):
             return "Methodology"
-        elif any(
-            keyword in content_lower for keyword in ["result", "finding", "outcome"]
-        ):
+        elif any(keyword in content_lower for keyword in ["result", "finding", "outcome"]):
             return "Results"
-        elif any(
-            keyword in content_lower
-            for keyword in ["limitation", "weakness", "drawback"]
-        ):
+        elif any(keyword in content_lower for keyword in ["limitation", "weakness", "drawback"]):
             return "Limitations"
-        elif any(
-            keyword in content_lower
-            for keyword in ["application", "use case", "practical"]
-        ):
+        elif any(keyword in content_lower for keyword in ["application", "use case", "practical"]):
             return "Applications"
-        elif any(
-            keyword in content_lower for keyword in ["theory", "framework", "model"]
-        ):
+        elif any(keyword in content_lower for keyword in ["theory", "framework", "model"]):
             return "Theoretical Contributions"
-        elif any(
-            keyword in content_lower
-            for keyword in ["innovation", "novel", "breakthrough"]
-        ):
+        elif any(keyword in content_lower for keyword in ["innovation", "novel", "breakthrough"]):
             return "Innovation"
         else:
             return "General Analysis"
@@ -442,10 +366,7 @@ SIGNIFICANCE:
 
             # Check for conflicting responses related to this topic
             conflicting_responses = [
-                resp
-                for resp in responses
-                if resp.stance.lower() in ["disagree", "challenge"]
-                and topic.lower() in resp.content.lower()
+                resp for resp in responses if resp.stance.lower() in ["disagree", "challenge"] and topic.lower() in resp.content.lower()
             ]
 
             if len(conflicting_responses) > len(insights) / 2:
@@ -453,23 +374,12 @@ SIGNIFICANCE:
 
             # Build consensus content
             supporting_agents = list(set(insight.agent_id for insight in insights))
-            avg_importance = sum(
-                insight.importance_score for insight in insights
-            ) / len(insights)
-            avg_confidence = sum(insight.confidence for insight in insights) / len(
-                insights
-            )
+            avg_importance = sum(insight.importance_score for insight in insights) / len(insights)
+            avg_confidence = sum(insight.confidence for insight in insights) / len(insights)
 
             # Synthesize consensus content
             consensus_content = f"Analysis of {topic}: " + "; ".join(
-                [
-                    (
-                        insight.content[:100] + "..."
-                        if len(insight.content) > 100
-                        else insight.content
-                    )
-                    for insight in insights[:3]
-                ]
+                [(insight.content[:100] + "..." if len(insight.content) > 100 else insight.content) for insight in insights[:3]]
             )
 
             return {
@@ -485,9 +395,7 @@ SIGNIFICANCE:
             self.logger.error(f"Error evaluating topic consensus: {e}")
             return {"has_consensus": False}
 
-    def _group_conflicts_by_topic(
-        self, challenged_insights: List[Dict]
-    ) -> Dict[str, Dict]:
+    def _group_conflicts_by_topic(self, challenged_insights: List[Dict]) -> Dict[str, Dict]:
         """Group conflicts by topic."""
         conflicts = defaultdict(list)
 
@@ -515,9 +423,7 @@ SIGNIFICANCE:
                     "content": main_conflict["insight_content"],
                     "holding_agent": main_conflict["question"].from_agent,
                     "reasoning": main_conflict["response"].content,
-                    "counter_arguments": [
-                        c["response"].content for c in conflict_list[1:]
-                    ],
+                    "counter_arguments": [c["response"].content for c in conflict_list[1:]],
                 }
 
         return result

@@ -22,7 +22,6 @@ import sys
 import logfire
 
 from .core import comprehensive_analysis
-from .core import compute
 from .core import discussion_analysis
 from .core import main
 from .core import run_react_analysis
@@ -89,9 +88,7 @@ MODELS:
         help="Single agent analysis",
         description="Use a single SimpleAgent for basic analysis",
     )
-    simple_parser.add_argument(
-        "document_file", help="Path to the document file to analyze (PDF or TXT)"
-    )
+    simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     simple_parser.add_argument(
         "--model",
         default="deepseek/deepseek-chat",
@@ -117,9 +114,7 @@ MODELS:
         help="ReAct agent iterative analysis",
         description="Use ReAct agent for intelligent iterative analysis with reasoning and acting pattern",
     )
-    react_parser.add_argument(
-        "document_file", help="Path to the document file to analyze (PDF or TXT)"
-    )
+    react_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     react_parser.add_argument(
         "task",
         nargs="?",
@@ -150,9 +145,7 @@ MODELS:
         help="Multi-agent discussion-based analysis",
         description="Use multiple personality-driven agents for collaborative analysis through discussion and consensus-building",
     )
-    discussion_parser.add_argument(
-        "document_file", help="Path to the document file to analyze (PDF or TXT)"
-    )
+    discussion_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     discussion_parser.add_argument(
         "--model",
         default="deepseek/deepseek-chat",
@@ -166,9 +159,7 @@ MODELS:
 
     # Handle different commands
     if args.command == "coordinate":
-        logger.debug(
-            f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}"
-        )
+        logger.debug(f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}")
 
         try:
             result = asyncio.run(comprehensive_analysis(args.pdf_file, args.model))
@@ -178,9 +169,7 @@ MODELS:
             print("=" * 60)
             print(f"Analysis Plan: {result.analysis_plan.reasoning}")
             print(f"Total Execution Time: {result.total_execution_time:.2f} seconds")
-            print(
-                f"Agents Executed: {result.execution_summary['total_agents_executed']}"
-            )
+            print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
             print(f"Successful Agents: {result.execution_summary['successful_agents']}")
             print(f"Failed Agents: {result.execution_summary['failed_agents']}")
 
@@ -223,9 +212,7 @@ MODELS:
             return 1
 
     elif args.command == "simple":
-        logger.debug(
-            f"Running simple mode with file: {args.document_file}, model: {args.model}"
-        )
+        logger.debug(f"Running simple mode with file: {args.document_file}, model: {args.model}")
 
         try:
             result = asyncio.run(main(args.document_file, args.model))
@@ -241,9 +228,7 @@ MODELS:
             return 1
 
     elif args.command == "discussion":
-        logger.debug(
-            f"Running discussion mode with file: {args.document_file}, model: {args.model}"
-        )
+        logger.debug(f"Running discussion mode with file: {args.document_file}, model: {args.model}")
 
         try:
             result = asyncio.run(discussion_analysis(args.document_file, args.model))
@@ -294,9 +279,7 @@ MODELS:
                         for evidence in insight.supporting_evidence:
                             print(f"       - {evidence}")
                     if insight.related_sections:
-                        print(
-                            f"     Related Sections: {', '.join(insight.related_sections)}"
-                        )
+                        print(f"     Related Sections: {', '.join(insight.related_sections)}")
                     if i < len(result.final_insights):
                         print()
 

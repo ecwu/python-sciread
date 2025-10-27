@@ -1,8 +1,12 @@
 """Vector index wrapper for semantic search using ChromaDB."""
 
-import chromadb
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+
+import chromadb
 
 from .models import Chunk
 
@@ -41,13 +45,11 @@ class VectorIndex:
         self._collection.add(
             embeddings=embeddings,
             documents=[chunk.content for chunk in chunks],
-            metadatas=[{
-                "source": chunk.chunk_name,
-                "position": chunk.position,
-                "word_count": chunk.word_count,
-                "confidence": chunk.confidence
-            } for chunk in chunks],
-            ids=[chunk.id for chunk in chunks]
+            metadatas=[
+                {"source": chunk.chunk_name, "position": chunk.position, "word_count": chunk.word_count, "confidence": chunk.confidence}
+                for chunk in chunks
+            ],
+            ids=[chunk.id for chunk in chunks],
         )
 
     def search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
@@ -61,10 +63,7 @@ class VectorIndex:
             List of search results with id, distance, metadata, and content
         """
         try:
-            results = self._collection.query(
-                query_embeddings=[query_embedding],
-                n_results=top_k
-            )
+            results = self._collection.query(query_embeddings=[query_embedding], n_results=top_k)
         except Exception as e:
             raise RuntimeError(f"Failed to query vector index: {e}") from e
 
@@ -76,27 +75,18 @@ class VectorIndex:
             results["ids"][0],
             results["distances"][0],
             results["metadatas"][0],
-            results["documents"][0]
+            results["documents"][0],
         )
 
         for i in range(len(ids)):
-            result_list.append({
-                "id": ids[i],
-                "distance": distances[i],
-                "metadata": metadatas[i],
-                "content": documents[i]
-            })
+            result_list.append({"id": ids[i], "distance": distances[i], "metadata": metadatas[i], "content": documents[i]})
         return result_list
 
     def get_collection_info(self) -> Dict[str, Any]:
         """Get information about the collection."""
         try:
             count = self._collection.count()
-            return {
-                "name": self._collection.name,
-                "count": count,
-                "persist_path": str(self.persist_path) if self.persist_path else None
-            }
+            return {"name": self._collection.name, "count": count, "persist_path": str(self.persist_path) if self.persist_path else None}
         except Exception as e:
             return {"error": str(e)}
 

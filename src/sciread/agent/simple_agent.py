@@ -4,23 +4,23 @@ This module provides the main SimpleAgent class that can analyze academic papers
 using pydantic-ai framework and the existing LLM provider infrastructure.
 """
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Union
+from dataclasses import dataclass
+from dataclasses import field
+from typing import Any
+from typing import Dict
+from typing import Optional
+from typing import Union
 
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent
+from pydantic_ai import RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
 from ..document.document import Document
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .error_handling import (
-    AgentError,
-    AnalysisTimeoutError,
-    handle_model_retry,
-    safe_agent_execution,
-    validate_document_content,
-)
+from .error_handling import handle_model_retry
+from .error_handling import safe_agent_execution
 from .models.simple_models import SimpleAnalysisResult
 from .prompts.simple import DEFAULT_SYSTEM_PROMPT
 from .prompts.simple import build_analysis_prompt
@@ -102,7 +102,7 @@ class SimpleAgent:
                 raise handle_model_retry(
                     ValueError("Document has no text content to analyze"),
                     "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content."
+                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
                 )
 
             # Process text based on dependencies
@@ -118,21 +118,9 @@ class SimpleAgent:
             document_metadata = None
             if deps.include_metadata and deps.document:
                 document_metadata = {
-                    "source_path": (
-                        str(deps.document.source_path)
-                        if deps.document.source_path
-                        else None
-                    ),
-                    "title": (
-                        deps.document.metadata.title
-                        if deps.document.metadata.title
-                        else None
-                    ),
-                    "author": (
-                        deps.document.metadata.author
-                        if deps.document.metadata.author
-                        else None
-                    ),
+                    "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
+                    "title": (deps.document.metadata.title if deps.document.metadata.title else None),
+                    "author": (deps.document.metadata.author if deps.document.metadata.author else None),
                 }
 
             full_prompt = build_analysis_prompt(
@@ -168,9 +156,7 @@ class SimpleAgent:
         Returns:
             Generated analysis report as a string
         """
-        self.logger.debug(
-            f"Starting document analysis for: {document.source_path or 'text document'}"
-        )
+        self.logger.debug(f"Starting document analysis for: {document.source_path or 'text document'}")
 
         # Create dependencies object
         deps = SimpleAnalysisDeps(
@@ -187,11 +173,9 @@ class SimpleAgent:
             result = await safe_agent_execution(
                 self.agent.run("Analyze the document according to the task", deps=deps),
                 timeout=self.timeout,
-                operation_name="document analysis"
+                operation_name="document analysis",
             )
-            self.logger.info(
-                f"Document analysis completed successfully. Total characters in report: {len(result.output)}"
-            )
+            self.logger.info(f"Document analysis completed successfully. Total characters in report: {len(result.output)}")
             return result.output
 
         except Exception as e:
@@ -244,7 +228,7 @@ class SimpleAgent:
                 raise handle_model_retry(
                     ValueError("Document has no text content to analyze"),
                     "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content."
+                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
                 )
 
             # Process text based on dependencies
@@ -257,21 +241,9 @@ class SimpleAgent:
             document_metadata = None
             if deps.include_metadata and deps.document:
                 document_metadata = {
-                    "source_path": (
-                        str(deps.document.source_path)
-                        if deps.document.source_path
-                        else None
-                    ),
-                    "title": (
-                        deps.document.metadata.title
-                        if deps.document.metadata.title
-                        else None
-                    ),
-                    "author": (
-                        deps.document.metadata.author
-                        if deps.document.metadata.author
-                        else None
-                    ),
+                    "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
+                    "title": (deps.document.metadata.title if deps.document.metadata.title else None),
+                    "author": (deps.document.metadata.author if deps.document.metadata.author else None),
                 }
 
             full_prompt = build_analysis_prompt(
@@ -298,11 +270,9 @@ class SimpleAgent:
             result = await safe_agent_execution(
                 structured_agent.run("Analyze the document according to the task", deps=deps),
                 timeout=self.timeout,
-                operation_name="structured document analysis"
+                operation_name="structured document analysis",
             )
-            self.logger.info(
-                f"Structured document analysis completed successfully. Report length: {len(result.output.report)}"
-            )
+            self.logger.info(f"Structured document analysis completed successfully. Report length: {len(result.output.report)}")
             return result.output
 
         except Exception as e:

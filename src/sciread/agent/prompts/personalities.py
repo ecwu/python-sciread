@@ -1,8 +1,10 @@
 """Personality-based prompts for multi-agent discussion system."""
 
-from typing import Dict, Any, List
-from ..models.discussion_models import AgentPersonality
+from typing import Any
+from typing import Dict
+from typing import List
 
+from ..models.discussion_models import AgentPersonality
 
 CRITICAL_EVALUATOR_SYSTEM_PROMPT = """You are a Critical Evaluator, an expert in identifying limitations, methodological flaws, and potential weaknesses in academic research.
 
@@ -154,7 +156,7 @@ def build_insight_generation_prompt(
         sections_text = "\n\n**Note:** No specific section content was provided. Base your analysis on the abstract."
 
     user_prompt = f"""
-As a {personality.value.replace('_', ' ').title()}, analyze the following academic paper and generate your most important insights.
+As a {personality.value.replace("_", " ").title()}, analyze the following academic paper and generate your most important insights.
 
 **Paper Information:**
 Title: {document_title}
@@ -166,9 +168,9 @@ Abstract: {document_abstract}
 {chr(10).join(f"- {section}" for section in key_sections)}
 
 **Discussion Context:**
-Current Phase: {discussion_context.get('phase', 'initial_analysis')}
-Iteration: {discussion_context.get('iteration', 1)}
-Total Insights Generated So Far: {discussion_context.get('total_insights', 0)}
+Current Phase: {discussion_context.get("phase", "initial_analysis")}
+Iteration: {discussion_context.get("iteration", 1)}
+Total Insights Generated So Far: {discussion_context.get("total_insights", 0)}
 
 **Your Task:**
 Generate 2-3 most significant insights from your personality's perspective based on the content you've read. Each insight should:

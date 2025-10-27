@@ -343,23 +343,21 @@ class Document:
         try:
             config = get_config()
             vector_config = config.vector_store
-            ollama_client = OllamaClient(
-                model=vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings
-            )
-            embeddings = ollama_client.get_embeddings(
-                [c.content for c in self._chunks],
-                batch_size=vector_config.batch_size
-            )
+            ollama_client = OllamaClient(model=vector_config.embedding_model, cache_embeddings=vector_config.cache_embeddings)
+            embeddings = ollama_client.get_embeddings([c.content for c in self._chunks], batch_size=vector_config.batch_size)
 
             persist_path = None
             if persist:
                 store_path = Path(vector_config.path).expanduser()
                 store_path.mkdir(parents=True, exist_ok=True)
-                doc_id = self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
+                doc_id = self.metadata.file_hash or (
+                    Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
+                )
                 persist_path = store_path / doc_id
 
-            collection_name = self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
+            collection_name = self.metadata.file_hash or (
+                Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
+            )
             self.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
             self.vector_index.add_chunks(self._chunks, embeddings)
             self.logger.info("Vector index built successfully.")
@@ -382,10 +380,7 @@ class Document:
         try:
             config = get_config()
             vector_config = config.vector_store
-            ollama_client = OllamaClient(
-                model=vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings
-            )
+            ollama_client = OllamaClient(model=vector_config.embedding_model, cache_embeddings=vector_config.cache_embeddings)
 
             query_embedding = ollama_client.get_embedding(query)
             if not query_embedding:
@@ -409,7 +404,9 @@ class Document:
         self.logger.info(f"Saving document state to {output_path}...")
 
         try:
-            vector_index_path_str = str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
+            vector_index_path_str = (
+                str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
+            )
 
             # Convert metadata to dict, handling Path objects and None values
             metadata_dict = asdict(self.metadata)
@@ -451,7 +448,7 @@ class Document:
         logger.info(f"Loading document from state file: {state_path}")
 
         try:
-            with open(state_path, "r", encoding="utf-8") as f:
+            with open(state_path, encoding="utf-8") as f:
                 doc_state = json.load(f)
 
             # Reconstruct metadata with proper Path object and datetime handling
@@ -461,6 +458,7 @@ class Document:
 
             # Handle datetime parsing
             from datetime import datetime
+
             if metadata_dict.get("created_at"):
                 metadata_dict["created_at"] = datetime.fromisoformat(metadata_dict["created_at"])
             if metadata_dict.get("modified_at"):
