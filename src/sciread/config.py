@@ -36,36 +36,41 @@ class RegexSectionSplitterConfig(BaseModel):
     custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
 
 
-class TopicFlowSplitterConfig(BaseModel):
-    """Configuration for TopicFlowSplitter."""
+class ConsecutiveFlowSplitterConfig(BaseModel):
+    """Configuration for ConsecutiveFlowSplitter."""
 
     model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
     base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
-    # Continuity thresholds
-    local_continuity_threshold: float = Field(default=0.6, description="Threshold for local continuity (adjacent sentences)")
-    context_continuity_threshold: float = Field(
-        default=0.65,
-        description="Threshold for context continuity (segment vs sentence)",
-    )
-    # Size constraints
-    min_segment_sentences: int = Field(default=4, description="Minimum sentences per segment for content-based cuts")
-    min_segment_chars: int = Field(default=300, description="Minimum characters per segment")
+    similarity_threshold: float = Field(default=0.45, description="Threshold for consecutive similarity (adjacent sentences)")
+    min_segment_sentences: int = Field(default=2, description="Minimum sentences per segment")
+    min_segment_chars: int = Field(default=200, description="Minimum characters per segment")
     max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
-    # Processing parameters
     embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
     timeout: int = Field(default=30, description="Request timeout in seconds")
     cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
-    # Adaptive thresholds
-    adaptive_floor: float = Field(default=0.4, description="Adaptive floor for local continuity detection")
-    soft_target: float = Field(default=0.7, description="Soft target for context continuity")
+
+
+class CumulativeFlowSplitterConfig(BaseModel):
+    """Configuration for CumulativeFlowSplitter."""
+
+    model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
+    base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
+    similarity_threshold: float = Field(default=0.45, description="Threshold for cumulative similarity (segment vs next sentence)")
+    min_segment_sentences: int = Field(default=2, description="Minimum sentences per segment")
+    min_segment_chars: int = Field(default=200, description="Minimum characters per segment")
+    max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
+    embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
+    timeout: int = Field(default=30, description="Request timeout in seconds")
+    cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
 
 
 class DocumentSplitterConfig(BaseModel):
     """Configuration for document splitters."""
 
-    default_splitter: str = Field(default="topic_flow", description="Default splitter to use")
+    default_splitter: str = Field(default="consecutive_flow", description="Default splitter to use")
     regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
-    topic_flow: TopicFlowSplitterConfig = Field(default_factory=TopicFlowSplitterConfig)
+    consecutive_flow: ConsecutiveFlowSplitterConfig = Field(default_factory=ConsecutiveFlowSplitterConfig)
+    cumulative_flow: CumulativeFlowSplitterConfig = Field(default_factory=CumulativeFlowSplitterConfig)
 
 
 class MineruConfig(BaseModel):

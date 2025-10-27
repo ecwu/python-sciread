@@ -12,8 +12,9 @@ from .document_builder import DocumentBuilder
 from .external_clients import MineruClient
 from .external_clients import OllamaClient
 from .models import DocumentMetadata
+from .splitters.consecutive_flow import ConsecutiveFlowSplitter
+from .splitters.cumulative_flow import CumulativeFlowSplitter
 from .splitters.semantic_splitter import SemanticSplitter
-from .splitters.topic_flow import TopicFlowSplitter
 
 
 class DocumentFactory:
@@ -74,24 +75,47 @@ class DocumentFactory:
         return builder.from_file(file_path, to_markdown=use_markdown).with_splitter(splitter)
 
     @staticmethod
-    def create_topic_flow_document(
-        file_path: Union[str, Path], ollama_client: Optional[OllamaClient] = None, **topic_flow_kwargs
+    def create_consecutive_flow_document(
+        file_path: Union[str, Path], ollama_client: Optional[OllamaClient] = None, **consecutive_flow_kwargs
     ) -> "Document":
         """
-        Create document using TopicFlow splitting.
+        Create document using ConsecutiveFlow splitting.
 
         Args:
             file_path: Path to the file.
             ollama_client: Optional Ollama client.
-            **topic_flow_kwargs: Additional arguments for TopicFlowSplitter.
+            **consecutive_flow_kwargs: Additional arguments for ConsecutiveFlowSplitter.
 
         Returns:
-            Document instance split using TopicFlow algorithm.
+            Document instance split using ConsecutiveFlow algorithm.
         """
         if ollama_client is None:
             ollama_client = OllamaClient()
 
-        splitter = TopicFlowSplitter(ollama_client=ollama_client, **topic_flow_kwargs)
+        splitter = ConsecutiveFlowSplitter(ollama_client=ollama_client, **consecutive_flow_kwargs)
+        builder = DocumentBuilder()
+        builder.splitter = splitter
+        return builder.from_file(file_path, auto_split=True)
+
+    @staticmethod
+    def create_cumulative_flow_document(
+        file_path: Union[str, Path], ollama_client: Optional[OllamaClient] = None, **cumulative_flow_kwargs
+    ) -> "Document":
+        """
+        Create document using CumulativeFlow splitting.
+
+        Args:
+            file_path: Path to the file.
+            ollama_client: Optional Ollama client.
+            **cumulative_flow_kwargs: Additional arguments for CumulativeFlowSplitter.
+
+        Returns:
+            Document instance split using CumulativeFlow algorithm.
+        """
+        if ollama_client is None:
+            ollama_client = OllamaClient()
+
+        splitter = CumulativeFlowSplitter(ollama_client=ollama_client, **cumulative_flow_kwargs)
         builder = DocumentBuilder()
         builder.splitter = splitter
         return builder.from_file(file_path, auto_split=True)

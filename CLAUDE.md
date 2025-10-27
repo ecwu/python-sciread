@@ -66,10 +66,11 @@ src/sciread/
 │   └── splitters/   # Text splitters for chunking documents
 │       ├── __init__.py
 │       ├── base.py         # Base splitter interface
+│       ├── consecutive_flow.py   # Consecutive similarity-based splitter
+│       ├── cumulative_flow.py    # Cumulative similarity-based splitter
 │       ├── markdown_splitter.py # Markdown-aware splitter
 │       ├── regex_section_splitter.py # Regex-based academic paper splitter
-│       ├── semantic_splitter.py   # Semantic splitter using embeddings
-│       └── topic_flow.py   # Topic flow splitter
+│       └── semantic_splitter.py   # Semantic splitter using embeddings
 ├── llm_provider/   # LLM provider module with factory pattern
 │   ├── __init__.py  # Main interface exports get_model() function
 │   ├── factory.py   # ModelFactory for creating model instances
@@ -158,7 +159,8 @@ The `document` module provides a complete pipeline for processing academic paper
 - **MarkdownSplitter**: Markdown-aware splitter for structured content
 - **RegexSectionSplitter**: Advanced regex-based academic paper section detection
 - **SemanticSplitter**: Semantic splitter using embeddings for intelligent chunking
-- **TopicFlowSplitter**: Bottom-up sentence splitter that grows segments based on semantic continuity
+- **ConsecutiveFlowSplitter**: Sentence splitter using consecutive similarity (adjacent sentences)
+- **CumulativeFlowSplitter**: Sentence splitter using cumulative similarity (segment vs next sentence)
 
 **Key Features**:
 - Multi-format document loading (PDF, TXT) with markdown conversion support
@@ -203,6 +205,30 @@ The `config/sciread.toml` file supports:
 - API key management
 - Base URL customization
 - Model-specific settings
+- Splitter configurations for different chunking strategies
+
+**Splitter Configuration Example**:
+
+```toml
+[document_splitter]
+default_splitter = "consecutive_flow"
+
+[document_splitter.consecutive_flow]
+model = "embeddinggemma:latest"
+base_url = "http://localhost:11434"
+similarity_threshold = 0.45
+min_segment_sentences = 2
+min_segment_chars = 200
+max_segment_chars = 2000
+
+[document_splitter.cumulative_flow]
+model = "embeddinggemma:latest"
+base_url = "http://localhost:11434"
+similarity_threshold = 0.45
+min_segment_sentences = 2
+min_segment_chars = 200
+max_segment_chars = 2000
+```
 
 #### Logging System
 The project uses loguru for structured logging with comprehensive configuration options:
@@ -351,9 +377,21 @@ sections_by_name = doc.get_sections_by_name(["abstract", "introduction"])
 ```python
 from sciread.document import DocumentBuilder
 from sciread.document.external_clients import MineruClient, OllamaClient
-from sciread.document.splitters import SemanticSplitter
+from sciread.document.splitters import SemanticSplitter, ConsecutiveFlowSplitter, CumulativeFlowSplitter
 
-# Create custom processing pipeline
+# Create custom processing pipeline with flow splitters
+builder = DocumentBuilder(
+    splitter=ConsecutiveFlowSplitter(ollama_client=OllamaClient(), similarity_threshold=0.4),
+    mineru_client=MineruClient()
+)
+
+# Alternative: Use cumulative flow splitter
+builder = DocumentBuilder(
+    splitter=CumulativeFlowSplitter(ollama_client=OllamaClient(), similarity_threshold=0.5),
+    mineru_client=MineruClient()
+)
+
+# Traditional semantic splitter
 builder = DocumentBuilder(
     splitter=SemanticSplitter(ollama_client=OllamaClient()),
     mineru_client=MineruClient()
@@ -361,6 +399,56 @@ builder = DocumentBuilder(
 
 # Build document with custom settings
 doc = builder.from_file("paper.pdf", to_markdown=True, auto_split=True)
+```
+
+### Using DocumentFactory with Flow Splitters
+
+```python
+from sciread.document import DocumentFactory
+from sciread.document.external_clients import OllamaClient
+
+# Create document using consecutive flow splitting
+doc = DocumentFactory.create_consecutive_flow_document(
+    "paper.pdf",
+    ollama_client=OllamaClient(),
+    similarity_threshold=0.45,
+    min_segment_chars=200
+)
+
+# Create document using cumulative flow splitting
+doc = DocumentFactory.create_cumulative_flow_document(
+    "paper.pdf",
+    ollama_client=OllamaClient(),
+    similarity_threshold=0.4,
+    max_segment_chars=1500
+)
+```
+
+### Flow Splitter Configuration
+
+```python
+from sciread.document import ConsecutiveFlowSplitter, CumulativeFlowSplitter
+from sciread.document.external_clients import OllamaClient
+
+# ConsecutiveFlowSplitter - compares adjacent sentences
+consecutive_splitter = ConsecutiveFlowSplitter(
+    ollama_client=OllamaClient(),
+    similarity_threshold=0.45,  # Split when similarity < threshold
+    min_segment_sentences=2,    # Minimum sentences per segment
+    min_segment_chars=200,      # Minimum characters per segment
+    max_segment_chars=2000,     # Hard budget limit
+    embedding_batch_size=10     # Batch size for embeddings
+)
+
+# CumulativeFlowSplitter - compares segment with next sentence
+cumulative_splitter = CumulativeFlowSplitter(
+    ollama_client=OllamaClient(),
+    similarity_threshold=0.45,  # Split when similarity < threshold
+    min_segment_sentences=2,    # Minimum sentences per segment
+    min_segment_chars=200,      # Minimum characters per segment
+    max_segment_chars=2000,     # Hard budget limit
+    embedding_batch_size=10     # Batch size for embeddings
+)
 ```
 
 ### Adding Custom Loaders and Splitters
