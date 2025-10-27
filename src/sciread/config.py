@@ -84,6 +84,15 @@ class MineruConfig(BaseModel):
     )
 
 
+class VectorStoreConfig(BaseModel):
+    """Configuration for vector store (RAG functionality)."""
+
+    path: str = Field(default="~/.sciread/vector_store", description="Path to store vector indices")
+    embedding_model: str = Field(default="embeddinggemma:latest", description="Model for embeddings")
+    batch_size: int = Field(default=10, description="Embedding batch size")
+    cache_embeddings: bool = Field(default=True, description="Cache embeddings for better performance")
+
+
 class DefaultConfig(BaseModel):
     """Default provider and model settings."""
 
@@ -114,6 +123,7 @@ class ScireadConfig(BaseSettings):
     default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-chat"))
     document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
     mineru: MineruConfig = Field(default_factory=MineruConfig)
+    vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
 
     config_file: Optional[Path] = Field(default=None, description="Path to configuration file")
 
@@ -180,11 +190,16 @@ class ScireadConfig(BaseSettings):
             mineru_config["token"] = mineru_token
             mineru = MineruConfig(**mineru_config)
 
+            # Extract vector store configuration
+            vector_store_config = config_data.get("vector_store", {})
+            vector_store = VectorStoreConfig(**vector_store_config)
+
             return cls(
                 llm_providers=providers,
                 default=default_settings,
                 document_splitters=document_splitters,
                 mineru=mineru,
+                vector_store=vector_store,
                 config_file=config_path,
             )
 

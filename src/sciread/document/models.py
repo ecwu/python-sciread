@@ -1,5 +1,6 @@
 """Core data models for document processing."""
 
+import uuid
 from dataclasses import dataclass
 from dataclasses import field
 from datetime import datetime
@@ -12,6 +13,7 @@ from typing import Optional
 class Chunk:
     """A chunk of text from a document with metadata."""
 
+    id: str = field(default_factory=lambda: str(uuid.uuid4()), init=False)
     content: str
     chunk_name: str = "unknown"  # abstract, introduction, methods, etc.
     position: int = 0  # Sequential position in document
@@ -58,6 +60,7 @@ class DocumentMetadata:
     source_path: Optional[Path] = None
     file_type: Optional[str] = None  # pdf, txt, etc.
     file_size: Optional[int] = None  # in bytes
+    file_hash: Optional[str] = None  # hash of file content for identification
     created_at: Optional[datetime] = None
     modified_at: Optional[datetime] = None
     title: Optional[str] = None

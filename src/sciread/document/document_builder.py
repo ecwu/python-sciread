@@ -191,9 +191,7 @@ class DocumentBuilder:
 
         # Split the text
         chunks = active_splitter.split(doc.text)
-        doc._chunks = chunks
-        doc._split = True
-        doc.processing_state.update_timestamp("split")
+        doc._set_chunks(chunks)
         doc.processing_state.add_note(
             f"Document split using {active_splitter.splitter_name}"
         )

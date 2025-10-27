@@ -87,6 +87,20 @@ class OllamaClient:
 
         return batch_embeddings
 
+    def get_embedding(self, text: str) -> Optional[list[float]]:
+        """Get embedding for a single text from Ollama API."""
+        # Check cache first
+        cache_key = f"{self.model}:{hash(text)}"
+        if self.cache_embeddings and cache_key in self.embedding_cache:
+            return self.embedding_cache[cache_key]
+
+        # Get embedding from Ollama
+        embedding = self._get_single_embedding(text)
+        if embedding and self.cache_embeddings:
+            self.embedding_cache[cache_key] = embedding
+
+        return embedding
+
     def _get_single_embedding(self, text: str) -> Optional[list[float]]:
         """Get embedding for a single text from Ollama API."""
         try:

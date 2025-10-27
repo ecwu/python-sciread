@@ -59,3 +59,14 @@ enable_table = true       # Enable table extraction
 language = "ch"           # Document language: "ch" for Chinese, "en" for English
 timeout = 600             # Processing timeout in seconds
 poll_interval = 10        # Status poll interval in seconds
+
+# Vector store configuration for RAG functionality
+[vector_store]
+# Path to store vector indices for persistent search
+path = "~/.sciread/vector_store"
+# Default model for embeddings (should match your Ollama setup)
+embedding_model = "embeddinggemma:latest"
+# Embedding batch size
+batch_size = 10
+# Cache embeddings for better performance
+cache_embeddings = true
