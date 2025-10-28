@@ -8,10 +8,11 @@ Main Interface:
     SimpleAgent - Simple agent class for basic document analysis
     CoordinateAgent - Multi-agent controller with expert sub-agents
     ReActAgent - Reasoning and Acting agent for iterative analysis
+    RAGReActAgent - Retrieval-Augmented Generation + ReAct agent for semantic search-based analysis
     DiscussionAgent - Multi-agent discussion system with personality-driven analysis
 
 Example Usage:
-    from sciread.agent import SimpleAgent, CoordinateAgent, ReActAgent, DiscussionAgent
+    from sciread.agent import SimpleAgent, CoordinateAgent, ReActAgent, RAGReActAgent, DiscussionAgent
     from sciread.document import Document
 
     # Create a simple agent
@@ -22,6 +23,9 @@ Example Usage:
 
     # Create a ReAct agent
     react_agent = ReActAgent("deepseek/deepseek-chat")
+
+    # Create a RAG ReAct agent
+    rag_react_agent = RAGReActAgent("deepseek/deepseek-chat")
 
     # Create a discussion-based multi-agent system
     discussion_agent = DiscussionAgent("deepseek/deepseek-chat")
@@ -37,6 +41,9 @@ Example Usage:
 
     # Generate iterative analysis with ReAct agent
     react_result = await react_agent.analyze_document(doc, "What are the main contributions?")
+
+    # Generate semantic search-based analysis with RAG ReAct agent
+    rag_react_result = await rag_react_agent.analyze_document(doc, "What are the main contributions?")
 
     # Generate discussion-based analysis with personality agents
     discussion_result = await discussion_agent.analyze_document(doc)
@@ -71,6 +78,10 @@ from .models.discussion_models import Response
 from .models.react_models import ReActAgentInput
 from .models.react_models import ReActAgentOutput
 
+# RAG ReActAgent models - now imported from models folder
+from .models.rag_react_models import RAGReActAgentInput
+from .models.rag_react_models import RAGReActAgentOutput
+
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
 from .models.task_models import Task
@@ -88,6 +99,10 @@ from .react_agent import analyze_document_with_react
 from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
+
+# RAG ReActAgent and utility functions
+from .rag_react_agent import RAGReActAgent
+from .rag_react_agent import analyze_document_with_rag_react
 from .simple_agent import SimpleAgent
 from .task_queue import TaskQueueManager
 from .text_utils import remove_references
@@ -102,6 +117,9 @@ __all__ = [
     "MetadataExtractionResult",
     "MethodologyResult",
     "PreviousMethodsResult",
+    "RAGReActAgent",
+    "RAGReActAgentInput",
+    "RAGReActAgentOutput",
     "ReActAgent",
     "ReActAgentInput",
     "ReActAgentOutput",
@@ -131,6 +149,7 @@ __all__ = [
     "TaskResult",
     "TaskQueue",
     # Utility functions
+    "analyze_document_with_rag_react",
     "analyze_document_with_react",
     "format_status_summary",
     "get_initial_sections",

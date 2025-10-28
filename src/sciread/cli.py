@@ -24,6 +24,7 @@ import logfire
 from .core import comprehensive_analysis
 from .core import discussion_analysis
 from .core import main
+from .core import run_rag_react_analysis
 from .core import run_react_analysis
 from .logging_config import logger
 
@@ -53,6 +54,8 @@ MODES:
          (metadata, methodology, experiments, future directions)
   react  - Uses ReAct agent for intelligent iterative analysis
          with reasoning and acting pattern
+  rag_react - Uses RAG ReAct agent for semantic search-based iterative analysis
+         with retrieval-augmented generation
   discussion - Uses DiscussionAgent with multiple personality-driven agents
          for collaborative analysis through discussion and consensus-building
 
@@ -68,6 +71,9 @@ EXAMPLES:
   python -msciread react paper.pdf
   python -msciread react paper.pdf "What are the main contributions?"
   python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
+  python -msciread rag_react paper.pdf
+  python -msciread rag_react paper.pdf "What are the main contributions?"
+  python -msciread rag_react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
   python -msciread discussion paper.pdf
   python -msciread discussion paper.pdf deepseek-reasoner
 
@@ -150,6 +156,37 @@ MODELS:
         "--model",
         default="deepseek/deepseek-chat",
         help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+    )
+
+    # RAG ReAct mode parser
+    rag_react_parser = subparsers.add_parser(
+        "rag_react",
+        help="RAG ReAct agent iterative analysis",
+        description="Use RAG ReAct agent for semantic search-based iterative analysis with retrieval-augmented generation",
+    )
+    rag_react_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    rag_react_parser.add_argument(
+        "task",
+        nargs="?",
+        default="Analyze this academic paper focusing on: 1) What are the research questions and objectives? 2) What methodology and approach did the researchers use? 3) What are the key findings and results? 4) What are the main contributions and significance of this work?",
+        help="Analysis task or question about the document (default: comprehensive academic analysis)",
+    )
+    rag_react_parser.add_argument(
+        "--model",
+        default="deepseek/deepseek-chat",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+    )
+    rag_react_parser.add_argument(
+        "--max-loops",
+        type=int,
+        default=8,
+        metavar="N",
+        help="Maximum number of analysis iterations (default: 8)",
+    )
+    rag_react_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Hide progress display during analysis",
     )
 
     # Parse arguments (skip the script name)
@@ -312,6 +349,33 @@ MODELS:
             return 0
         except Exception as e:
             logger.error(f"Discussion analysis failed: {e}")
+            print(f"Error: {e}")
+            return 1
+
+    elif args.command == "rag_react":
+        task_display = args.task[:100] + "..." if len(args.task) > 100 else args.task
+        logger.debug(
+            f"Running rag_react mode with file: {args.document_file}, task: {task_display}, model: {args.model}, max_loops: {args.max_loops}, show_progress: {not args.no_progress}"
+        )
+
+        try:
+            result = run_rag_react_analysis(
+                args.document_file,
+                args.task,
+                model=args.model,
+                max_loops=args.max_loops,
+                show_progress=not args.no_progress,
+            )
+            # The final report is already printed if show_progress=True
+            if args.no_progress:
+                print("=" * 60)
+                print("RAG REACT ANALYSIS RESULT:")
+                print("=" * 60)
+                print(result)
+                print("=" * 60)
+            return 0
+        except Exception as e:
+            logger.error(f"RAG ReAct analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 
