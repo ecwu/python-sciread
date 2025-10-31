@@ -5,10 +5,11 @@ for intelligent iterative document analysis using semantic search and pydantic-a
 """
 
 import traceback
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import List
 
 from pydantic_ai import Agent
 from pydantic_ai import ModelRetry
@@ -17,6 +18,8 @@ from pydantic_ai import RunContext
 from ..document import Document
 from ..document.loaders.pdf_loader import PdfLoader
 from ..document.splitters.cumulative_flow import CumulativeFlowSplitter
+from ..document.vector_index import VectorIndex
+from ..embedding_provider import EmbeddingFactory
 from ..embedding_provider import get_embedding_client
 from ..llm_provider import get_model
 from ..logging_config import get_logger
@@ -24,6 +27,145 @@ from .models.rag_react_models import RAGReActAgentOutput
 from .prompts.rag_react import format_agent_prompt
 
 logger = get_logger(__name__)
+
+
+def build_vector_index_with_parallel_support(
+    document: Document,
+    embedding_model: str = "siliconflow/Qwen/Qwen3-Embedding-8B",
+    cache_embeddings: bool = True,
+) -> None:
+    """Build vector index with parallel embedding requests if supported.
+
+    Args:
+        document: Document to build index for
+        embedding_model: Embedding model identifier
+        cache_embeddings: Whether to cache embeddings
+
+    Raises:
+        RuntimeError: If vector index building fails
+    """
+    if not document.chunks:
+        logger.warning("No chunks to index. Document must be split first.")
+        return
+
+    print(f"\n{'='*60}")
+    print("🔨 Building Vector Index")
+    print(f"{'='*60}")
+    print(f"📝 Total chunks: {len(document.chunks)}")
+    print(f"🤖 Embedding model: {embedding_model}")
+    logger.info(f"Building vector index from {len(document.chunks)} chunks...")
+
+    # Check if the embedding model supports concurrent requests
+    supports_concurrent = EmbeddingFactory.supports_concurrent_requests(embedding_model)
+    print(f"🔧 Concurrent support: {supports_concurrent}")
+
+    # Create embedding client
+    embedding_client = get_embedding_client(
+        embedding_model,
+        cache_embeddings=cache_embeddings,
+    )
+
+    if supports_concurrent:
+        logger.info(
+            f"Using parallel embedding requests for {embedding_model} (concurrent support: True)"
+        )
+        print("⚡ Using parallel embedding requests (concurrent mode)")
+        embeddings = _get_embeddings_parallel(
+            embedding_client, [c.content for c in document.chunks]
+        )
+    else:
+        logger.info(
+            f"Using sequential embedding requests for {embedding_model} (concurrent support: False)"
+        )
+        print("🔄 Using sequential embedding requests")
+        print(f"  Processing {len(document.chunks)} chunks...")
+        batch_size = 10  # Default batch size
+        embeddings = embedding_client.get_embeddings(
+            [c.content for c in document.chunks], batch_size=batch_size
+        )
+        print("✅ Completed embedding generation\n")
+
+    # Prepare collection name
+    collection_name = document.metadata.file_hash or (
+        Path(document.metadata.source_path).stem
+        if document.metadata.source_path
+        else "unnamed_document"
+    )
+
+    # Create vector index
+    print("📊 Building vector index...")
+    document.vector_index = VectorIndex(collection_name=collection_name)
+    document.vector_index.add_chunks(document.chunks, embeddings)
+    document._embedding_client = embedding_client
+
+    print(f"✅ Vector index built successfully with {len(embeddings)} embeddings\n")
+    logger.info("Vector index built successfully with parallel support.")
+
+
+def _get_embeddings_parallel(
+    embedding_client, texts: list[str], max_workers: int = 10
+) -> list[list[float]]:
+    """Get embeddings in parallel using ThreadPoolExecutor.
+
+    Args:
+        embedding_client: Embedding client instance
+        texts: List of texts to embed
+        max_workers: Maximum number of parallel workers
+
+    Returns:
+        List of embedding vectors in the same order as input texts
+    """
+    total_texts = len(texts)
+    logger.info(
+        f"Getting embeddings for {total_texts} texts with {max_workers} workers"
+    )
+    print(f"\n🔄 Processing {total_texts} chunks in parallel...")
+
+    # Create a mapping from index to embedding
+    embeddings_map = {}
+    completed_count = 0
+
+    # Use ThreadPoolExecutor for parallel requests
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_index = {
+            executor.submit(embedding_client.get_embedding, text): idx
+            for idx, text in enumerate(texts)
+        }
+
+        # Collect results as they complete with progress tracking
+        for future in as_completed(future_to_index):
+            idx = future_to_index[future]
+            completed_count += 1
+
+            # Print progress every 10% or every 5 chunks (whichever is more frequent)
+            progress_interval = max(1, min(5, total_texts // 10))
+            if (
+                completed_count % progress_interval == 0
+                or completed_count == total_texts
+            ):
+                percentage = (completed_count / total_texts) * 100
+                print(
+                    f"  Progress: {completed_count}/{total_texts} chunks ({percentage:.1f}%)"
+                )
+
+            try:
+                embedding = future.result()
+                if embedding:
+                    embeddings_map[idx] = embedding
+                else:
+                    logger.warning(f"Empty embedding for text at index {idx}")
+                    # Fallback to zero vector
+                    embeddings_map[idx] = [0.0] * 4096  # Default dimension
+            except Exception as e:
+                logger.error(f"Failed to get embedding for text at index {idx}: {e}")
+                embeddings_map[idx] = [0.0] * 4096  # Fallback
+
+    # Return embeddings in original order
+    embeddings = [embeddings_map[i] for i in range(len(texts))]
+    print(f"✅ Successfully obtained {len(embeddings)} embeddings\n")
+    logger.info(f"Successfully obtained {len(embeddings)} embeddings")
+    return embeddings
 
 
 @dataclass
@@ -34,7 +176,7 @@ class RAGReActDeps:
     task: str
     max_loops: int = 8
     show_progress: bool = True
-    previous_queries: List[str] = field(default_factory=list)
+    previous_queries: list[str] = field(default_factory=list)
     current_report: str = ""
     loop_count: int = 0
     accessed_chunk_ids: set[str] = field(default_factory=set)
@@ -47,7 +189,7 @@ class RAGReActDeps:
 class RAGReActState:
     """State management for RAG ReAct analysis using message history."""
 
-    previous_queries: List[str] = field(default_factory=list)
+    previous_queries: list[str] = field(default_factory=list)
     current_report: str = ""
     loop_count: int = 0
     current_search_query: str = ""
@@ -220,17 +362,17 @@ def retrieve_content_for_query(
         f"Searching for content with query: '{query}' (excluding {len(accessed_chunk_ids)} already accessed chunks)"
     )
 
-    # Build vector index if not already built using SiliconFlow embeddings
+    # Build vector index if not already built using SiliconFlow embeddings with parallel support
     if not document.vector_index:
         logger.info(
             "Building vector index for semantic search with SiliconFlow embeddings..."
         )
-        # Use embedding provider system to create SiliconFlow client for RAG search
-        embedding_client = get_embedding_client(
-            "siliconflow/Qwen/Qwen3-Embedding-8B",
+        # Use our parallel-aware function to build the vector index
+        build_vector_index_with_parallel_support(
+            document,
+            embedding_model="siliconflow/Qwen/Qwen3-Embedding-8B",
             cache_embeddings=True,
         )
-        document.build_vector_index(embedding_client=embedding_client)
 
     # Perform semantic search with more results to filter from
     # We search for more than top_k to account for filtering out already accessed chunks
