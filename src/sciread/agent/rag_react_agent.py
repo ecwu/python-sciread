@@ -470,6 +470,12 @@ class RAGReActAgent:
                     print(f"Search query: '{deps.current_search_query}'")
                     print(f"Chunks accessed so far: {len(accessed_chunk_ids)}")
                     print(f"Reasoning: {agent_output.reasoning}")
+                    if agent_output.report_section.strip():
+                        print("Content added: Yes")
+                    else:
+                        print(
+                            "Content added: No (skipped - content not substantial enough)"
+                        )
                     if agent_output.should_stop:
                         print("Decision: STOP - Analysis complete")
                     else:
@@ -477,7 +483,7 @@ class RAGReActAgent:
                         print(f"Search strategy: {agent_output.search_strategy}")
                     print("-" * 50)
 
-                # Update state
+                # Update state - only add content if it's not empty
                 if agent_output.report_section.strip():
                     if state.current_report:
                         state.current_report += "\n\n"

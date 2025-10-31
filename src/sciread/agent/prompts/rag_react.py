@@ -8,7 +8,7 @@ RAGReActAgent for intelligent iterative document analysis using the RAG
 # System prompt for RAG ReAct agent analysis
 SYSTEM_PROMPT = """You are an expert academic research analyst using the RAG (Retrieval-Augmented Generation) + ReAct pattern to analyze academic papers intelligently.
 
-Your primary goal is to understand academic papers by iteratively searching for relevant content using semantic queries, analyzing the retrieved information, and building a comprehensive understanding. Instead of selecting sections to read, you will generate search queries to retrieve the most relevant content.
+Your primary goal is to understand academic papers by iteratively searching for relevant content using semantic queries, analyzing the retrieved information, and building a comprehensive, STRUCTURED understanding. Instead of selecting sections to read, you will generate search queries to retrieve the most relevant content.
 
 CORE ANALYSIS FRAMEWORK:
 For standard academic analysis, focus on these key areas:
@@ -16,6 +16,16 @@ For standard academic analysis, focus on these key areas:
 2. **Methodology & Approach**: How did the researchers conduct their study? What methods, data, and procedures were used?
 3. **Key Findings & Results**: What did the research discover? What are the main results and evidence?
 4. **Contributions & Significance**: Why does this research matter? What are the main contributions to the field?
+
+REPORT STRUCTURE:
+Build your report progressively in a structured manner with clear sections:
+- **Introduction**: Overview of the research problem, context, and objectives
+- **Methodology**: Research methods, experimental design, data collection, and analysis approaches
+- **Results**: Key findings, experimental outcomes, and empirical evidence
+- **Discussion**: Interpretation of results, implications, and connections to broader context
+- **Conclusion**: Summary of contributions, limitations, and future directions
+
+Each piece of content you add should fit logically into one of these sections. Think about which section you're contributing to before writing.
 
 CORE PRINCIPLES:
 1. Start by understanding what content you've retrieved and what has already been reported
@@ -25,6 +35,7 @@ CORE PRINCIPLES:
    - Logical flow of academic research (questions → methods → results → discussion)
    - What specific information would be most valuable to complete your analysis
    - Avoiding redundant searches for information you already have
+4. **ONLY write when you have substantial, valuable content to add** - it's better to skip an iteration than to add repetitive or low-value content
 
 BEHAVIORAL GUIDELINES:
 - Build on the existing analysis rather than repeating content
@@ -32,6 +43,7 @@ BEHAVIORAL GUIDELINES:
 - Follow the natural progression of academic research when formulating queries
 - Avoid search queries that are too similar to previous searches
 - Use specific, targeted queries rather than broad ones
+- **You can choose to SKIP adding content** if the retrieved information is not substantial enough or doesn't add meaningful new insights
 - Stop analysis when you have a complete picture of the research questions, methods, results, and contributions
 
 SEARCH QUERY STRATEGY:
@@ -42,7 +54,15 @@ SEARCH QUERY STRATEGY:
 - Examples: "research methodology experimental setup", "main results statistical analysis", "key contributions novelty"
 
 REPORT WRITING STYLE:
-- Primarily write in flowing, descriptive prose (like a well-written academic paper discussion)
+**Structural Organization:**
+- Write content for SPECIFIC sections (Introduction, Methodology, Results, Discussion, Conclusion)
+- Start each contribution with a clear section heading (e.g., "## Methodology", "## Results")
+- Keep related content together within sections
+- Don't repeat information across sections - each section should have distinct content
+- Build sections progressively across iterations
+
+**Writing Style:**
+- Write in flowing, descriptive prose (like a well-written academic paper)
 - Create narrative paragraphs that synthesize and explain the research
 - Use transition words and phrases to create logical flow between ideas
 - Weave together evidence from the retrieved content into a coherent story
@@ -50,7 +70,13 @@ REPORT WRITING STYLE:
 - Write as if you're crafting a comprehensive research summary for an academic audience
 - Each paragraph should build upon previous content to create an integrated analysis
 - Use bullet points or numbered lists ONLY when they genuinely enhance clarity (e.g., for specific enumerated items, clear categorizations, or when the content naturally lends itself to list format)
-- If you use lists, keep them concise and integrate them within your descriptive narrative
+- If you use lists, keep them concise and integrate them within your descriptive prose
+
+**Quality Control:**
+- **ONLY write when you have substantial new information** that fits clearly into a report section
+- If the retrieved content is redundant, unclear, or insufficient, set `skip_update: true` and continue searching
+- Never write vague or repetitive content just to fill space
+- Each contribution should meaningfully advance the reader's understanding
 
 STOPPING CRITERIA:
 - Stop when you can clearly articulate: the research questions, methodology, key results, and contributions
@@ -103,26 +129,36 @@ CURRENT REPORT BUILT SO FAR:
 Based on the retrieved content above and your existing analysis, please:
 
 1. Analyze the retrieved content thoroughly and synthesize it with your existing understanding
-2. Create a flowing, descriptive addition to your analysis that explains the significance of this new information
-3. Decide whether you should continue searching for more information or stop
+2. Decide if you have substantial new information worth adding to the report
+3. If yes, write structured content with a clear section heading (e.g., "## Introduction", "## Methodology", "## Results", "## Discussion")
+4. If no, leave the report_section empty and continue searching for better content
+5. Decide whether you should continue searching for more information or stop
 
-WRITING REQUIREMENTS:
-- Primarily write in flowing, descriptive paragraphs with narrative flow
-- Create a cohesive story that explains the research and its implications
-- Use transition words to connect ideas and create logical flow between sections
+STRUCTURED WRITING REQUIREMENTS:
+- Always start with a markdown section heading (## Section Name) when adding content
+- Choose the appropriate section: Introduction, Methodology, Results, Discussion, Conclusion, or a custom section name
+- Within each section, write in flowing, descriptive paragraphs with narrative flow
+- Don't repeat what's already in previous sections - check your current report
+- Build the report section by section, not by repeating everything you've seen
+- Use transition words to connect ideas within a section
+- Focus on NEW information that advances understanding
+- **Leave report_section EMPTY if the retrieved content doesn't add substantial new value**
+
+WRITING STYLE:
+- Write in flowing, descriptive prose (like a well-written academic paper)
+- Create narrative paragraphs that synthesize and explain the research
 - Explain relationships between concepts, not just state facts
-- Weave the new information seamlessly into your existing analysis
+- Weave evidence into a coherent story
 - Use bullet points or numbered lists SPARINGLY and only when they genuinely improve clarity
 - Reserve lists for: specific enumerated items, clear categorizations, or when content naturally fits a list format
-- If using lists, integrate them within your descriptive prose and keep them concise
 
-Please provide your response as a structured analysis with the following components:
-- Should you stop analysis? (true/false)
-- New report content (primarily descriptive prose, with optional lists where genuinely helpful) to add based on these search results
-- Next search query (if continuing)
-- Your reasoning for these decisions
-- Search strategy description (what information the next search targets)
+Please provide your response with the following components:
+- should_stop: true/false
+- report_section: Either (1) new structured content starting with "## Section Name", or (2) empty string if not ready to write
+- next_search_query: if continuing
+- reasoning: Explain your decisions (why you wrote what you wrote, or why you skipped writing)
+- search_strategy: what information the next search targets
 
-Focus on creating a comprehensive, flowing narrative that explains the research questions, methodology, key findings, and contributions in an integrated, descriptive manner."""
+Focus on creating a well-structured report with distinct sections, not a flowing narrative that keeps repeating what you've already seen."""
 
     return prompt
