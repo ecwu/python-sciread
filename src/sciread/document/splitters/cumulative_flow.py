@@ -1,10 +1,10 @@
-"""CumulativeFlow splitter: Cumulative segment similarity-based chunking."""
+"""CumulativeFlow splitter: Cumulative sentence similarity-based chunking."""
 
 from typing import Any
 
 import regex
 
-from ..external_clients import OllamaClient
+from ...embedding_provider import OllamaClient
 from ..models import Chunk
 from .base import BaseSplitter
 
@@ -154,7 +154,9 @@ class CumulativeFlowSplitter(BaseSplitter):
         """Get embeddings for texts using Ollama client."""
         return self.ollama_client.get_embeddings(texts, self.embedding_batch_size)
 
-    def _create_chunks_using_cumulative_similarity(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[Chunk]:
+    def _create_chunks_using_cumulative_similarity(
+        self, sentences: list[dict[str, Any]], embeddings: list[list[float]]
+    ) -> list[Chunk]:
         """Create chunks using cumulative similarity between segment and next sentence."""
         if len(sentences) != len(embeddings):
             return self._fallback_split(" ".join(s["text"] for s in sentences))
@@ -170,17 +172,24 @@ class CumulativeFlowSplitter(BaseSplitter):
             sentence_embedding = embeddings[i]
 
             # Calculate cumulative segment embedding (centroid of all sentence embeddings)
-            segment_embedding = self.ollama_client.calculate_centroid(current_segment_embeddings)
+            segment_embedding = self.ollama_client.calculate_centroid(
+                current_segment_embeddings
+            )
 
             # Calculate similarity between cumulative segment and next sentence
-            similarity_score = self.ollama_client.cosine_similarity(segment_embedding, sentence_embedding)
+            similarity_score = self.ollama_client.cosine_similarity(
+                segment_embedding, sentence_embedding
+            )
 
             # Check if adding this sentence would exceed budget
-            would_exceed_budget = current_segment_chars + sentence["length"] > self.max_segment_chars
+            would_exceed_budget = (
+                current_segment_chars + sentence["length"] > self.max_segment_chars
+            )
 
             # Check if we have enough content to make a split decision
             ready_for_split = (
-                len(current_segment_sentences) >= self.min_segment_sentences and current_segment_chars >= self.min_segment_chars
+                len(current_segment_sentences) >= self.min_segment_sentences
+                and current_segment_chars >= self.min_segment_chars
             )
 
             # Decision logic
@@ -200,7 +209,11 @@ class CumulativeFlowSplitter(BaseSplitter):
                     current_segment_sentences,
                     current_segment_start,
                     split_reason,
-                    similarity_score if split_reason == "cumulative_similarity_drop" else None,
+                    (
+                        similarity_score
+                        if split_reason == "cumulative_similarity_drop"
+                        else None
+                    ),
                 )
                 chunks.append(chunk)
 
@@ -239,10 +252,14 @@ class CumulativeFlowSplitter(BaseSplitter):
         content = " ".join(s["text"] for s in sentences)
 
         # Calculate character range
-        end_char = start_char + sum(s["length"] for s in sentences) + len(sentences) - 1  # Account for spaces
+        end_char = (
+            start_char + sum(s["length"] for s in sentences) + len(sentences) - 1
+        )  # Account for spaces
 
         # Calculate confidence based on split reason and segment quality
-        confidence = self._calculate_chunk_confidence(sentences, split_reason, similarity_score)
+        confidence = self._calculate_chunk_confidence(
+            sentences, split_reason, similarity_score
+        )
 
         # Store metadata
         metadata = {
@@ -312,7 +329,13 @@ class CumulativeFlowSplitter(BaseSplitter):
         else:
             length_boost = 0.0
 
-        confidence = base_confidence + reason_boost + similarity_boost + size_boost + length_boost
+        confidence = (
+            base_confidence
+            + reason_boost
+            + similarity_boost
+            + size_boost
+            + length_boost
+        )
         return max(0.0, min(1.0, confidence))
 
     def _create_single_chunk(self, text: str) -> list[Chunk]:

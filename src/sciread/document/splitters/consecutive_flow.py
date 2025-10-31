@@ -4,7 +4,7 @@ from typing import Any
 
 import regex
 
-from ..external_clients import OllamaClient
+from ...embedding_provider import OllamaClient
 from ..models import Chunk
 from .base import BaseSplitter
 
@@ -154,7 +154,9 @@ class ConsecutiveFlowSplitter(BaseSplitter):
         """Get embeddings for texts using Ollama client."""
         return self.ollama_client.get_embeddings(texts, self.embedding_batch_size)
 
-    def _create_chunks_using_consecutive_similarity(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[Chunk]:
+    def _create_chunks_using_consecutive_similarity(
+        self, sentences: list[dict[str, Any]], embeddings: list[list[float]]
+    ) -> list[Chunk]:
         """Create chunks using consecutive similarity between adjacent sentences."""
         if len(sentences) != len(embeddings):
             return self._fallback_split(" ".join(s["text"] for s in sentences))
@@ -170,14 +172,19 @@ class ConsecutiveFlowSplitter(BaseSplitter):
             prev_embedding = embeddings[i - 1]
 
             # Calculate consecutive similarity
-            similarity_score = self.ollama_client.cosine_similarity(prev_embedding, next_embedding)
+            similarity_score = self.ollama_client.cosine_similarity(
+                prev_embedding, next_embedding
+            )
 
             # Check if adding this sentence would exceed budget
-            would_exceed_budget = current_segment_chars + sentence["length"] > self.max_segment_chars
+            would_exceed_budget = (
+                current_segment_chars + sentence["length"] > self.max_segment_chars
+            )
 
             # Check if we have enough content to make a split decision
             ready_for_split = (
-                len(current_segment_sentences) >= self.min_segment_sentences and current_segment_chars >= self.min_segment_chars
+                len(current_segment_sentences) >= self.min_segment_sentences
+                and current_segment_chars >= self.min_segment_chars
             )
 
             # Decision logic
@@ -234,10 +241,14 @@ class ConsecutiveFlowSplitter(BaseSplitter):
         content = " ".join(s["text"] for s in sentences)
 
         # Calculate character range
-        end_char = start_char + sum(s["length"] for s in sentences) + len(sentences) - 1  # Account for spaces
+        end_char = (
+            start_char + sum(s["length"] for s in sentences) + len(sentences) - 1
+        )  # Account for spaces
 
         # Calculate confidence based on split reason and segment quality
-        confidence = self._calculate_chunk_confidence(sentences, split_reason, similarity_score)
+        confidence = self._calculate_chunk_confidence(
+            sentences, split_reason, similarity_score
+        )
 
         # Store metadata
         metadata = {
@@ -307,7 +318,13 @@ class ConsecutiveFlowSplitter(BaseSplitter):
         else:
             length_boost = 0.0
 
-        confidence = base_confidence + reason_boost + similarity_boost + size_boost + length_boost
+        confidence = (
+            base_confidence
+            + reason_boost
+            + similarity_boost
+            + size_boost
+            + length_boost
+        )
         return max(0.0, min(1.0, confidence))
 
     def _create_single_chunk(self, text: str) -> list[Chunk]:

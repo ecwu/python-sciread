@@ -8,9 +8,9 @@ from typing import Union
 if TYPE_CHECKING:
     from .document import Document
 
+from ..embedding_provider import OllamaClient
 from ..logging_config import get_logger
 from .external_clients import MineruClient
-from .external_clients import OllamaClient
 from .loaders import BaseLoader
 from .loaders.pdf_loader import PdfLoader
 from .loaders.txt_loader import TxtLoader
@@ -67,7 +67,9 @@ class DocumentBuilder:
         from .document import Document  # Import here to avoid circular imports
 
         path = Path(file_path)
-        self.logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
+        self.logger.debug(
+            f"Creating document from file: {path} (to_markdown={to_markdown})"
+        )
 
         # Initialize default loader if none provided
         if self.loader is None:
@@ -88,14 +90,18 @@ class DocumentBuilder:
 
         # Update processing state
         doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note(f"Document loaded using {self.loader.loader_name}")
+        doc.processing_state.add_note(
+            f"Document loaded using {self.loader.loader_name}"
+        )
 
         # Add any warnings to processing state
         for warning in load_result.warnings:
             doc.processing_state.add_note(f"Warning: {warning}")
             self.logger.warning(f"Document loading warning: {warning}")
 
-        self.logger.debug(f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters")
+        self.logger.debug(
+            f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters"
+        )
 
         # Auto-split if requested
         if auto_split:
@@ -164,7 +170,9 @@ class DocumentBuilder:
 
             raise ValueError(f"Unsupported file format: {suffix}")
 
-    def _split_document(self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs) -> None:
+    def _split_document(
+        self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs
+    ) -> None:
         """
         Split document into chunks.
 
@@ -184,9 +192,13 @@ class DocumentBuilder:
         # Split the text
         chunks = active_splitter.split(doc.text)
         doc._set_chunks(chunks)
-        doc.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
+        doc.processing_state.add_note(
+            f"Document split using {active_splitter.splitter_name}"
+        )
 
-        self.logger.info(f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}")
+        self.logger.info(
+            f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}"
+        )
 
     def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
         """Create appropriate splitter based on document content."""

@@ -10,8 +10,8 @@ from typing import Optional
 from typing import Union
 
 from ..config import get_config
+from ..embedding_provider import get_embedding_client
 from ..logging_config import get_logger
-from .external_clients import OllamaClient
 from .factory import DocumentFactory
 from .models import Chunk
 from .models import DocumentMetadata
@@ -355,8 +355,14 @@ class Document:
         self.processing_state.update_timestamp("split")
         self.processing_state.add_note(f"Document split into {len(chunks)} chunks")
 
-    def build_vector_index(self, persist: bool = False) -> None:
-        """Builds a semantic vector index from the document's chunks."""
+    def build_vector_index(self, persist: bool = False, embedding_client=None) -> None:
+        """Builds a semantic vector index from the document's chunks.
+
+        Args:
+            persist: Whether to persist the index to disk
+            embedding_client: Optional embedding client (OllamaClient or SiliconFlowClient).
+                            If not provided, uses OllamaClient from config.
+        """
         if not self._chunks:
             self.logger.warning("No chunks to index. Please split the document first.")
             return
@@ -364,14 +370,25 @@ class Document:
         self.logger.info(f"Building vector index from {len(self._chunks)} chunks...")
 
         try:
-            config = get_config()
-            vector_config = config.vector_store
-            ollama_client = OllamaClient(
-                model=vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings,
-            )
-            embeddings = ollama_client.get_embeddings(
-                [c.content for c in self._chunks], batch_size=vector_config.batch_size
+            # Use provided embedding client or create default from config
+            if embedding_client is None:
+                config = get_config()
+                vector_config = config.vector_store
+                # Use embedding provider system to create client
+                embedding_client = get_embedding_client(
+                    vector_config.embedding_model,
+                    cache_embeddings=vector_config.cache_embeddings,
+                )
+
+            # Store the embedding client for later use in semantic_search
+            self._embedding_client = embedding_client
+
+            batch_size = 10  # Default batch size
+            if hasattr(embedding_client, "embedding_batch_size"):
+                batch_size = embedding_client.embedding_batch_size
+
+            embeddings = embedding_client.get_embeddings(
+                [c.content for c in self._chunks], batch_size=batch_size
             )
 
             persist_path = None
@@ -430,14 +447,22 @@ class Document:
         self.logger.info(f"Performing semantic search for: '{query}'")
 
         try:
-            config = get_config()
-            vector_config = config.vector_store
-            ollama_client = OllamaClient(
-                model=vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings,
-            )
+            # Use the embedding client that was used to build the index, or create a default one
+            if (
+                hasattr(self, "_embedding_client")
+                and self._embedding_client is not None
+            ):
+                embedding_client = self._embedding_client
+            else:
+                config = get_config()
+                vector_config = config.vector_store
+                # Use embedding provider system to create client
+                embedding_client = get_embedding_client(
+                    vector_config.embedding_model,
+                    cache_embeddings=vector_config.cache_embeddings,
+                )
 
-            query_embedding = ollama_client.get_embedding(query)
+            query_embedding = embedding_client.get_embedding(query)
             if not query_embedding:
                 self.logger.error("Failed to get embedding for query")
                 return []

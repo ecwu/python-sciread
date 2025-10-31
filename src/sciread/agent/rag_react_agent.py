@@ -17,6 +17,7 @@ from pydantic_ai import RunContext
 from ..document import Document
 from ..document.loaders.pdf_loader import PdfLoader
 from ..document.splitters.cumulative_flow import CumulativeFlowSplitter
+from ..embedding_provider import get_embedding_client
 from ..llm_provider import get_model
 from ..logging_config import get_logger
 from .models.rag_react_models import RAGReActAgentOutput
@@ -54,7 +55,9 @@ class RAGReActState:
     current_search_results_summary: str = ""
 
 
-def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool = False) -> Document:
+def load_and_process_document_for_rag(
+    file_path: str | Path, to_markdown: bool = False
+) -> Document:
     """Load and process document specifically for RAG analysis.
 
     This function loads PDFs without using Mineru API and uses CumulativeFlowSplitter
@@ -101,10 +104,12 @@ def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool =
 
     else:
         # Try to load as general document
-        logger.warning(f"Unsupported file type: {file_path.suffix}, attempting general load...")
+        logger.warning(
+            f"Unsupported file type: {file_path.suffix}, attempting general load..."
+        )
         doc = Document.from_file(file_path, to_markdown=False)
 
-    # Use CumulativeFlowSplitter for intelligent chunking
+    # Use CumulativeFlowSplitter for intelligent chunking with Ollama embeddings
     logger.info("Splitting document using CumulativeFlowSplitter...")
     splitter = CumulativeFlowSplitter(
         similarity_threshold=0.45,
@@ -116,7 +121,9 @@ def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool =
     # Test Ollama connection
     logger.info("Testing connection to Ollama server...")
     if not splitter.test_ollama_connection():
-        raise RuntimeError("Cannot connect to Ollama server! Make sure Ollama is running: 'ollama serve'")
+        raise RuntimeError(
+            "Cannot connect to Ollama server! Make sure Ollama is running: 'ollama serve'"
+        )
 
     logger.info(f"Using embedding model: {splitter.ollama_client.model}")
     logger.info("Computing embeddings for sentences...")
@@ -129,7 +136,9 @@ def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool =
     # Log chunk statistics
     if doc.chunks:
         chunk_lengths = [len(chunk.content) for chunk in doc.chunks]
-        logger.info(f"Average chunk size: {sum(chunk_lengths) // len(chunk_lengths)} characters")
+        logger.info(
+            f"Average chunk size: {sum(chunk_lengths) // len(chunk_lengths)} characters"
+        )
         logger.info(f"Min chunk size: {min(chunk_lengths)} characters")
         logger.info(f"Max chunk size: {max(chunk_lengths)} characters")
 
@@ -175,7 +184,9 @@ def format_search_results_summary(search_results, query: str) -> str:
     if not search_results:
         return f"No results found for query: '{query}'"
 
-    summary_parts = [f"Found {len(search_results)} relevant chunks for query: '{query}'"]
+    summary_parts = [
+        f"Found {len(search_results)} relevant chunks for query: '{query}'"
+    ]
 
     # Add information about the sections found
     sections = set()
@@ -191,7 +202,9 @@ def format_search_results_summary(search_results, query: str) -> str:
     return " | ".join(summary_parts)
 
 
-def retrieve_content_for_query(document: Document, query: str, accessed_chunk_ids: set[str], top_k: int = 5) -> tuple[str, List]:
+def retrieve_content_for_query(
+    document: Document, query: str, accessed_chunk_ids: set[str], top_k: int = 5
+) -> tuple[str, list]:
     """Retrieve content using semantic search for a given query, filtering out already accessed chunks.
 
     Args:
@@ -203,17 +216,30 @@ def retrieve_content_for_query(document: Document, query: str, accessed_chunk_id
     Returns:
         Tuple of (formatted_content, search_results)
     """
-    logger.info(f"Searching for content with query: '{query}' (excluding {len(accessed_chunk_ids)} already accessed chunks)")
+    logger.info(
+        f"Searching for content with query: '{query}' (excluding {len(accessed_chunk_ids)} already accessed chunks)"
+    )
 
-    # Build vector index if not already built
+    # Build vector index if not already built using SiliconFlow embeddings
     if not document.vector_index:
-        logger.info("Building vector index for semantic search...")
-        document.build_vector_index()
+        logger.info(
+            "Building vector index for semantic search with SiliconFlow embeddings..."
+        )
+        # Use embedding provider system to create SiliconFlow client for RAG search
+        embedding_client = get_embedding_client(
+            "siliconflow/Qwen/Qwen3-Embedding-8B",
+            cache_embeddings=True,
+        )
+        document.build_vector_index(embedding_client=embedding_client)
 
     # Perform semantic search with more results to filter from
     # We search for more than top_k to account for filtering out already accessed chunks
-    expanded_top_k = top_k * 3  # Get 3x more results to ensure we have enough fresh content
-    all_search_results = document.semantic_search(query, top_k=expanded_top_k, return_scores=True)
+    expanded_top_k = (
+        top_k * 3
+    )  # Get 3x more results to ensure we have enough fresh content
+    all_search_results = document.semantic_search(
+        query, top_k=expanded_top_k, return_scores=True
+    )
 
     if not all_search_results:
         logger.warning(f"No search results found for query: '{query}'")
@@ -230,10 +256,14 @@ def retrieve_content_for_query(document: Document, query: str, accessed_chunk_id
             break
 
     if not filtered_results:
-        logger.warning(f"No fresh content found for query: '{query}' (all {len(all_search_results)} results already accessed)")
+        logger.warning(
+            f"No fresh content found for query: '{query}' (all {len(all_search_results)} results already accessed)"
+        )
         return "", []
 
-    logger.info(f"Retrieved {len(filtered_results)} fresh chunks for query: '{query}' (from {len(all_search_results)} total results)")
+    logger.info(
+        f"Retrieved {len(filtered_results)} fresh chunks for query: '{query}' (from {len(all_search_results)} total results)"
+    )
 
     # Update accessed chunk IDs
     new_chunk_ids = {chunk.id for chunk, _ in filtered_results}
@@ -242,7 +272,9 @@ def retrieve_content_for_query(document: Document, query: str, accessed_chunk_id
     # Format the retrieved content
     content_parts = []
     for chunk, score in filtered_results:
-        section_name = chunk.chunk_name if chunk.chunk_name != "unknown" else "unknown section"
+        section_name = (
+            chunk.chunk_name if chunk.chunk_name != "unknown" else "unknown section"
+        )
         content_parts.append(
             f"=== {section_name.upper()} (Similarity: {score:.3f}, Chunk ID: {chunk.id}) ===\n{chunk.content}"
         )
@@ -280,7 +312,9 @@ def analyze_document_with_rag_react(
     """
     logger.info(f"Starting RAG ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
+    logger.info(
+        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
+    )
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -348,7 +382,9 @@ class RAGReActAgent:
                         "The document might not have relevant content or the search failed."
                     )
 
-                search_results_summary = format_search_results_summary(search_results, search_query)
+                search_results_summary = format_search_results_summary(
+                    search_results, search_query
+                )
 
                 # Store the current search information for this iteration
                 deps.current_search_query = search_query
@@ -371,9 +407,13 @@ class RAGReActAgent:
                 previous_queries=deps.previous_queries.copy(),
             )
 
-        self.logger.info(f"Initialized RAGReActAgent with model: {model} (max_loops={max_loops})")
+        self.logger.info(
+            f"Initialized RAGReActAgent with model: {model} (max_loops={max_loops})"
+        )
 
-    def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> str:
+    def analyze_document(
+        self, document: Document, task: str, show_progress: bool = True
+    ) -> str:
         """Main analysis method that orchestrates the RAG ReAct loop using semantic search.
 
         Args:
@@ -413,10 +453,16 @@ class RAGReActAgent:
 
                 # Run the agent with message history for context persistence
                 self.logger.debug("Running agent with message history")
-                result = self.agent.run_sync("Execute analysis iteration", deps=deps, message_history=message_history)
+                result = self.agent.run_sync(
+                    "Execute analysis iteration",
+                    deps=deps,
+                    message_history=message_history,
+                )
                 agent_output = result.output
 
-                self.logger.debug(f"Agent response: should_stop={agent_output.should_stop}, next_query={agent_output.next_search_query}")
+                self.logger.debug(
+                    f"Agent response: should_stop={agent_output.should_stop}, next_query={agent_output.next_search_query}"
+                )
 
                 # Print reasoning for this iteration if show_progress is enabled
                 if show_progress:
@@ -438,7 +484,10 @@ class RAGReActAgent:
                     state.current_report += agent_output.report_section
 
                 # Add current search query to previous queries
-                if deps.current_search_query and deps.current_search_query not in state.previous_queries:
+                if (
+                    deps.current_search_query
+                    and deps.current_search_query not in state.previous_queries
+                ):
                     state.previous_queries.append(deps.current_search_query)
 
                 # Update message history with this iteration
@@ -446,7 +495,9 @@ class RAGReActAgent:
 
                 # Check if agent wants to stop
                 if agent_output.should_stop:
-                    self.logger.info(f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}")
+                    self.logger.info(
+                        f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}"
+                    )
                     break
 
                 # Prepare for next iteration by retrieving content for the next search query
@@ -456,19 +507,27 @@ class RAGReActAgent:
                     )
 
                     if not next_content.strip():
-                        self.logger.warning(f"No fresh content found for next search query: '{agent_output.next_search_query}'")
+                        self.logger.warning(
+                            f"No fresh content found for next search query: '{agent_output.next_search_query}'"
+                        )
                         break
 
                     # Store the next search results in the state for the next iteration
                     state.current_search_query = agent_output.next_search_query
                     state.current_retrieved_content = next_content
-                    state.current_search_results_summary = format_search_results_summary(next_results, agent_output.next_search_query)
+                    state.current_search_results_summary = (
+                        format_search_results_summary(
+                            next_results, agent_output.next_search_query
+                        )
+                    )
                 else:
                     self.logger.info("No next search query provided")
                     break
 
             except Exception as e:
-                self.logger.error(f"Agent execution failed in loop {state.loop_count}: {e}")
+                self.logger.error(
+                    f"Agent execution failed in loop {state.loop_count}: {e}"
+                )
                 self.logger.error(f"Exception type: {type(e)}")
                 self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 break
@@ -493,4 +552,6 @@ class RAGReActAgent:
 
     def __repr__(self) -> str:
         """String representation of the RAGReActAgent."""
-        return f"RAGReActAgent(model={self.model_identifier}, max_loops={self.max_loops})"
+        return (
+            f"RAGReActAgent(model={self.model_identifier}, max_loops={self.max_loops})"
+        )
