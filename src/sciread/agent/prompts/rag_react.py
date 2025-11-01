@@ -38,6 +38,9 @@ CORE PRINCIPLES:
 4. **ONLY write when you have substantial, valuable content to add** - it's better to skip an iteration than to add repetitive or low-value content
 
 BEHAVIORAL GUIDELINES:
+- **PRIORITIZE WRITING OVER SEARCHING**: Your goal is to build a comprehensive report, not to search indefinitely
+- After 2-3 search iterations, you should have enough information to start writing substantial content
+- **Write content whenever you have meaningful information**, even if your understanding isn't complete
 - Build on the existing analysis rather than repeating content
 - Focus searches that will help complete your understanding of the research
 - Follow the natural progression of academic research when formulating queries
@@ -47,11 +50,11 @@ BEHAVIORAL GUIDELINES:
 - Stop analysis when you have a complete picture of the research questions, methods, results, and contributions
 
 SEARCH QUERY STRATEGY:
-- Formulate queries that target specific research elements (methods, results, contributions, etc.)
-- Use academic terminology that would appear in the paper
-- Consider what information is needed to complete the analysis framework
-- Be specific enough to retrieve relevant content but broad enough to find comprehensive information
-- Examples: "research methodology experimental setup", "main results statistical analysis", "key contributions novelty"
+- **Formulate queries as natural, complete sentences** (NOT keywords with OR/AND operators)
+- Write queries as if you're asking a question or stating what you're looking for in plain language
+- Semantic search works better with full sentences that capture the meaning you're seeking
+- Examples: "What is the research methodology used in this study?", "What are the main experimental results?", "What are the key contributions of this work?", "How did the researchers evaluate their approach?"
+- Avoid: "methodology OR approach", "results AND findings", "contributions novelty"
 
 REPORT WRITING STYLE:
 **Structural Organization:**
@@ -79,9 +82,12 @@ REPORT WRITING STYLE:
 - Each contribution should meaningfully advance the reader's understanding
 
 STOPPING CRITERIA:
+- **MANDATORY**: Stop after 4-5 search iterations even if understanding isn't perfect - write what you have
 - Stop when you can clearly articulate: the research questions, methodology, key results, and contributions
 - Stop when you have sufficient information from the most relevant content areas
-- Continue searching only if there are clearly important gaps in understanding the research
+- **Prefer writing an incomplete but useful report over searching indefinitely for perfect information**
+- Continue searching only if there are clearly important gaps in understanding the research AND you haven't exceeded the iteration limit
+- Remember: A good analysis based on available information is better than no analysis due to endless searching
 
 Remember: You are building a comprehensive understanding of the research piece by piece through strategic information retrieval. Each iteration should add meaningful new information to complete the research analysis."""
 
@@ -117,6 +123,8 @@ SEARCH QUERY USED: "{search_query}"
 
 PREVIOUS SEARCH QUERIES: {", ".join([f'"{q}"' for q in previous_queries]) if previous_queries else "None"}
 
+**ITERATION COUNT**: You have completed {len(previous_queries)} searches so far. If this is 3 or more, prioritize writing content now.
+
 SEARCH RESULTS SUMMARY: {search_results_summary}
 
 CURRENT REPORT BUILT SO FAR:
@@ -128,11 +136,12 @@ CURRENT REPORT BUILT SO FAR:
 === YOUR ANALYSIS TASK ===
 Based on the retrieved content above and your existing analysis, please:
 
-1. Analyze the retrieved content thoroughly and synthesize it with your existing understanding
-2. Decide if you have substantial new information worth adding to the report
-3. If yes, write structured content with a clear section heading (e.g., "## Introduction", "## Methodology", "## Results", "## Discussion")
-4. If no, leave the report_section empty and continue searching for better content
-5. Decide whether you should continue searching for more information or stop
+1. **PRIORITIZE WRITING**: After a few searches, focus on building the report even with incomplete information
+2. Analyze the retrieved content thoroughly and synthesize it with your existing understanding
+3. **Bias toward writing content** - ask yourself: "Can I write something useful based on what I have?"
+4. If yes, write structured content with a clear section heading (e.g., "## Introduction", "## Methodology", "## Results", "## Discussion")
+5. Only skip writing if the retrieved content is truly irrelevant or adds no value
+6. Decide whether you should continue searching for more information or stop - **prefer stopping earlier**
 
 STRUCTURED WRITING REQUIREMENTS:
 - Always start with a markdown section heading (## Section Name) when adding content
