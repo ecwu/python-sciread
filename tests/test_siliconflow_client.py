@@ -1,7 +1,10 @@
 """Test SiliconFlow client integration."""
 
+from unittest.mock import Mock
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import Mock, patch
+
 from sciread.document import SiliconFlowClient
 
 

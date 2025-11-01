@@ -23,9 +23,7 @@ class DocumentFactory:
     """Factory class for creating documents with common configurations."""
 
     @staticmethod
-    def create_from_file(
-        file_path: Union[str, Path], to_markdown: bool = False
-    ) -> "Document":
+    def create_from_file(file_path: Union[str, Path], to_markdown: bool = False) -> Document:
         """
         Create document from file with default configuration.
 
@@ -40,9 +38,7 @@ class DocumentFactory:
         return builder.from_file(file_path, to_markdown=to_markdown)
 
     @staticmethod
-    def create_from_text(
-        text: str, metadata: Optional[DocumentMetadata] = None
-    ) -> "Document":
+    def create_from_text(text: str, metadata: Optional[DocumentMetadata] = None) -> Document:
         """
         Create document from text with default configuration.
 
@@ -61,7 +57,7 @@ class DocumentFactory:
         file_path: Union[str, Path],
         use_markdown: bool = True,
         mineru_client: Optional[MineruClient] = None,
-    ) -> "Document":
+    ) -> Document:
         """
         Create document optimized for academic papers.
 
@@ -80,16 +76,14 @@ class DocumentFactory:
             min_chunk_size=300,
             max_chunk_size=2500,
         )
-        return builder.from_file(file_path, to_markdown=use_markdown).with_splitter(
-            splitter
-        )
+        return builder.from_file(file_path, to_markdown=use_markdown).with_splitter(splitter)
 
     @staticmethod
     def create_consecutive_flow_document(
         file_path: Union[str, Path],
         ollama_client: Optional[OllamaClient] = None,
         **consecutive_flow_kwargs,
-    ) -> "Document":
+    ) -> Document:
         """
         Create document using ConsecutiveFlow splitting.
 
@@ -104,9 +98,7 @@ class DocumentFactory:
         if ollama_client is None:
             ollama_client = OllamaClient()
 
-        splitter = ConsecutiveFlowSplitter(
-            ollama_client=ollama_client, **consecutive_flow_kwargs
-        )
+        splitter = ConsecutiveFlowSplitter(ollama_client=ollama_client, **consecutive_flow_kwargs)
         builder = DocumentBuilder()
         builder.splitter = splitter
         return builder.from_file(file_path, auto_split=True)
@@ -116,7 +108,7 @@ class DocumentFactory:
         file_path: Union[str, Path],
         ollama_client: Optional[OllamaClient] = None,
         **cumulative_flow_kwargs,
-    ) -> "Document":
+    ) -> Document:
         """
         Create document using CumulativeFlow splitting.
 
@@ -131,9 +123,7 @@ class DocumentFactory:
         if ollama_client is None:
             ollama_client = OllamaClient()
 
-        splitter = CumulativeFlowSplitter(
-            ollama_client=ollama_client, **cumulative_flow_kwargs
-        )
+        splitter = CumulativeFlowSplitter(ollama_client=ollama_client, **cumulative_flow_kwargs)
         builder = DocumentBuilder()
         builder.splitter = splitter
         return builder.from_file(file_path, auto_split=True)

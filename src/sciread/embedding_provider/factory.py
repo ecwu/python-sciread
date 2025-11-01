@@ -44,9 +44,7 @@ class EmbeddingFactory:
             InvalidEmbeddingIdentifierError: If the identifier format is invalid
         """
         if not embedding_identifier or not embedding_identifier.strip():
-            raise InvalidEmbeddingIdentifierError(
-                "Embedding identifier cannot be empty"
-            )
+            raise InvalidEmbeddingIdentifierError("Embedding identifier cannot be empty")
 
         embedding_identifier = embedding_identifier.strip()
 
@@ -70,9 +68,7 @@ class EmbeddingFactory:
 
                 # If not found, treat first part as provider name
                 if not parts[0] or not parts[1]:
-                    raise InvalidEmbeddingIdentifierError(
-                        f"Invalid embedding identifier format: {embedding_identifier}"
-                    )
+                    raise InvalidEmbeddingIdentifierError(f"Invalid embedding identifier format: {embedding_identifier}")
                 return parts[0].strip(), parts[1].strip()
         else:
             # No explicit provider, try to infer from model name
@@ -98,16 +94,11 @@ class EmbeddingFactory:
         """
         if provider_name not in cls.PROVIDERS:
             supported = ", ".join(cls.PROVIDERS.keys())
-            raise UnsupportedEmbeddingModelError(
-                f"Unsupported embedding provider: {provider_name}. "
-                f"Supported providers: {supported}"
-            )
+            raise UnsupportedEmbeddingModelError(f"Unsupported embedding provider: {provider_name}. Supported providers: {supported}")
         return cls.PROVIDERS[provider_name]
 
     @classmethod
-    def create_client(
-        cls, embedding_identifier: str, **kwargs: Any
-    ) -> OllamaClient | SiliconFlowClient:
+    def create_client(cls, embedding_identifier: str, **kwargs: Any) -> OllamaClient | SiliconFlowClient:
         """Create an embedding client instance from an embedding identifier.
 
         Args:
@@ -133,8 +124,7 @@ class EmbeddingFactory:
         if not provider_class.is_model_supported(model_name):
             supported_models = list(provider_class.get_supported_models().keys())
             raise UnsupportedEmbeddingModelError(
-                f"Model '{model_name}' is not supported by provider '{provider_name}'. "
-                f"Supported models: {', '.join(supported_models)}"
+                f"Model '{model_name}' is not supported by provider '{provider_name}'. Supported models: {', '.join(supported_models)}"
             )
 
         # Create the client instance
@@ -184,9 +174,7 @@ class EmbeddingFactory:
         return models
 
 
-def get_embedding_client(
-    embedding_identifier: str, **kwargs: Any
-) -> OllamaClient | SiliconFlowClient:
+def get_embedding_client(embedding_identifier: str, **kwargs: Any) -> OllamaClient | SiliconFlowClient:
     """Get an embedding client instance.
 
     This is the main public interface for creating embedding client instances.

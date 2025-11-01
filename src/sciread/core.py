@@ -3,8 +3,8 @@ from pathlib import Path
 from .agent import CoordinateAgent
 from .agent import DiscussionAgent
 from .agent import SimpleAgent
-from .agent import analyze_document_with_react
 from .agent import analyze_document_with_rag_react
+from .agent import analyze_document_with_react
 from .agent import remove_references
 from .document import Document
 from .logging_config import get_logger

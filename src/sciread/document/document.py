@@ -171,11 +171,7 @@ class Document:
 
         # Filter by confidence threshold
         if confidence_threshold is not None:
-            chunks = [
-                chunk
-                for chunk in chunks
-                if (chunk.confidence or 0.0) >= confidence_threshold
-            ]
+            chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
 
         # Filter by minimum length
         if min_length is not None:
@@ -183,9 +179,7 @@ class Document:
 
         # Exclude specific chunk types
         if exclude_types:
-            chunks = [
-                chunk for chunk in chunks if chunk.chunk_name not in exclude_types
-            ]
+            chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
 
         # Apply limit
         if limit is not None:
@@ -247,9 +241,7 @@ class Document:
             chunk.mark_processed()
 
         if chunks_to_mark:
-            self.processing_state.add_note(
-                f"Marked {len(chunks_to_mark)} chunks as processed"
-            )
+            self.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
             self.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
 
         return len(chunks_to_mark)
@@ -292,10 +284,7 @@ class Document:
                 section_name = chunk.chunk_name
                 if section_name not in section_names:  # Avoid duplicates
                     section_names.append(section_name)
-            elif (
-                chunk.metadata.get("splitter")
-                and chunk.metadata["splitter"] != "unknown"
-            ):
+            elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
                 # For chunks without explicit section names, use a generic name based on splitter type
                 splitter_type = chunk.metadata["splitter"]
                 generic_name = f"untitled_{splitter_type}"
@@ -387,29 +376,21 @@ class Document:
             if hasattr(embedding_client, "embedding_batch_size"):
                 batch_size = embedding_client.embedding_batch_size
 
-            embeddings = embedding_client.get_embeddings(
-                [c.content for c in self._chunks], batch_size=batch_size
-            )
+            embeddings = embedding_client.get_embeddings([c.content for c in self._chunks], batch_size=batch_size)
 
             persist_path = None
             if persist:
                 store_path = Path(vector_config.path).expanduser()
                 store_path.mkdir(parents=True, exist_ok=True)
                 doc_id = self.metadata.file_hash or (
-                    Path(self.metadata.source_path).stem
-                    if self.metadata.source_path
-                    else "unnamed_document"
+                    Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
                 )
                 persist_path = store_path / doc_id
 
             collection_name = self.metadata.file_hash or (
-                Path(self.metadata.source_path).stem
-                if self.metadata.source_path
-                else "unnamed_document"
+                Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
             )
-            self.vector_index = VectorIndex(
-                collection_name=collection_name, persist_path=persist_path
-            )
+            self.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
             self.vector_index.add_chunks(self._chunks, embeddings)
             self.logger.info("Vector index built successfully.")
 
@@ -417,9 +398,7 @@ class Document:
             self.logger.error(f"Failed to build vector index: {e}")
             raise RuntimeError(f"Failed to build vector index: {e}") from e
 
-    def semantic_search(
-        self, query: str, top_k: int = 5, return_scores: bool = False
-    ) -> Union[List[Chunk], List[tuple[Chunk, float]]]:
+    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> Union[List[Chunk], List[tuple[Chunk, float]]]:
         """Performs a semantic search on the document chunks using cosine similarity.
 
         This method uses cosine similarity for ranking, which is length-invariant
@@ -436,9 +415,7 @@ class Document:
             Similarity scores are in range [0, 1] where 1 is most similar
         """
         if not self.vector_index:
-            self.logger.warning(
-                "Vector index not found. Please run `build_vector_index()` first."
-            )
+            self.logger.warning("Vector index not found. Please run `build_vector_index()` first.")
             return []
 
         if not self._chunks_by_id:
@@ -448,10 +425,7 @@ class Document:
 
         try:
             # Use the embedding client that was used to build the index, or create a default one
-            if (
-                hasattr(self, "_embedding_client")
-                and self._embedding_client is not None
-            ):
+            if hasattr(self, "_embedding_client") and self._embedding_client is not None:
                 embedding_client = self._embedding_client
             else:
                 config = get_config()
@@ -481,11 +455,7 @@ class Document:
                 return results_with_scores
             else:
                 # Return just the chunks (backward compatible)
-                found_chunks = [
-                    self._chunks_by_id[res["id"]]
-                    for res in search_results
-                    if res["id"] in self._chunks_by_id
-                ]
+                found_chunks = [self._chunks_by_id[res["id"]] for res in search_results if res["id"] in self._chunks_by_id]
                 self.logger.info(f"Found {len(found_chunks)} matching chunks")
                 return found_chunks
 
@@ -501,9 +471,7 @@ class Document:
 
         try:
             vector_index_path_str = (
-                str(self.vector_index.persist_path.resolve())
-                if self.vector_index and self.vector_index.persist_path
-                else None
+                str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
             )
 
             # Convert metadata to dict, handling Path objects and None values
@@ -558,13 +526,9 @@ class Document:
             from datetime import datetime
 
             if metadata_dict.get("created_at"):
-                metadata_dict["created_at"] = datetime.fromisoformat(
-                    metadata_dict["created_at"]
-                )
+                metadata_dict["created_at"] = datetime.fromisoformat(metadata_dict["created_at"])
             if metadata_dict.get("modified_at"):
-                metadata_dict["modified_at"] = datetime.fromisoformat(
-                    metadata_dict["modified_at"]
-                )
+                metadata_dict["modified_at"] = datetime.fromisoformat(metadata_dict["modified_at"])
 
             metadata = DocumentMetadata(**metadata_dict)
 
@@ -589,9 +553,7 @@ class Document:
                 persist_path = Path(vector_index_path_str)
                 if persist_path.exists():
                     collection_name = persist_path.stem
-                    doc.vector_index = VectorIndex(
-                        collection_name=collection_name, persist_path=persist_path
-                    )
+                    doc.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
                     logger.info("Vector index re-linked successfully")
                 else:
                     logger.warning(f"Vector index path does not exist: {persist_path}")

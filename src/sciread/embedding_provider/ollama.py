@@ -36,9 +36,7 @@ class OllamaClient:
         self.embedding_cache: dict[str, list[float]] = {}
         self.logger = get_logger(__name__)
 
-    def get_embeddings(
-        self, texts: list[str], batch_size: int = 10
-    ) -> list[list[float]]:
+    def get_embeddings(self, texts: list[str], batch_size: int = 10) -> list[list[float]]:
         """
         Get embeddings for texts using Ollama API.
 

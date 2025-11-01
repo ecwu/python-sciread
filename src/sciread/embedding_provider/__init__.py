@@ -6,8 +6,8 @@ from .ollama import OllamaClient
 from .siliconflow import SiliconFlowClient
 
 __all__ = [
-    "get_embedding_client",
     "EmbeddingFactory",
     "OllamaClient",
     "SiliconFlowClient",
+    "get_embedding_client",
 ]

@@ -46,13 +46,9 @@ class SiliconFlowClient:
         if not self.api_key:
             self.api_key = os.getenv("SILICONFLOW_API_KEY")
             if not self.api_key:
-                self.logger.warning(
-                    "No SiliconFlow API key provided. Set SILICONFLOW_API_KEY environment variable."
-                )
+                self.logger.warning("No SiliconFlow API key provided. Set SILICONFLOW_API_KEY environment variable.")
 
-    def get_embeddings(
-        self, texts: list[str], batch_size: int = 10
-    ) -> list[list[float]]:
+    def get_embeddings(self, texts: list[str], batch_size: int = 10) -> list[list[float]]:
         """
         Get embeddings for texts using SiliconFlow API.
 
@@ -92,9 +88,7 @@ class SiliconFlowClient:
                     if self.cache_embeddings:
                         self.embedding_cache[cache_key] = embedding
                 else:
-                    batch_embeddings.append(
-                        [0.0] * self.embedding_dimension
-                    )  # Fallback
+                    batch_embeddings.append([0.0] * self.embedding_dimension)  # Fallback
             except Exception:
                 batch_embeddings.append([0.0] * self.embedding_dimension)  # Fallback
 
@@ -132,9 +126,7 @@ class SiliconFlowClient:
                 "encoding_format": "float",
             }
 
-            response = requests.post(
-                url, json=payload, headers=headers, timeout=self.timeout
-            )
+            response = requests.post(url, json=payload, headers=headers, timeout=self.timeout)
 
             if response.status_code == 200:
                 data = response.json()
@@ -143,9 +135,7 @@ class SiliconFlowClient:
                     if embedding:
                         return embedding
 
-            self.logger.warning(
-                f"SiliconFlow API returned status {response.status_code}: {response.text}"
-            )
+            self.logger.warning(f"SiliconFlow API returned status {response.status_code}: {response.text}")
             return None
         except Exception as e:
             self.logger.warning(f"Failed to get embedding from SiliconFlow: {e}")

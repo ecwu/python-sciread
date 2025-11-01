@@ -74,13 +74,13 @@ from .models.discussion_models import DivergentView
 from .models.discussion_models import Question
 from .models.discussion_models import Response
 
-# ReActAgent models - now imported from models folder
-from .models.react_models import ReActAgentInput
-from .models.react_models import ReActAgentOutput
-
 # RAG ReActAgent models - now imported from models folder
 from .models.rag_react_models import RAGReActAgentInput
 from .models.rag_react_models import RAGReActAgentOutput
+
+# ReActAgent models - now imported from models folder
+from .models.react_models import ReActAgentInput
+from .models.react_models import ReActAgentOutput
 
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
@@ -93,16 +93,16 @@ from .models.task_models import TaskType
 from .personality_agents import PersonalityAgent
 from .personality_agents import create_personality_agent
 
+# RAG ReActAgent and utility functions
+from .rag_react_agent import RAGReActAgent
+from .rag_react_agent import analyze_document_with_rag_react
+
 # ReActAgent and utility functions
 from .react_agent import ReActAgent
 from .react_agent import analyze_document_with_react
 from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
-
-# RAG ReActAgent and utility functions
-from .rag_react_agent import RAGReActAgent
-from .rag_react_agent import analyze_document_with_rag_react
 from .simple_agent import SimpleAgent
 from .task_queue import TaskQueueManager
 from .text_utils import remove_references

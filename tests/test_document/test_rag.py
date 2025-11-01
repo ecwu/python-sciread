@@ -83,9 +83,7 @@ class TestDocumentRAG:
     @patch("sciread.document.document.get_config")
     @patch("sciread.document.document.get_embedding_client")
     @patch("sciread.document.document.VectorIndex")
-    def test_build_vector_index_success(
-        self, mock_vector_index, mock_get_embedding_client, mock_config
-    ):
+    def test_build_vector_index_success(self, mock_vector_index, mock_get_embedding_client, mock_config):
         """Test successful vector index building."""
         # Setup mocks
         mock_config.return_value.vector_store = Mock(
@@ -109,21 +107,15 @@ class TestDocumentRAG:
         doc.build_vector_index(persist=False)
 
         # Verify method calls
-        mock_get_embedding_client.assert_called_once_with(
-            "test-model", cache_embeddings=True
-        )
+        mock_get_embedding_client.assert_called_once_with("test-model", cache_embeddings=True)
         mock_embedding_client.get_embeddings.assert_called_once()
         mock_vector_index.assert_called_once()
-        mock_vector_index_instance.add_chunks.assert_called_once_with(
-            chunks, [[0.1, 0.2], [0.3, 0.4]]
-        )
+        mock_vector_index_instance.add_chunks.assert_called_once_with(chunks, [[0.1, 0.2], [0.3, 0.4]])
 
     @patch("sciread.document.document.get_config")
     @patch("sciread.document.document.get_embedding_client")
     @patch("sciread.document.document.VectorIndex")
-    def test_build_vector_index_with_persistence(
-        self, mock_vector_index, mock_get_embedding_client, mock_config
-    ):
+    def test_build_vector_index_with_persistence(self, mock_vector_index, mock_get_embedding_client, mock_config):
         """Test building vector index with persistence."""
         # Setup mocks
         from pathlib import Path
@@ -182,9 +174,7 @@ class TestDocumentRAG:
     def test_semantic_search_success(self, mock_get_embedding_client, mock_config):
         """Test successful semantic search."""
         # Setup mocks
-        mock_config.return_value.vector_store = Mock(
-            embedding_model="test-model", cache_embeddings=True
-        )
+        mock_config.return_value.vector_store = Mock(embedding_model="test-model", cache_embeddings=True)
         mock_embedding_client = Mock()
         mock_get_embedding_client.return_value = mock_embedding_client
         mock_embedding_client.get_embedding.return_value = [0.1, 0.2, 0.3]
@@ -212,21 +202,15 @@ class TestDocumentRAG:
         assert results[0] == chunks[1]  # Should return the actual Chunk object
 
         # Verify method calls
-        mock_get_embedding_client.assert_called_once_with(
-            "test-model", cache_embeddings=True
-        )
+        mock_get_embedding_client.assert_called_once_with("test-model", cache_embeddings=True)
         mock_embedding_client.get_embedding.assert_called_once_with("test query")
         mock_vector_index.search.assert_called_once_with([0.1, 0.2, 0.3], top_k=5)
 
     @patch("sciread.document.document.get_config")
     @patch("sciread.document.document.get_embedding_client")
-    def test_semantic_search_embedding_error(
-        self, mock_get_embedding_client, mock_config
-    ):
+    def test_semantic_search_embedding_error(self, mock_get_embedding_client, mock_config):
         """Test semantic search with embedding error."""
-        mock_config.return_value.vector_store = Mock(
-            embedding_model="test-model", cache_embeddings=True
-        )
+        mock_config.return_value.vector_store = Mock(embedding_model="test-model", cache_embeddings=True)
         mock_embedding_client = Mock()
         mock_get_embedding_client.return_value = mock_embedding_client
         mock_embedding_client.get_embedding.return_value = None
@@ -398,9 +382,7 @@ class TestDocumentRAG:
             doc = Document.load(state_path)
 
             # Verify vector index was re-linked
-            mock_vector_index.assert_called_once_with(
-                collection_name="vector_index", persist_path=vector_path
-            )
+            mock_vector_index.assert_called_once_with(collection_name="vector_index", persist_path=vector_path)
             assert doc.vector_index is not None
 
     def test_load_vector_index_not_exists(self):
