@@ -41,7 +41,10 @@ class TestDocumentRAG:
     def test_set_chunks(self):
         """Test setting chunks and updating _chunks_by_id."""
         doc = Document(text="test text")
-        chunks = [Chunk(content="Chunk 1", chunk_name="intro"), Chunk(content="Chunk 2", chunk_name="methods")]
+        chunks = [
+            Chunk(content="Chunk 1", chunk_name="intro"),
+            Chunk(content="Chunk 2", chunk_name="methods"),
+        ]
 
         doc._set_chunks(chunks)
 
@@ -67,28 +70,33 @@ class TestDocumentRAG:
         assert chunk2.id in doc._chunks_by_id
 
     @patch("sciread.document.document.get_config")
-    @patch("sciread.document.document.OllamaClient")
-    def test_build_vector_index_no_chunks(self, mock_ollama, mock_config):
+    @patch("sciread.document.document.get_embedding_client")
+    def test_build_vector_index_no_chunks(self, mock_get_embedding_client, mock_config):
         """Test building vector index with no chunks."""
         doc = Document(text="test text")
         doc.build_vector_index()
 
         # Should not attempt to build index
-        mock_ollama.assert_not_called()
+        mock_get_embedding_client.assert_not_called()
         mock_config.assert_not_called()
 
     @patch("sciread.document.document.get_config")
-    @patch("sciread.document.document.OllamaClient")
+    @patch("sciread.document.document.get_embedding_client")
     @patch("sciread.document.document.VectorIndex")
-    def test_build_vector_index_success(self, mock_vector_index, mock_ollama, mock_config):
+    def test_build_vector_index_success(
+        self, mock_vector_index, mock_get_embedding_client, mock_config
+    ):
         """Test successful vector index building."""
         # Setup mocks
         mock_config.return_value.vector_store = Mock(
-            embedding_model="test-model", batch_size=5, cache_embeddings=True, path="~/.test_vector_store"
+            embedding_model="test-model",
+            batch_size=5,
+            cache_embeddings=True,
+            path="~/.test_vector_store",
         )
-        mock_ollama_instance = Mock()
-        mock_ollama.return_value = mock_ollama_instance
-        mock_ollama_instance.get_embeddings.return_value = [[0.1, 0.2], [0.3, 0.4]]
+        mock_embedding_client = Mock()
+        mock_get_embedding_client.return_value = mock_embedding_client
+        mock_embedding_client.get_embeddings.return_value = [[0.1, 0.2], [0.3, 0.4]]
 
         mock_vector_index_instance = Mock()
         mock_vector_index.return_value = mock_vector_index_instance
@@ -101,15 +109,21 @@ class TestDocumentRAG:
         doc.build_vector_index(persist=False)
 
         # Verify method calls
-        mock_ollama.assert_called_once_with(model="test-model", cache_embeddings=True)
-        mock_ollama_instance.get_embeddings.assert_called_once_with(["Chunk 1", "Chunk 2"], batch_size=5)
+        mock_get_embedding_client.assert_called_once_with(
+            "test-model", cache_embeddings=True
+        )
+        mock_embedding_client.get_embeddings.assert_called_once()
         mock_vector_index.assert_called_once()
-        mock_vector_index_instance.add_chunks.assert_called_once_with(chunks, [[0.1, 0.2], [0.3, 0.4]])
+        mock_vector_index_instance.add_chunks.assert_called_once_with(
+            chunks, [[0.1, 0.2], [0.3, 0.4]]
+        )
 
     @patch("sciread.document.document.get_config")
-    @patch("sciread.document.document.OllamaClient")
+    @patch("sciread.document.document.get_embedding_client")
     @patch("sciread.document.document.VectorIndex")
-    def test_build_vector_index_with_persistence(self, mock_vector_index, mock_ollama, mock_config):
+    def test_build_vector_index_with_persistence(
+        self, mock_vector_index, mock_get_embedding_client, mock_config
+    ):
         """Test building vector index with persistence."""
         # Setup mocks
         from pathlib import Path
@@ -117,11 +131,14 @@ class TestDocumentRAG:
         mock_store_path = Path("/tmp/test_vector_store")
 
         mock_config.return_value.vector_store = Mock(
-            embedding_model="test-model", batch_size=5, cache_embeddings=True, path="/tmp/test_vector_store"
+            embedding_model="test-model",
+            batch_size=5,
+            cache_embeddings=True,
+            path="/tmp/test_vector_store",
         )
-        mock_ollama_instance = Mock()
-        mock_ollama.return_value = mock_ollama_instance
-        mock_ollama_instance.get_embeddings.return_value = [[0.1, 0.2]]
+        mock_embedding_client = Mock()
+        mock_get_embedding_client.return_value = mock_embedding_client
+        mock_embedding_client.get_embeddings.return_value = [[0.1, 0.2]]
 
         mock_vector_index_instance = Mock()
         mock_vector_index.return_value = mock_vector_index_instance
@@ -161,18 +178,23 @@ class TestDocumentRAG:
         assert results == []
 
     @patch("sciread.document.document.get_config")
-    @patch("sciread.document.document.OllamaClient")
-    def test_semantic_search_success(self, mock_ollama, mock_config):
+    @patch("sciread.document.document.get_embedding_client")
+    def test_semantic_search_success(self, mock_get_embedding_client, mock_config):
         """Test successful semantic search."""
         # Setup mocks
-        mock_config.return_value.vector_store = Mock(embedding_model="test-model", cache_embeddings=True)
-        mock_ollama_instance = Mock()
-        mock_ollama.return_value = mock_ollama_instance
-        mock_ollama_instance.get_embedding.return_value = [0.1, 0.2, 0.3]
+        mock_config.return_value.vector_store = Mock(
+            embedding_model="test-model", cache_embeddings=True
+        )
+        mock_embedding_client = Mock()
+        mock_get_embedding_client.return_value = mock_embedding_client
+        mock_embedding_client.get_embedding.return_value = [0.1, 0.2, 0.3]
 
         # Create document with chunks and vector index
         doc = Document(text="test text")
-        chunks = [Chunk(content="Chunk 1", chunk_name="intro"), Chunk(content="Chunk 2", chunk_name="methods")]
+        chunks = [
+            Chunk(content="Chunk 1", chunk_name="intro"),
+            Chunk(content="Chunk 2", chunk_name="methods"),
+        ]
         doc._set_chunks(chunks)
 
         # Mock vector index
@@ -190,18 +212,24 @@ class TestDocumentRAG:
         assert results[0] == chunks[1]  # Should return the actual Chunk object
 
         # Verify method calls
-        mock_ollama.assert_called_once_with(model="test-model", cache_embeddings=True)
-        mock_ollama_instance.get_embedding.assert_called_once_with("test query")
+        mock_get_embedding_client.assert_called_once_with(
+            "test-model", cache_embeddings=True
+        )
+        mock_embedding_client.get_embedding.assert_called_once_with("test query")
         mock_vector_index.search.assert_called_once_with([0.1, 0.2, 0.3], top_k=5)
 
     @patch("sciread.document.document.get_config")
-    @patch("sciread.document.document.OllamaClient")
-    def test_semantic_search_embedding_error(self, mock_ollama, mock_config):
+    @patch("sciread.document.document.get_embedding_client")
+    def test_semantic_search_embedding_error(
+        self, mock_get_embedding_client, mock_config
+    ):
         """Test semantic search with embedding error."""
-        mock_config.return_value.vector_store = Mock(embedding_model="test-model", cache_embeddings=True)
-        mock_ollama_instance = Mock()
-        mock_ollama.return_value = mock_ollama_instance
-        mock_ollama_instance.get_embedding.return_value = None
+        mock_config.return_value.vector_store = Mock(
+            embedding_model="test-model", cache_embeddings=True
+        )
+        mock_embedding_client = Mock()
+        mock_get_embedding_client.return_value = mock_embedding_client
+        mock_embedding_client.get_embedding.return_value = None
 
         doc = Document(text="test text")
         chunks = [Chunk(content="Chunk 1")]
@@ -370,7 +398,9 @@ class TestDocumentRAG:
             doc = Document.load(state_path)
 
             # Verify vector index was re-linked
-            mock_vector_index.assert_called_once_with(collection_name="vector_index", persist_path=vector_path)
+            mock_vector_index.assert_called_once_with(
+                collection_name="vector_index", persist_path=vector_path
+            )
             assert doc.vector_index is not None
 
     def test_load_vector_index_not_exists(self):

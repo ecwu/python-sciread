@@ -170,6 +170,7 @@ class TestSiliconFlowClient:
         assert len(embeddings2) == 1
         assert mock_post.call_count == 0  # Should not call API
 
+    @patch.dict("os.environ", {}, clear=True)
     def test_get_embeddings_fallback_on_error(self):
         """Test fallback embeddings on error."""
         client = SiliconFlowClient(api_key=None, embedding_dimension=100)
@@ -201,6 +202,7 @@ class TestSiliconFlowClient:
         client = SiliconFlowClient(api_key="test-key")
         assert client.test_connection() is False
 
+    @patch.dict("os.environ", {}, clear=True)
     def test_test_connection_no_api_key(self):
         """Test connection test without API key."""
         client = SiliconFlowClient(api_key=None)
