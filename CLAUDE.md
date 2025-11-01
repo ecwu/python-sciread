@@ -55,7 +55,8 @@ src/sciread/
 │   ├── __init__.py # Document module exports
 │   ├── document.py # Main Document class for managing document lifecycle
 │   ├── document_builder.py # DocumentBuilder and DocumentFactory classes
-│   ├── external_clients.py # External API clients (Mineru, Ollama)
+│   ├── external_clients.py # External API clients (Mineru)
+│   ├── factory.py   # DocumentFactory for creating documents with custom settings
 │   ├── mineru_cache.py # Caching for Mineru API responses
 │   ├── models.py   # Core data models (Chunk, DocumentMetadata, etc.)
 │   ├── loaders/    # Document loaders for different file formats
@@ -71,6 +72,11 @@ src/sciread/
 │       ├── markdown_splitter.py # Markdown-aware splitter
 │       ├── regex_section_splitter.py # Regex-based academic paper splitter
 │       └── semantic_splitter.py   # Semantic splitter using embeddings
+├── embedding_provider/ # Embedding provider module with factory pattern
+│   ├── __init__.py  # Main interface exports get_embedding_client() function
+│   ├── factory.py   # EmbeddingFactory for creating embedding client instances
+│   ├── ollama.py    # Ollama local embedding provider implementation
+│   └── siliconflow.py # SiliconFlow cloud embedding provider implementation
 ├── llm_provider/   # LLM provider module with factory pattern
 │   ├── __init__.py  # Main interface exports get_model() function
 │   ├── factory.py   # ModelFactory for creating model instances
@@ -88,6 +94,7 @@ src/sciread/
 - **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
 - **Document Module**: `document/` provides comprehensive document processing capabilities
 - **Agent Module**: `agent/` provides LLM-driven document analysis agents
+- **Embedding Provider Module**: `embedding_provider/` provides unified interface for multiple embedding model providers
 - **LLM Provider Module**: `llm_provider/` provides unified interface for multiple LLM providers
 
 #### Agent System
@@ -190,6 +197,52 @@ The `llm_provider` module implements a factory pattern for working with differen
 - Configuration-driven API key management
 - Model validation and error handling
 - Support for custom base URLs and provider settings
+
+#### Embedding Provider System
+The `embedding_provider` module implements a factory pattern for working with different embedding model providers for semantic search and text splitting operations:
+
+**Main Interface**: `get_embedding_client(embedding_identifier: str) -> EmbeddingClient`
+- Explicit provider: `get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")`
+- Inferred provider: `get_embedding_client("embeddinggemma:latest")` (uses ollama provider)
+- Factory method: `EmbeddingFactory.create_client("ollama/nomic-embed-text")`
+
+**Supported Providers**:
+- **Ollama**: Local embedding models like `nomic-embed-text`, `embeddinggemma:latest` (localhost:11434)
+- **SiliconFlow**: Cloud embedding models like `Qwen/Qwen3-Embedding-8B`, `BAAI/bge-large-en-v1.5`
+
+**Key Features**:
+- Factory pattern for embedding client creation (`src/sciread/embedding_provider/factory.py:101`)
+- Automatic provider inference from model names
+- Support for concurrent requests (provider-dependent)
+- Model validation and error handling
+- Comprehensive model support checking with `EmbeddingFactory.supports_concurrent_requests()`
+- Configuration-driven API key and base URL management
+
+**Usage Examples**:
+
+```python
+from sciread.embedding_provider import get_embedding_client, EmbeddingFactory
+
+# Create embedding clients with explicit provider
+ollama_client = get_embedding_client("ollama/nomic-embed-text")
+siliconflow_client = get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")
+
+# Create clients with inferred provider (default to ollama)
+client = get_embedding_client("embeddinggemma:latest")
+
+# Check for concurrent request support
+if EmbeddingFactory.supports_concurrent_requests("siliconflow/Qwen/Qwen3-Embedding-8B"):
+    # Can make parallel embedding requests
+    pass
+
+# List all supported models
+all_models = EmbeddingFactory.list_all_supported_models()
+```
+
+**Integration with Text Splitters**: The embedding provider is used by semantic and flow-based text splitters for intelligent chunking:
+- `SemanticSplitter` - Uses embeddings for semantic similarity-based text splitting
+- `ConsecutiveFlowSplitter` - Uses consecutive sentence similarity for chunking
+- `CumulativeFlowSplitter` - Uses cumulative segment similarity for chunking
 
 ### Configuration
 - **pyproject.toml**: Modern Python packaging configuration with ruff linting/formatting rules
