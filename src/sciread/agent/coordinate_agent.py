@@ -241,7 +241,11 @@ class CoordinateAgent:
             deps = ctx.deps
 
             # Extract content for analysis
-            if deps.sections_to_analyze:
+            if deps.analysis_type == "metadata":
+                # Special case: Get first 3 chunks for metadata extraction
+                chunks = deps.document.chunks[:3]  # Get first 3 chunks
+                content = "\n\n".join([chunk.content for chunk in chunks])
+            elif deps.sections_to_analyze:
                 # Use specific sections
                 content_parts = []
                 for section_name in deps.sections_to_analyze:
