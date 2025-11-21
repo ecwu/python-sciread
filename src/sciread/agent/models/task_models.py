@@ -223,6 +223,19 @@ class TaskQueue(BaseModel):
 
         return False
 
+    def get_task(self, task_id: str) -> Optional[Task]:
+        """Retrieve a task by ID from any queue bucket."""
+        for task_list in [
+            self.pending_tasks,
+            self.active_tasks,
+            self.completed_tasks,
+            self.failed_tasks,
+        ]:
+            for task in task_list:
+                if task.task_id == task_id:
+                    return task
+        return None
+
     def get_task_status(self, task_id: str) -> Optional[TaskStatus]:
         """Get the status of a specific task."""
         for task_list in [

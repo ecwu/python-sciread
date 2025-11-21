@@ -171,20 +171,55 @@ class ConsensusBuilder:
     ) -> List[DivergentView]:
         """Identify significant divergent views."""
         try:
+            # Build lookup so we can recover the original insight from a question reference
+            insight_lookup_by_id: Dict[str, AgentInsight] = {}
+            insight_lookup_by_snippet: Dict[str, List[AgentInsight]] = defaultdict(list)
+
+            for insights in agent_insights.values():
+                for insight in insights:
+                    insight_id = getattr(insight, "insight_id", None)
+                    if insight_id:
+                        insight_lookup_by_id[insight_id] = insight
+
+                    # Questions currently reference the first 50 chars; store both the clipped and full strings
+                    snippet_key = insight.content[:50]
+                    insight_lookup_by_snippet[snippet_key].append(insight)
+                    insight_lookup_by_snippet[insight.content].append(insight)
+
             # Find insights that were strongly challenged
             challenged_insights = []
 
             for question in questions:
                 for response in responses:
-                    if response.question_id == question.question_id:
-                        if response.stance.lower() in ["disagree", "challenge"]:
-                            challenged_insights.append(
-                                {
-                                    "question": question,
-                                    "response": response,
-                                    "insight_content": question.target_insight,
-                                }
-                            )
+                    if response.question_id != question.question_id:
+                        continue
+
+                    stance = (response.stance or "").lower()
+                    if stance not in ["disagree", "challenge", "modify"]:
+                        continue
+
+                    target_insight: Optional[AgentInsight] = None
+
+                    target_id = getattr(question, "target_insight_id", None)
+                    if target_id:
+                        target_insight = insight_lookup_by_id.get(target_id)
+
+                    if not target_insight:
+                        target_key = question.target_insight or ""
+                        matches = insight_lookup_by_snippet.get(target_key)
+                        if matches:
+                            target_insight = matches[0]
+
+                    if not target_insight:
+                        continue
+
+                    challenged_insights.append(
+                        {
+                            "question": question,
+                            "response": response,
+                            "insight": target_insight,
+                        }
+                    )
 
             # Group conflicts by topic
             conflicts = self._group_conflicts_by_topic(challenged_insights)
@@ -366,7 +401,7 @@ SIGNIFICANCE:
 
             # Check for conflicting responses related to this topic
             conflicting_responses = [
-                resp for resp in responses if resp.stance.lower() in ["disagree", "challenge"] and topic.lower() in resp.content.lower()
+                resp for resp in responses if resp.stance.lower() in ["disagree", "challenge", "modify"] and topic.lower() in resp.content.lower()
             ]
 
             if len(conflicting_responses) > len(insights) / 2:
@@ -400,17 +435,17 @@ SIGNIFICANCE:
         conflicts = defaultdict(list)
 
         for challenge in challenged_insights:
+            insight: AgentInsight = challenge["insight"]
             question = challenge["question"]
             response = challenge["response"]
 
-            # Extract topic
-            topic = self._extract_topic_from_insight(response.content)
+            topic = self._extract_topic_from_insight(insight.content)
 
             conflicts[topic].append(
                 {
                     "question": question,
                     "response": response,
-                    "insight_content": challenge["insight_content"],
+                    "insight": insight,
                 }
             )
 
@@ -419,9 +454,10 @@ SIGNIFICANCE:
         for topic, conflict_list in conflicts.items():
             if conflict_list:
                 main_conflict = conflict_list[0]
+                main_insight: AgentInsight = main_conflict["insight"]
                 result[topic] = {
-                    "content": main_conflict["insight_content"],
-                    "holding_agent": main_conflict["question"].from_agent,
+                    "content": main_insight.content,
+                    "holding_agent": main_insight.agent_id,
                     "reasoning": main_conflict["response"].content,
                     "counter_arguments": [c["response"].content for c in conflict_list[1:]],
                 }

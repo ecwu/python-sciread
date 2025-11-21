@@ -9,9 +9,13 @@ from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
 from ..logging_config import get_logger
+from .models.discussion_models import AgentInsight
 from .models.discussion_models import AgentPersonality
+from .models.discussion_models import Question
+from .models.discussion_models import Response
 from .models.task_models import Task
 from .models.task_models import TaskPriority
 from .models.task_models import TaskQueue
