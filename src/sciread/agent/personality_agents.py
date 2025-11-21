@@ -142,46 +142,119 @@ Select sections that will help you provide the most valuable insights from your 
 
     def _get_default_sections(self, available_sections: List[str]) -> List[str]:
         """Get default sections based on personality if selection fails."""
-        # Always include abstract and introduction if available
-        defaults = []
-        for section in available_sections:
-            section_lower = section.lower()
-            if "abstract" in section_lower or "introduction" in section_lower:
-                defaults.append(section)
+        try:
+            # Use unified section matching for better results
+            defaults = []
 
-        # Add personality-specific defaults
-        if self.personality == AgentPersonality.CRITICAL_EVALUATOR:
-            keywords = ["method", "result", "experiment", "evaluation", "limitation"]
-        elif self.personality == AgentPersonality.INNOVATIVE_INSIGHTER:
-            keywords = ["approach", "innovation", "novel", "future", "contribution"]
-        elif self.personality == AgentPersonality.PRACTICAL_APPLICATOR:
-            keywords = ["application", "experiment", "implementation", "practical"]
-        else:  # THEORETICAL_INTEGRATOR
-            keywords = ["related", "work", "theory", "framework", "conclusion"]
-
-        for section in available_sections:
-            section_lower = section.lower()
-            if any(keyword in section_lower for keyword in keywords):
-                if section not in defaults:
+            # Since we don't have document access here, use pattern-based matching
+            # Always include abstract and introduction if available
+            for section in available_sections:
+                section_lower = section.lower()
+                if "abstract" in section_lower and not any("abstract" in d.lower() for d in defaults):
+                    defaults.append(section)
+                elif "introduction" in section_lower and not any("introduction" in d.lower() for d in defaults):
                     defaults.append(section)
 
-        return defaults[:5] if defaults else available_sections[:3]
+            # Add personality-specific defaults using pattern matching
+            if self.personality == AgentPersonality.CRITICAL_EVALUATOR:
+                targets = ["methodology", "experiments", "results", "evaluation", "limitations"]
+            elif self.personality == AgentPersonality.INNOVATIVE_INSIGHTER:
+                targets = ["approach", "innovation", "novelty", "contributions", "future"]
+            elif self.personality == AgentPersonality.PRACTICAL_APPLICATOR:
+                targets = ["applications", "experiments", "implementation", "deployment"]
+            else:  # THEORETICAL_INTEGRATOR
+                targets = ["related work", "background", "theory", "framework", "conclusion"]
+
+            # Use pattern matching to find sections
+            for target in targets:
+                for section in available_sections:
+                    if section not in defaults:
+                        section_lower = section.lower()
+                        target_lower = target.lower()
+                        if (target_lower in section_lower or
+                            section_lower in target_lower or
+                            any(word in section_lower for word in target_lower.split())):
+                            defaults.append(section)
+                            break
+
+            return defaults[:5] if defaults else available_sections[:3]
+
+        except Exception as e:
+            self.logger.warning(f"Enhanced section matching failed, using fallback approach: {e}")
+
+            # Fallback to original approach
+            defaults = []
+            for section in available_sections:
+                section_lower = section.lower()
+                if "abstract" in section_lower or "introduction" in section_lower:
+                    defaults.append(section)
+
+            # Add personality-specific defaults
+            if self.personality == AgentPersonality.CRITICAL_EVALUATOR:
+                keywords = ["method", "result", "experiment", "evaluation", "limitation"]
+            elif self.personality == AgentPersonality.INNOVATIVE_INSIGHTER:
+                keywords = ["approach", "innovation", "novel", "future", "contribution"]
+            elif self.personality == AgentPersonality.PRACTICAL_APPLICATOR:
+                keywords = ["application", "experiment", "implementation", "practical"]
+            else:  # THEORETICAL_INTEGRATOR
+                keywords = ["related", "work", "theory", "framework", "conclusion"]
+
+            for section in available_sections:
+                section_lower = section.lower()
+                if any(keyword in section_lower for keyword in keywords):
+                    if section not in defaults:
+                        defaults.append(section)
+
+            return defaults[:5] if defaults else available_sections[:3]
 
     def _get_section_content(self, document: Document, section_names: List[str]) -> Dict[str, str]:
-        """Get the actual content of selected sections."""
-        content_dict = {}
+        """Get the actual content of selected sections using unified section handling."""
+        try:
+            # Use unified personality-based section selection
+            personality_sections = document.get_sections_for_personality(
+                personality_type=self.personality.value,
+                max_sections=len(section_names) + 2,  # Allow a few extra sections
+                max_chars_per_section=3000,  # Match current limit
+                include_fallback=True,
+            )
 
-        for section_name in section_names:
-            chunks = document.get_sections_by_name([section_name])
-            if chunks:
-                # Combine all chunks for this section
-                section_text = "\n\n".join(chunk.content for chunk in chunks)
-                # Limit content length to avoid token overflow
-                if len(section_text) > 3000:
-                    section_text = section_text[:3000] + "\n... (content truncated)"
-                content_dict[section_name] = section_text
+            content_dict = {}
 
-        return content_dict
+            # Start with personality-selected sections
+            for section_name, content in personality_sections:
+                content_dict[section_name] = content
+
+            # Add any explicitly requested sections that weren't included
+            for section_name in section_names:
+                if section_name not in content_dict:
+                    chunks = document.get_sections_by_name([section_name])
+                    if chunks:
+                        # Combine all chunks for this section
+                        section_text = "\n\n".join(chunk.content for chunk in chunks)
+                        # Limit content length to avoid token overflow
+                        if len(section_text) > 3000:
+                            section_text = section_text[:3000] + "\n... (content truncated)"
+                        content_dict[section_name] = section_text
+
+            return content_dict
+
+        except Exception as e:
+            self.logger.warning(f"Unified personality section selection failed, falling back to legacy approach: {e}")
+
+            # Fallback to original approach
+            content_dict = {}
+
+            for section_name in section_names:
+                chunks = document.get_sections_by_name([section_name])
+                if chunks:
+                    # Combine all chunks for this section
+                    section_text = "\n\n".join(chunk.content for chunk in chunks)
+                    # Limit content length to avoid token overflow
+                    if len(section_text) > 3000:
+                        section_text = section_text[:3000] + "\n... (content truncated)"
+                    content_dict[section_name] = section_text
+
+            return content_dict
 
     async def ask_question(
         self,

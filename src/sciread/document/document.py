@@ -2,11 +2,14 @@
 
 import hashlib
 import json
+import re
 from collections.abc import Iterator
 from dataclasses import asdict
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 
 from ..config import get_config
@@ -462,6 +465,844 @@ class Document:
         except Exception as e:
             self.logger.error(f"Semantic search failed: {e}")
             return []
+
+    # ========== Unified Section Handling Methods ==========
+
+    def print_for_human(
+        self,
+        section_names: Optional[List[str]] = None,
+        max_sections: Optional[int] = None,
+        show_metadata: bool = True,
+        show_confidence: bool = True,
+        use_colors: bool = True,
+    ) -> None:
+        """Print formatted document sections for human reading.
+
+        Args:
+            section_names: Specific section names to display. If None, shows all sections.
+            max_sections: Maximum number of sections to display.
+            show_metadata: Whether to show document metadata (title, author, etc.).
+            show_confidence: Whether to show confidence scores for each section.
+            use_colors: Whether to use colored output (if terminal supports it).
+        """
+        try:
+            # Use color codes if supported and requested
+            if use_colors:
+                colors = {
+                    "header": "\033[1;36m",  # Cyan
+                    "title": "\033[1;33m",  # Yellow
+                    "section": "\033[1;32m",  # Green
+                    "confidence": "\033[0;36m",  # Light cyan
+                    "content": "\033[0m",  # Reset
+                    "metadata": "\033[0;33m",  # Light yellow
+                }
+                reset = "\033[0m"
+            else:
+                colors = {k: "" for k in ["header", "title", "section", "confidence", "content", "metadata"]}
+                reset = ""
+
+            # Show document metadata
+            if show_metadata:
+                print(f"{colors['header']}{'='*80}{reset}")
+                print(f"{colors['title']}Document: {self.metadata.title or 'Untitled'}{reset}")
+                if self.metadata.author:
+                    print(f"{colors['metadata']}Author: {self.metadata.author}{reset}")
+                if self.metadata.source_path:
+                    print(f"{colors['metadata']}Source: {self.metadata.source_path}{reset}")
+                if self.metadata.page_count:
+                    print(f"{colors['metadata']}Pages: {self.metadata.page_count}{reset}")
+                print(f"{colors['header']}{'='*80}{reset}")
+                print()
+
+            # Get sections to display
+            if section_names:
+                sections_chunks = self.get_sections_by_name(section_names)
+            else:
+                # Get unique sections in order
+                all_section_names = self.get_section_names()
+                if max_sections:
+                    all_section_names = all_section_names[:max_sections]
+                sections_chunks = self.get_sections_by_name(all_section_names)
+
+            # Display each section
+            for i, chunk in enumerate(sections_chunks, 1):
+                section_name = chunk.chunk_name or "untitled"
+                content = chunk.content
+                confidence = chunk.confidence or 0.0
+
+                print(f"{colors['section']}Section {i}: {section_name}{reset}")
+                if show_confidence:
+                    print(f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}")
+                print(f"{colors['header']}{'-'*60}{reset}")
+                print(f"{colors['content']}{content}{reset}")
+                print()
+
+        except Exception as e:
+            self.logger.error(f"Failed to print document for human: {e}")
+            print(f"Error printing document: {e}")
+
+    def get_for_llm(
+        self,
+        section_names: Optional[List[str]] = None,
+        max_tokens: Optional[int] = None,
+        include_headers: bool = True,
+        clean_text: bool = True,
+        personality: Optional[str] = None,
+        max_chars_per_section: Optional[int] = None,
+    ) -> str:
+        """Get document content optimized for LLM consumption.
+
+        Args:
+            section_names: Specific section names to include. If None, includes all sections.
+            max_tokens: Approximate maximum number of tokens (rough estimation: 1 token ≈ 4 chars).
+            include_headers: Whether to include section headers.
+            clean_text: Whether to clean and normalize text content.
+            personality: Optional personality type for content tailoring (DiscussionAgent).
+            max_chars_per_section: Maximum characters per section to prevent overflow.
+
+        Returns:
+            Formatted document content as string.
+        """
+        try:
+            # Get sections to include
+            if section_names:
+                sections_chunks = self.get_sections_by_name(section_names)
+            else:
+                all_section_names = self.get_section_names()
+                sections_chunks = self.get_sections_by_name(all_section_names)
+
+            # Apply personality-based filtering if specified
+            if personality:
+                sections_chunks = self._filter_sections_for_personality(sections_chunks, personality)
+
+            # Build content
+            content_parts = []
+            total_chars = 0
+            token_limit = max_tokens * 4 if max_tokens else None
+
+            # Add document context
+            if include_headers:
+                context_parts = []
+                if self.metadata.title:
+                    context_parts.append(f"Title: {self.metadata.title}")
+                if self.metadata.author:
+                    context_parts.append(f"Author: {self.metadata.author}")
+                if context_parts:
+                    content_parts.append("DOCUMENT METADATA:")
+                    content_parts.extend(context_parts)
+                    content_parts.append("")
+
+            for chunk in sections_chunks:
+                section_name = chunk.chunk_name or "untitled"
+                content = chunk.content
+
+                # Clean content if requested
+                if clean_text:
+                    content = self._clean_section_content(content)
+
+                # Limit section length if specified
+                if max_chars_per_section and len(content) > max_chars_per_section:
+                    content = content[:max_chars_per_section] + "...[truncated]"
+
+                # Check token limit
+                section_text = f"=== {section_name.upper()} ===\n{content}\n"
+                if token_limit and total_chars + len(section_text) > token_limit:
+                    # Add partial section if we have space
+                    remaining = token_limit - total_chars - 50  # Reserve space for header
+                    if remaining > 200:  # Only add if we have meaningful space
+                        partial_content = content[:remaining] + "...[truncated due to token limit]"
+                        section_text = f"=== {section_name.upper()} ===\n{partial_content}\n"
+                        content_parts.append(section_text)
+                    break
+
+                content_parts.append(section_text)
+                total_chars += len(section_text)
+
+            return "\n".join(content_parts)
+
+        except Exception as e:
+            self.logger.error(f"Failed to get content for LLM: {e}")
+            return f"Error retrieving content: {e}"
+
+    def get_section_by_number(self, index: int, include_content: bool = True, max_chars: Optional[int] = None) -> Optional[Tuple[str, str]]:
+        """Get section by numerical index.
+
+        Args:
+            index: Zero-based index of the section.
+            include_content: Whether to include section content.
+            max_chars: Maximum characters to return for content.
+
+        Returns:
+            Tuple of (section_name, content) if found, None otherwise.
+        """
+        try:
+            section_names = self.get_section_names()
+            if index < 0 or index >= len(section_names):
+                return None
+
+            section_name = section_names[index]
+            if not include_content:
+                return (section_name, "")
+
+            # Get chunks for this section
+            section_chunks = self.get_sections_by_name([section_name])
+            if not section_chunks:
+                return (section_name, "")
+
+            # Combine content from all chunks in this section
+            content = "\n\n".join(chunk.content for chunk in section_chunks)
+
+            # Apply character limit if specified
+            if max_chars and len(content) > max_chars:
+                content = content[:max_chars] + "...[truncated]"
+
+            return (section_name, content)
+
+        except Exception as e:
+            self.logger.error(f"Failed to get section by number {index}: {e}")
+            return None
+
+    def get_section_by_name(
+        self,
+        name: str,
+        fuzzy: bool = True,
+        case_sensitive: bool = False,
+        threshold: float = 0.8,
+    ) -> Optional[Tuple[str, str]]:
+        """Get section by name with optional fuzzy matching.
+
+        Args:
+            name: Section name to search for.
+            fuzzy: Whether to use fuzzy matching if exact match not found.
+            case_sensitive: Whether matching should be case sensitive.
+            threshold: Similarity threshold for fuzzy matching (0.0-1.0).
+
+        Returns:
+            Tuple of (section_name, content) if found, None otherwise.
+        """
+        try:
+            section_names = self.get_section_names()
+
+            # Normalize for case sensitivity
+            if not case_sensitive:
+                search_name = name.lower()
+                normalized_names = [n.lower() for n in section_names]
+            else:
+                search_name = name
+                normalized_names = section_names
+
+            # Try exact match first
+            if search_name in normalized_names:
+                actual_name = section_names[normalized_names.index(search_name)]
+                return self.get_section_by_number(section_names.index(actual_name))
+
+            # Try fuzzy matching if requested
+            if fuzzy:
+                closest_match = self.get_closest_section_name(name, case_sensitive=case_sensitive, threshold=threshold)
+                if closest_match:
+                    return self.get_section_by_number(section_names.index(closest_match))
+
+            return None
+
+        except Exception as e:
+            self.logger.error(f"Failed to get section by name '{name}': {e}")
+            return None
+
+    def get_closest_section_name(
+        self,
+        target_name: str,
+        available_names: Optional[List[str]] = None,
+        case_sensitive: bool = False,
+        threshold: float = 0.8,
+        use_embedding: bool = False,
+    ) -> Optional[str]:
+        """Find closest matching section name using various similarity measures.
+
+        Args:
+            target_name: Name to search for.
+            available_names: List of section names to search in. If None, uses document's section names.
+            case_sensitive: Whether matching should be case sensitive.
+            threshold: Minimum similarity threshold (0.0-1.0).
+            use_embedding: Whether to use semantic similarity via embeddings (if available).
+
+        Returns:
+            Closest matching section name if above threshold, None otherwise.
+        """
+        try:
+            if available_names is None:
+                available_names = self.get_section_names()
+
+            if not available_names:
+                return None
+
+            # Normalize for case sensitivity
+            if not case_sensitive:
+                search_name = target_name.lower()
+                normalized_names = [n.lower() for n in available_names]
+            else:
+                search_name = target_name
+                normalized_names = available_names
+
+            best_match = None
+            best_score = 0.0
+
+            # Step 1: Try exact match first
+            if search_name in normalized_names:
+                return available_names[normalized_names.index(search_name)]
+
+            # Step 2: Try pattern-based matching
+            pattern_match = self._match_section_pattern(search_name, normalized_names, available_names)
+            if pattern_match:
+                return pattern_match
+
+            # Step 3: Try semantic similarity first if requested and available
+            if use_embedding and hasattr(self, '_embedding_client'):
+                try:
+                    target_embedding = self._embedding_client.get_embedding(search_name)
+                    if target_embedding:
+                        for i, name in enumerate(normalized_names):
+                            name_embedding = self._embedding_client.get_embedding(name)
+                            if name_embedding:
+                                # Calculate cosine similarity
+                                similarity = self._cosine_similarity(target_embedding, name_embedding)
+                                if similarity > best_score and similarity >= threshold:
+                                    best_score = similarity
+                                    best_match = available_names[i]
+                except Exception:
+                    # Fall back to string similarity if embedding fails
+                    pass
+
+            # Step 4: Use enhanced string similarity with multiple strategies
+            if best_match is None:
+                for i, name in enumerate(normalized_names):
+                    # Multiple similarity measures
+                    sequence_sim = SequenceMatcher(None, search_name, name).ratio()
+                    word_sim = self._word_similarity(search_name, name)
+                    prefix_sim = self._prefix_similarity(search_name, name)
+
+                    # Use the best similarity score
+                    combined_sim = max(sequence_sim, word_sim, prefix_sim)
+
+                    if combined_sim > best_score and combined_sim >= threshold:
+                        best_score = combined_sim
+                        best_match = available_names[i]
+
+            return best_match
+
+        except Exception as e:
+            self.logger.error(f"Failed to find closest section name for '{target_name}': {e}")
+            return None
+
+    def _match_section_pattern(self, search_name: str, normalized_names: List[str], original_names: List[str]) -> Optional[str]:
+        """Match section using common academic paper patterns."""
+        # Common academic section patterns and their variations
+        section_patterns = {
+            # Introduction variations
+            'introduction': ['intro', 'introduction', 'background', 'overview', 'prelude', 'preamble'],
+
+            # Abstract variations
+            'abstract': ['abstract', 'summary', 'executive summary', 'overview'],
+
+            # Related work variations
+            'related work': ['related work', 'background', 'literature review', 'survey', 'previous work', 'state of the art'],
+
+            # Methodology variations
+            'methodology': ['methodology', 'method', 'methods', 'approach', 'methodology and approach', 'technical approach', 'design'],
+
+            # Experiments variations
+            'experiments': ['experiment', 'experiments', 'experimental setup', 'evaluation', 'empirical evaluation', 'study design', 'case study'],
+
+            # Results variations
+            'results': ['results', 'findings', 'outcomes', 'performance', 'evaluation results', 'experimental results'],
+
+            # Discussion variations
+            'discussion': ['discussion', 'analysis', 'interpretation', 'implications'],
+
+            # Conclusion variations
+            'conclusion': ['conclusion', 'conclusions', 'summary', 'future work', 'concluding remarks'],
+
+            # References/Bibliography variations
+            'references': ['references', 'bibliography', 'citations', 'works cited', 'bibliography and references'],
+
+            # Appendix variations
+            'appendix': ['appendix', 'appendices', 'supplementary material', 'supplemental material', 'additional information'],
+        }
+
+        # Check each pattern
+        for canonical_name, variations in section_patterns.items():
+            if search_name in variations:
+                # Now look for any of these variations in the available names
+                for variation in variations:
+                    if variation in normalized_names:
+                        return original_names[normalized_names.index(variation)]
+
+        return None
+
+    def _word_similarity(self, str1: str, str2: str) -> float:
+        """Calculate word-level similarity between two strings."""
+        try:
+            words1 = set(str1.split())
+            words2 = set(str2.split())
+
+            if not words1 or not words2:
+                return 0.0
+
+            intersection = words1.intersection(words2)
+            union = words1.union(words2)
+
+            return len(intersection) / len(union) if union else 0.0
+        except Exception:
+            return 0.0
+
+    def _prefix_similarity(self, str1: str, str2: str) -> float:
+        """Calculate prefix similarity between two strings."""
+        try:
+            min_len = min(len(str1), len(str2))
+            if min_len == 0:
+                return 0.0
+
+            common_prefix = 0
+            for i in range(min_len):
+                if str1[i] == str2[i]:
+                    common_prefix += 1
+                else:
+                    break
+
+            return common_prefix / min_len
+        except Exception:
+            return 0.0
+
+    def get_section_overview(self, include_stats: bool = True, include_quality: bool = True) -> dict:
+        """Get comprehensive overview of all sections.
+
+        Args:
+            include_stats: Whether to include section statistics.
+            include_quality: Whether to include quality metrics.
+
+        Returns:
+            Dictionary with section information.
+        """
+        try:
+            overview = {
+                "document_title": self.metadata.title or "Untitled",
+                "total_sections": 0,
+                "sections": [],
+                "total_chunks": len(self._chunks),
+                "document_type": "markdown" if self.is_markdown else "text",
+            }
+
+            section_names = self.get_section_names()
+            overview["total_sections"] = len(section_names)
+
+            for i, section_name in enumerate(section_names):
+                section_chunks = self.get_sections_by_name([section_name])
+                total_chars = sum(len(chunk.content) for chunk in section_chunks)
+                avg_confidence = sum(chunk.confidence or 0.0 for chunk in section_chunks) / len(section_chunks) if section_chunks else 0.0
+
+                section_info = {
+                    "index": i,
+                    "name": section_name,
+                    "chunk_count": len(section_chunks),
+                    "character_count": total_chars,
+                }
+
+                if include_quality:
+                    section_info.update({
+                        "average_confidence": avg_confidence,
+                        "high_quality_chunks": sum(1 for chunk in section_chunks if (chunk.confidence or 0.0) >= 0.7),
+                        "processed_chunks": sum(1 for chunk in section_chunks if chunk.processed),
+                    })
+
+                if include_stats:
+                    # Add additional statistics if requested
+                    chunk_lengths = [len(chunk.content) for chunk in section_chunks]
+                    section_info.update({
+                        "min_chunk_size": min(chunk_lengths) if chunk_lengths else 0,
+                        "max_chunk_size": max(chunk_lengths) if chunk_lengths else 0,
+                        "avg_chunk_size": sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0,
+                    })
+
+                overview["sections"].append(section_info)
+
+            return overview
+
+        except Exception as e:
+            self.logger.error(f"Failed to get section overview: {e}")
+            return {"error": str(e)}
+
+    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> List[Tuple[str, str]]:
+        """Get sections that meet minimum quality criteria.
+
+        Args:
+            min_confidence: Minimum confidence threshold (0.0-1.0).
+            min_length: Minimum character length per section.
+
+        Returns:
+            List of (section_name, content) tuples that meet criteria.
+        """
+        try:
+            sections = []
+            section_names = self.get_section_names()
+
+            for section_name in section_names:
+                section_chunks = self.get_sections_by_name([section_name])
+                if not section_chunks:
+                    continue
+
+                # Calculate combined confidence and length for the section
+                total_confidence = sum(chunk.confidence or 0.0 for chunk in section_chunks)
+                avg_confidence = total_confidence / len(section_chunks)
+                total_length = sum(len(chunk.content) for chunk in section_chunks)
+
+                if avg_confidence >= min_confidence and total_length >= min_length:
+                    content = "\n\n".join(chunk.content for chunk in section_chunks)
+                    sections.append((section_name, content))
+
+            return sections
+
+        except Exception as e:
+            self.logger.error(f"Failed to get sections with confidence: {e}")
+            return []
+
+    # ========== Helper Methods ==========
+
+    def _clean_section_content(self, content: str) -> str:
+        """Clean and normalize section content."""
+        try:
+            # Remove excessive whitespace
+            content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
+
+            # Fix common PDF extraction artifacts
+            content = re.sub(r'\b(\w+)-\s*\n\s*(\w+)\b', r'\1\2', content)  # Fix hyphenated words
+
+            # Normalize quotes (using string replacement instead of regex)
+            content = content.replace('"', '"').replace('"', '"')
+            content = content.replace("'", "'").replace("'", "'")
+
+            # Remove excessive spaces
+            content = re.sub(r' +', ' ', content)
+
+            return content.strip()
+
+        except Exception as e:
+            self.logger.warning(f"Failed to clean section content: {e}")
+            return content
+
+    def _cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
+        """Calculate cosine similarity between two vectors."""
+        try:
+            dot_product = sum(a * b for a, b in zip(vec1, vec2))
+            magnitude1 = sum(a * a for a in vec1) ** 0.5
+            magnitude2 = sum(b * b for b in vec2) ** 0.5
+
+            if magnitude1 == 0 or magnitude2 == 0:
+                return 0.0
+
+            return dot_product / (magnitude1 * magnitude2)
+
+        except Exception:
+            return 0.0
+
+    def _filter_sections_for_personality(self, sections_chunks: List[Chunk], personality: str) -> List[Chunk]:
+        """Filter sections based on personality preferences (DiscussionAgent)."""
+        personality_preferences = {
+            "critical_evaluator": ["methodology", "experiments", "results", "evaluation", "limitations", "analysis"],
+            "innovative_insighter": ["introduction", "contributions", "novelty", "innovation", "future", "conclusion"],
+            "practical_applicator": ["experiments", "applications", "implementation", "case study", "deployment", "results"],
+            "theoretical_integrator": ["background", "related work", "theory", "analysis", "discussion", "conclusion"],
+        }
+
+        if personality.lower() not in personality_preferences:
+            return sections_chunks
+
+        preferred_keywords = personality_preferences[personality.lower()]
+        filtered_chunks = []
+
+        for chunk in sections_chunks:
+            section_name = (chunk.chunk_name or "").lower()
+            if any(keyword in section_name for keyword in preferred_keywords):
+                filtered_chunks.append(chunk)
+
+        # If no sections match preferences, return original sections
+        return filtered_chunks if filtered_chunks else sections_chunks
+
+    # ========== Agent-Specific Optimization Methods ==========
+
+    def get_sections_for_personality(
+        self,
+        personality_type: str,
+        max_sections: int = 5,
+        max_chars_per_section: int = 3000,
+        include_fallback: bool = True,
+    ) -> List[Tuple[str, str]]:
+        """Get sections optimized for specific DiscussionAgent personality type.
+
+        Args:
+            personality_type: Type of personality (critical_evaluator, innovative_insighter, etc.).
+            max_sections: Maximum number of sections to return.
+            max_chars_per_section: Maximum characters per section.
+            include_fallback: Whether to include fallback sections if preferred ones aren't found.
+
+        Returns:
+            List of (section_name, content) tuples optimized for the personality.
+        """
+        try:
+            # Get all sections
+            section_names = self.get_section_names()
+            if not section_names:
+                return []
+
+            # Filter sections based on personality preferences
+            sections_chunks = self.get_sections_by_name(section_names)
+            filtered_chunks = self._filter_sections_for_personality(sections_chunks, personality_type)
+
+            # If no sections match and fallback is enabled, return most important sections
+            if not filtered_chunks and include_fallback:
+                # Priority order: abstract, introduction, methodology, results, conclusion
+                priority_sections = ["abstract", "introduction", "methodology", "results", "conclusion"]
+                for priority in priority_sections:
+                    matching_chunks = self.get_sections_by_name([priority])
+                    if matching_chunks:
+                        filtered_chunks.extend(matching_chunks)
+                        break
+
+            # Limit to max_sections
+            filtered_chunks = filtered_chunks[:max_sections]
+
+            # Convert to (name, content) tuples with length limits
+            result = []
+            for chunk in filtered_chunks:
+                section_name = chunk.chunk_name or "untitled"
+                content = chunk.content
+
+                if max_chars_per_section and len(content) > max_chars_per_section:
+                    content = content[:max_chars_per_section] + "...[truncated]"
+
+                result.append((section_name, content))
+
+            return result
+
+        except Exception as e:
+            self.logger.error(f"Failed to get sections for personality '{personality_type}': {e}")
+            return []
+
+    def get_for_simple_agent(
+        self,
+        include_metadata: bool = True,
+        clean_references: bool = True,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Get document content optimized for SimpleAgent.
+
+        Args:
+            include_metadata: Whether to include document metadata.
+            clean_references: Whether to remove references section.
+            max_tokens: Maximum number of tokens to include.
+
+        Returns:
+            Formatted content for SimpleAgent processing.
+        """
+        try:
+            # Use full text approach for SimpleAgent (maintain simplicity)
+            content_parts = []
+
+            if include_metadata:
+                metadata_parts = []
+                if self.metadata.title:
+                    metadata_parts.append(f"Title: {self.metadata.title}")
+                if self.metadata.author:
+                    metadata_parts.append(f"Author: {self.metadata.author}")
+                if metadata_parts:
+                    content_parts.append("DOCUMENT INFORMATION:")
+                    content_parts.extend(metadata_parts)
+                    content_parts.append("")
+
+            # Get full text (SimpleAgent's approach)
+            if self._chunks:
+                full_text = self.get_full_text()
+            else:
+                full_text = self._raw_text
+
+            # Clean references if requested
+            if clean_references:
+                full_text = self._remove_references_section(full_text)
+
+            # Clean academic text artifacts
+            full_text = self._clean_section_content(full_text)
+
+            # Apply token limit if specified
+            if max_tokens and len(full_text) > max_tokens * 4:
+                full_text = full_text[:max_tokens * 4] + "...[truncated due to token limit]"
+
+            content_parts.append(full_text)
+            return "\n\n".join(content_parts)
+
+        except Exception as e:
+            self.logger.error(f"Failed to get content for SimpleAgent: {e}")
+            return f"Error retrieving content: {e}"
+
+    def get_for_coordinate_agent(
+        self,
+        expert_type: str,
+        planned_sections: Optional[List[str]] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Get document content optimized for CoordinateAgent expert type.
+
+        Args:
+            expert_type: Type of expert (metadata, methodology, experiments, evaluation, etc.).
+            planned_sections: Pre-planned sections for this expert type.
+            max_tokens: Maximum number of tokens to include.
+
+        Returns:
+            Formatted content optimized for specific expert analysis.
+        """
+        try:
+            # Expert-type section preferences
+            expert_sections = {
+                "metadata": ["abstract", "introduction", "title"],
+                "methodology": ["methodology", "method", "approach", "design", "technical approach"],
+                "experiments": ["experiments", "experimental setup", "evaluation", "study design", "case study"],
+                "evaluation": ["results", "evaluation", "findings", "outcomes", "performance"],
+                "contributions": ["introduction", "contributions", "novelty", "innovation"],
+                "limitations": ["limitations", "discussion", "conclusion", "future work"],
+            }
+
+            # Determine which sections to include
+            if planned_sections:
+                target_sections = planned_sections
+            elif expert_type in expert_sections:
+                target_sections = expert_sections[expert_type]
+            else:
+                # Default to key sections
+                target_sections = ["abstract", "introduction", "methodology", "results", "conclusion"]
+
+            # Find matching sections
+            matched_sections = []
+            for target in target_sections:
+                match = self.get_closest_section_name(target, threshold=0.7)
+                if match and match not in matched_sections:
+                    matched_sections.append(match)
+
+            if not matched_sections:
+                # Fallback to first few sections
+                all_sections = self.get_section_names()
+                matched_sections = all_sections[:3]
+
+            # Get formatted content for matched sections
+            return self.get_for_llm(
+                section_names=matched_sections,
+                max_tokens=max_tokens,
+                include_headers=True,
+                clean_text=True,
+                max_chars_per_section=2500,  # Slightly larger for expert analysis
+            )
+
+        except Exception as e:
+            self.logger.error(f"Failed to get content for CoordinateAgent expert '{expert_type}': {e}")
+            return f"Error retrieving content for {expert_type}: {e}"
+
+    def get_for_react_agent(
+        self,
+        current_report: str = "",
+        processed_sections: Optional[List[str]] = None,
+        next_section_hint: Optional[str] = None,
+        max_tokens: Optional[int] = None,
+    ) -> str:
+        """Get document content optimized for ReActAgent iterative exploration.
+
+        Args:
+            current_report: Current analysis report to provide context.
+            processed_sections: List of already processed section names.
+            next_section_hint: Hint for which section to explore next.
+            max_tokens: Maximum number of tokens for the content.
+
+        Returns:
+            Formatted content for ReActAgent next iteration.
+        """
+        try:
+            content_parts = []
+
+            # Add current report context
+            if current_report:
+                content_parts.append("CURRENT ANALYSIS:")
+                content_parts.append(current_report)
+                content_parts.append("")
+
+            # Determine which sections haven't been processed yet
+            all_sections = self.get_section_names()
+            unprocessed = []
+            if processed_sections:
+                for section in all_sections:
+                    if section not in processed_sections:
+                        unprocessed.append(section)
+            else:
+                unprocessed = all_sections
+
+            # Select next section(s) to explore
+            if next_section_hint:
+                # Try to find section matching the hint
+                hinted_match = self.get_closest_section_name(next_section_hint, threshold=0.7)
+                if hinted_match and hinted_match in unprocessed:
+                    next_sections = [hinted_match]
+                else:
+                    next_sections = unprocessed[:1] if unprocessed else []
+            else:
+                # Choose next unprocessed section
+                next_sections = unprocessed[:1] if unprocessed else []
+
+            if not next_sections:
+                content_parts.append("No more unprocessed sections available.")
+                return "\n\n".join(content_parts)
+
+            # Add context about remaining sections
+            content_parts.append(f"NEXT SECTION(S) TO ANALYZE:")
+            content_parts.append(f"Processed: {len(processed_sections) if processed_sections else 0}")
+            content_parts.append(f"Remaining: {len(unprocessed)}")
+            content_parts.append("")
+
+            # Get content for next sections
+            section_content = self.get_for_llm(
+                section_names=next_sections,
+                max_tokens=max_tokens,
+                include_headers=True,
+                clean_text=True,
+                max_chars_per_section=2000,  # Smaller for iterative processing
+            )
+
+            content_parts.append(section_content)
+            return "\n\n".join(content_parts)
+
+        except Exception as e:
+            self.logger.error(f"Failed to get content for ReActAgent: {e}")
+            return f"Error retrieving content: {e}"
+
+    def _remove_references_section(self, text: str) -> str:
+        """Remove references and bibliography sections from text."""
+        try:
+            # Common patterns for references sections
+            ref_patterns = [
+                r'\n\s*(?:references|bibliography|citations|works\s+cited)\s*\n',
+                r'\n\s*references\s*$',
+                r'\n\s*bibliography\s*$',
+                r'\n\s*citations\s*$',
+            ]
+
+            # Find the earliest occurrence of a references section
+            earliest_pos = len(text)
+            for pattern in ref_patterns:
+                matches = list(re.finditer(pattern, text, re.IGNORECASE | re.MULTILINE))
+                if matches:
+                    earliest_pos = min(earliest_pos, matches[0].start())
+
+            # If found, truncate text before references
+            if earliest_pos < len(text):
+                return text[:earliest_pos].strip()
+
+            return text
+
+        except Exception:
+            return text
 
     def save(self, output_path: Path) -> None:
         """Saves the document's state and its vector index path to a JSON file."""

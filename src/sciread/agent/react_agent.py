@@ -84,21 +84,38 @@ def get_initial_sections(document: Document) -> list[str]:
     available_sections = document.get_section_names()
     initial_sections = []
 
-    # Look for abstract first
-    for section in available_sections:
-        if "abstract" in section.lower():
-            initial_sections.append(section)
-            break
+    try:
+        # Use unified section matching for better results
+        # Look for abstract first
+        abstract_match = document.get_closest_section_name("abstract", threshold=0.7)
+        if abstract_match:
+            initial_sections.append(abstract_match)
 
-    # Look for introduction next
-    for section in available_sections:
-        if "introduction" in section.lower() and section not in initial_sections:
-            initial_sections.append(section)
-            break
+        # Look for introduction next
+        intro_match = document.get_closest_section_name("introduction", threshold=0.7)
+        if intro_match and intro_match not in initial_sections:
+            initial_sections.append(intro_match)
 
-    # If no abstract/introduction found, use first section
-    if not initial_sections and available_sections:
-        initial_sections = [available_sections[0]]
+        # If no matches found, use first section
+        if not initial_sections and available_sections:
+            initial_sections = [available_sections[0]]
+
+    except Exception as e:
+        logger.warning(f"Unified section matching failed, using fallback approach: {e}")
+
+        # Fallback to original approach
+        for section in available_sections:
+            if "abstract" in section.lower():
+                initial_sections.append(section)
+                break
+
+        for section in available_sections:
+            if "introduction" in section.lower() and section not in initial_sections:
+                initial_sections.append(section)
+                break
+
+        if not initial_sections and available_sections:
+            initial_sections = [available_sections[0]]
 
     logger.info(f"Initial sections selected: {initial_sections}")
     return initial_sections
@@ -228,28 +245,59 @@ class ReActAgent:
             """Generate system prompt with current analysis state."""
             deps = ctx.deps
 
-            # Format status summary
-            status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
+            try:
+                # Use unified document method for ReAct-optimized content
+                section_content = deps.document.get_for_react_agent(
+                    current_report=deps.current_report,
+                    processed_sections=deps.processed_sections,
+                    next_section_hint=deps.current_sections[0] if deps.current_sections else None,
+                    max_tokens=4000,  # Reasonable limit for iterative analysis
+                )
 
-            # Get content for current sections
-            section_content = ""
-            if deps.current_sections:
-                section_content = get_section_content(deps.document, deps.current_sections)
                 if not section_content.strip():
                     raise ModelRetry(
                         f"No content found for sections: {deps.current_sections}. "
                         "Please select different sections or provide more specific guidance."
                     )
 
-            # Format the agent prompt with all necessary information
-            return format_agent_prompt(
-                task=deps.task,
-                available_sections=deps.document.get_section_names(),
-                status=status,
-                section_content=section_content,
-                current_report=deps.current_report,
-                processed_sections=deps.processed_sections.copy(),
-            )
+                # Format status summary
+                status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
+
+                # Format the agent prompt with all necessary information
+                return format_agent_prompt(
+                    task=deps.task,
+                    available_sections=deps.document.get_section_names(),
+                    status=status,
+                    section_content=section_content,
+                    current_report=deps.current_report,
+                    processed_sections=deps.processed_sections.copy(),
+                )
+
+            except Exception as e:
+                self.logger.warning(f"Unified method failed, falling back to legacy approach: {e}")
+
+                # Fallback to original approach if unified method fails
+                status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
+
+                # Get content for current sections using legacy method
+                section_content = ""
+                if deps.current_sections:
+                    section_content = get_section_content(deps.document, deps.current_sections)
+                    if not section_content.strip():
+                        raise ModelRetry(
+                            f"No content found for sections: {deps.current_sections}. "
+                            "Please select different sections or provide more specific guidance."
+                        )
+
+                # Format the agent prompt with all necessary information
+                return format_agent_prompt(
+                    task=deps.task,
+                    available_sections=deps.document.get_section_names(),
+                    status=status,
+                    section_content=section_content,
+                    current_report=deps.current_report,
+                    processed_sections=deps.processed_sections.copy(),
+                )
 
         self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
 

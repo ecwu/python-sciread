@@ -92,45 +92,75 @@ class SimpleAgent:
             """Generate system prompt with document context."""
             deps = ctx.deps
 
-            # Process the document text based on dependencies
-            if deps.document.chunks:
-                text = deps.document.get_full_text()
-            else:
-                text = deps.document.text
-
-            if not text or not text.strip():
-                raise handle_model_retry(
-                    ValueError("Document has no text content to analyze"),
-                    "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+            try:
+                # Use unified document method for SimpleAgent-optimized content
+                text = deps.document.get_for_simple_agent(
+                    include_metadata=deps.include_metadata,
+                    clean_references=deps.remove_references,
+                    max_tokens=8000,  # Reasonable limit for simple analysis
                 )
 
-            # Process text based on dependencies
-            if deps.remove_references:
-                text = remove_references_func(text)
-                self.logger.debug("Removed reference section from document text")
+                if not text or not text.strip():
+                    raise handle_model_retry(
+                        ValueError("Document has no text content to analyze"),
+                        "document content validation",
+                        "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+                    )
 
-            if deps.clean_text:
-                text = clean_academic_text(text)
-                self.logger.debug("Cleaned document text for better processing")
+                self.logger.debug("Using unified section handling for SimpleAgent content preparation")
 
-            # Build the full prompt
-            document_metadata = None
-            if deps.include_metadata and deps.document:
-                document_metadata = {
-                    "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
-                    "title": (deps.document.metadata.title if deps.document.metadata.title else None),
-                    "author": (deps.document.metadata.author if deps.document.metadata.author else None),
-                }
+                # Build the full prompt using the processed text
+                full_prompt = build_analysis_prompt(
+                    text=text,
+                    task_prompt=deps.task_prompt,
+                    document_metadata=None,  # Metadata is already included in the processed text
+                    **deps.additional_context,
+                )
 
-            full_prompt = build_analysis_prompt(
-                text=text,
-                task_prompt=deps.task_prompt,
-                document_metadata=document_metadata,
-                **deps.additional_context,
-            )
+                return f"{self.system_prompt}\n\n{full_prompt}"
 
-            return f"{self.system_prompt}\n\n{full_prompt}"
+            except Exception as e:
+                self.logger.warning(f"Unified method failed, falling back to legacy approach: {e}")
+
+                # Fallback to original approach if unified method fails
+                if deps.document.chunks:
+                    text = deps.document.get_full_text()
+                else:
+                    text = deps.document.text
+
+                if not text or not text.strip():
+                    raise handle_model_retry(
+                        ValueError("Document has no text content to analyze"),
+                        "document content validation",
+                        "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+                    )
+
+                # Process text based on dependencies
+                if deps.remove_references:
+                    text = remove_references_func(text)
+                    self.logger.debug("Removed reference section from document text")
+
+                if deps.clean_text:
+                    text = clean_academic_text(text)
+                    self.logger.debug("Cleaned document text for better processing")
+
+                # Build the full prompt
+                document_metadata = None
+                if deps.include_metadata and deps.document:
+                    document_metadata = {
+                        "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
+                        "title": (deps.document.metadata.title if deps.document.metadata.title else None),
+                        "author": (deps.document.metadata.author if deps.document.metadata.author else None),
+                    }
+
+                full_prompt = build_analysis_prompt(
+                    text=text,
+                    task_prompt=deps.task_prompt,
+                    document_metadata=document_metadata,
+                    **deps.additional_context,
+                )
+
+                return f"{self.system_prompt}\n\n{full_prompt}"
 
         self.logger.debug("SimpleAgent initialized successfully")
 
@@ -218,42 +248,70 @@ class SimpleAgent:
             """Generate system prompt with document context."""
             deps = ctx.deps
 
-            # Process the document text based on dependencies
-            if deps.document.chunks:
-                text = deps.document.get_full_text()
-            else:
-                text = deps.document.text
-
-            if not text or not text.strip():
-                raise handle_model_retry(
-                    ValueError("Document has no text content to analyze"),
-                    "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+            try:
+                # Use unified document method for SimpleAgent-optimized content
+                text = deps.document.get_for_simple_agent(
+                    include_metadata=deps.include_metadata,
+                    clean_references=deps.remove_references,
+                    max_tokens=8000,  # Reasonable limit for simple analysis
                 )
 
-            # Process text based on dependencies
-            if deps.remove_references:
-                text = remove_references_func(text)
-            if deps.clean_text:
-                text = clean_academic_text(text)
+                if not text or not text.strip():
+                    raise handle_model_retry(
+                        ValueError("Document has no text content to analyze"),
+                        "document content validation",
+                        "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+                    )
 
-            # Build the full prompt
-            document_metadata = None
-            if deps.include_metadata and deps.document:
-                document_metadata = {
-                    "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
-                    "title": (deps.document.metadata.title if deps.document.metadata.title else None),
-                    "author": (deps.document.metadata.author if deps.document.metadata.author else None),
-                }
+                # Build the full prompt using the processed text
+                full_prompt = build_analysis_prompt(
+                    text=text,
+                    task_prompt=deps.task_prompt,
+                    document_metadata=None,  # Metadata is already included in the processed text
+                    **deps.additional_context,
+                )
 
-            full_prompt = build_analysis_prompt(
-                text=text,
-                task_prompt=deps.task_prompt,
-                document_metadata=document_metadata,
-                **deps.additional_context,
-            )
+                return f"{self.system_prompt}\n\n{full_prompt}"
 
-            return f"{self.system_prompt}\n\n{full_prompt}"
+            except Exception as e:
+                self.logger.warning(f"Unified method failed, falling back to legacy approach: {e}")
+
+                # Fallback to original approach if unified method fails
+                if deps.document.chunks:
+                    text = deps.document.get_full_text()
+                else:
+                    text = deps.document.text
+
+                if not text or not text.strip():
+                    raise handle_model_retry(
+                        ValueError("Document has no text content to analyze"),
+                        "document content validation",
+                        "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+                    )
+
+                # Process text based on dependencies
+                if deps.remove_references:
+                    text = remove_references_func(text)
+                if deps.clean_text:
+                    text = clean_academic_text(text)
+
+                # Build the full prompt
+                document_metadata = None
+                if deps.include_metadata and deps.document:
+                    document_metadata = {
+                        "source_path": (str(deps.document.source_path) if deps.document.source_path else None),
+                        "title": (deps.document.metadata.title if deps.document.metadata.title else None),
+                        "author": (deps.document.metadata.author if deps.document.metadata.author else None),
+                    }
+
+                full_prompt = build_analysis_prompt(
+                    text=text,
+                    task_prompt=deps.task_prompt,
+                    document_metadata=document_metadata,
+                    **deps.additional_context,
+                )
+
+                return f"{self.system_prompt}\n\n{full_prompt}"
 
         # Create dependencies object
         deps = SimpleAnalysisDeps(

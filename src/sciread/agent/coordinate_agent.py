@@ -240,43 +240,64 @@ class CoordinateAgent:
             """Generate system prompt for expert analysis."""
             deps = ctx.deps
 
-            # Extract content for analysis
-            if deps.analysis_type == "metadata":
-                # Special case: Get first 3 chunks for metadata extraction
-                chunks = deps.document.chunks[:3]  # Get first 3 chunks
-                content = "\n\n".join([chunk.content for chunk in chunks])
-            elif deps.sections_to_analyze:
-                # Use specific sections
-                content_parts = []
-                for section_name in deps.sections_to_analyze:
-                    sections = deps.document.get_sections_by_name([section_name])
-                    if sections:
-                        content_parts.extend([section.content for section in sections])
-                content = "\n\n".join(content_parts)
-            else:
-                # Use full document
-                content = deps.document.get_full_text()
-
-            # Validate content is available
-            if not content or not content.strip():
-                raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
-
-            # Process content
-            content = remove_references_func(content)
-            content = clean_academic_text(content)
-
-            # Validate processed content
-            if not content or not content.strip():
-                raise ModelRetry(
-                    f"Content processing failed for {deps.analysis_type} analysis. "
-                    "The document may lack substantial content after processing."
+            try:
+                # Use unified document method for expert-optimized content
+                content = deps.document.get_for_coordinate_agent(
+                    expert_type=deps.analysis_type,
+                    planned_sections=deps.sections_to_analyze if deps.sections_to_analyze else None,
+                    max_tokens=6000,  # Reasonable limit for expert analysis
                 )
 
-            # Build analysis prompt using the appropriate prompt builder
-            if "prompt_builder" in config:
-                return config["prompt_builder"](content)
-            else:
-                return build_generic_analysis_prompt(content)
+                # Validate content is available
+                if not content or not content.strip():
+                    raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
+
+                # Build analysis prompt using the appropriate prompt builder
+                if "prompt_builder" in config:
+                    return config["prompt_builder"](content)
+                else:
+                    return build_generic_analysis_prompt(content)
+
+            except Exception as e:
+                get_logger(__name__).warning(f"Unified method failed for {deps.analysis_type}, falling back to legacy approach: {e}")
+
+                # Fallback to original approach if unified method fails
+                if deps.analysis_type == "metadata":
+                    # Special case: Get first 3 chunks for metadata extraction
+                    chunks = deps.document.chunks[:3]  # Get first 3 chunks
+                    content = "\n\n".join([chunk.content for chunk in chunks])
+                elif deps.sections_to_analyze:
+                    # Use specific sections
+                    content_parts = []
+                    for section_name in deps.sections_to_analyze:
+                        sections = deps.document.get_sections_by_name([section_name])
+                        if sections:
+                            content_parts.extend([section.content for section in sections])
+                    content = "\n\n".join(content_parts)
+                else:
+                    # Use full document
+                    content = deps.document.get_full_text()
+
+                # Validate content is available
+                if not content or not content.strip():
+                    raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
+
+                # Process content
+                content = remove_references_func(content)
+                content = clean_academic_text(content)
+
+                # Validate processed content
+                if not content or not content.strip():
+                    raise ModelRetry(
+                        f"Content processing failed for {deps.analysis_type} analysis. "
+                        "The document may lack substantial content after processing."
+                    )
+
+                # Build analysis prompt using the appropriate prompt builder
+                if "prompt_builder" in config:
+                    return config["prompt_builder"](content)
+                else:
+                    return build_generic_analysis_prompt(content)
 
         return agent
 
