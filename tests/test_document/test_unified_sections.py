@@ -66,16 +66,6 @@ class TestUnifiedSectionHandling:
         assert "DOCUMENT METADATA:" in content
         assert "Sample Paper" in content
 
-    def test_get_for_llm_with_personality(self, sample_document_with_sections):
-        """Test get_for_llm with personality filtering."""
-        doc = sample_document_with_sections
-
-        # Test with practical applicator personality
-        content = doc.get_for_llm(personality="practical_applicator")
-
-        # Should include sections relevant to practical application
-        assert "RESULTS" in content or "EXPERIMENTS" in content
-
     def test_get_section_by_number(self, sample_document_with_sections):
         """Test get_section_by_number method."""
         doc = sample_document_with_sections
@@ -105,6 +95,16 @@ class TestUnifiedSectionHandling:
         section_name, content = doc.get_section_by_name("intro", fuzzy=True)
         assert section_name == "introduction"
         assert "This is the introduction section that is also sufficiently long to pass the minimum length check." in content
+
+    def test_get_sections_content_helper(self, sample_document_with_sections):
+        """Ensure helper returns ordered, truncated content consistently."""
+        doc = sample_document_with_sections
+
+        sections = doc.get_sections_content(max_sections=2)
+        assert [name for name, _ in sections] == ["abstract", "introduction"]
+
+        truncated = doc.get_sections_content(section_names=["abstract"], max_chars_per_section=20)
+        assert truncated[0][1].endswith("...[truncated]")
 
     def test_get_closest_section_name(self, sample_document_with_sections):
         """Test get_closest_section_name method."""
@@ -164,69 +164,6 @@ class TestUnifiedSectionHandling:
             assert isinstance(section_name, str)
             assert isinstance(content, str)
             assert len(content) > 0
-
-    def test_get_sections_for_personality(self, sample_document_with_sections):
-        """Test get_sections_for_personality method."""
-        doc = sample_document_with_sections
-
-        # Test critical evaluator personality
-        sections = doc.get_sections_for_personality("critical_evaluator")
-
-        assert len(sections) > 0
-
-        # Should include methodology and results for critical evaluator
-        section_names = [name for name, _ in sections]
-        assert any("methodology" in name.lower() for name in section_names)
-        assert any("results" in name.lower() for name in section_names)
-
-    def test_get_for_simple_agent(self, sample_document_with_sections):
-        """Test get_for_simple_agent method."""
-        doc = sample_document_with_sections
-
-        content = doc.get_for_simple_agent()
-
-        assert "DOCUMENT INFORMATION:" in content
-        assert "Sample Paper" in content
-        assert "This is the abstract of the paper with enough content to meet minimum length requirements." in content
-        assert "This is the introduction section that is also sufficiently long to pass the minimum length check." in content
-
-    def test_get_for_coordinate_agent(self, sample_document_with_sections):
-        """Test get_for_coordinate_agent method."""
-        doc = sample_document_with_sections
-
-        # Test with methodology expert
-        content = doc.get_for_coordinate_agent("methodology")
-
-        assert "=== METHODOLOGY ===" in content
-        assert "This describes our methodology in detail with sufficient length." in content
-
-    def test_get_for_react_agent(self, sample_document_with_sections):
-        """Test get_for_react_agent method."""
-        doc = sample_document_with_sections
-
-        content = doc.get_for_react_agent(
-            current_report="Current analysis report",
-            processed_sections=["abstract"]
-        )
-
-        assert "CURRENT ANALYSIS:" in content
-        assert "Current analysis report" in content
-        assert "NEXT SECTION(S) TO ANALYZE:" in content
-        assert "Processed: 1" in content
-        assert "Remaining: 5" in content
-
-    def test_agent_specific_methods_with_fallbacks(self, sample_document_with_sections):
-        """Test that agent-specific methods work even with invalid inputs."""
-        doc = sample_document_with_sections
-
-        # Test with unknown expert type
-        content = doc.get_for_coordinate_agent("unknown_expert")
-        assert content is not None
-        assert len(content) > 0
-
-        # Test with unknown personality
-        sections = doc.get_sections_for_personality("unknown_personality")
-        assert isinstance(sections, list)
 
     def test_content_cleaning(self, sample_document_with_sections):
         """Test content cleaning functionality."""

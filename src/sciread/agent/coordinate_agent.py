@@ -55,8 +55,6 @@ from .prompts.coordinate import build_methodology_analysis_prompt
 from .prompts.coordinate import build_previous_methods_analysis_prompt
 from .prompts.coordinate import build_report_synthesis_prompt
 from .prompts.coordinate import build_research_questions_analysis_prompt
-from .text_utils import clean_academic_text
-from .text_utils import remove_references as remove_references_func
 
 # Dependency classes for RunContext-based coordination
 
@@ -131,6 +129,48 @@ EXPERT_AGENT_CONFIG = {
         "prompt_builder": build_future_directions_analysis_prompt,
     },
 }
+
+EXPERT_SECTION_PREFERENCES = {
+    "metadata": ["abstract", "introduction", "title"],
+    "methodology": ["methodology", "method", "approach", "design", "technical approach"],
+    "experiments": ["experiments", "experimental setup", "evaluation", "study design", "case study"],
+    "evaluation": ["results", "evaluation", "findings", "outcomes", "performance"],
+    "contributions": ["introduction", "contributions", "novelty", "innovation"],
+    "limitations": ["limitations", "discussion", "conclusion", "future work"],
+}
+
+
+def _select_sections_for_expert(document: Document, analysis_type: str, planned_sections: list[str] | None) -> list[str]:
+    """Choose sections for an expert by matching target patterns to document sections."""
+    if planned_sections:
+        targets = planned_sections
+    elif analysis_type in EXPERT_SECTION_PREFERENCES:
+        targets = EXPERT_SECTION_PREFERENCES[analysis_type]
+    else:
+        targets = ["abstract", "introduction", "methodology", "results", "conclusion"]
+
+    matched: list[str] = []
+    for target in targets:
+        match = document.get_closest_section_name(target, threshold=0.7)
+        if match and match not in matched:
+            matched.append(match)
+
+    if not matched:
+        matched = document.get_section_names()[:3]
+
+    return matched
+
+
+def _build_expert_content(document: Document, analysis_type: str, sections_to_analyze: list[str] | None, max_tokens: int | None) -> str:
+    """Assemble expert-oriented content using the unified Document helper."""
+    section_names = _select_sections_for_expert(document, analysis_type, sections_to_analyze)
+    return document.get_for_llm(
+        section_names=section_names,
+        max_tokens=max_tokens,
+        include_headers=True,
+        clean_text=True,
+        max_chars_per_section=2500,
+    )
 
 
 class CoordinateAgent:
@@ -241,10 +281,10 @@ class CoordinateAgent:
             deps = ctx.deps
 
             try:
-                # Use unified document method for expert-optimized content
-                content = deps.document.get_for_coordinate_agent(
-                    expert_type=deps.analysis_type,
-                    planned_sections=deps.sections_to_analyze if deps.sections_to_analyze else None,
+                content = _build_expert_content(
+                    document=deps.document,
+                    analysis_type=deps.analysis_type,
+                    sections_to_analyze=deps.sections_to_analyze if deps.sections_to_analyze else None,
                     max_tokens=6000,  # Reasonable limit for expert analysis
                 )
 
@@ -259,45 +299,8 @@ class CoordinateAgent:
                     return build_generic_analysis_prompt(content)
 
             except Exception as e:
-                get_logger(__name__).warning(f"Unified method failed for {deps.analysis_type}, falling back to legacy approach: {e}")
-
-                # Fallback to original approach if unified method fails
-                if deps.analysis_type == "metadata":
-                    # Special case: Get first 3 chunks for metadata extraction
-                    chunks = deps.document.chunks[:3]  # Get first 3 chunks
-                    content = "\n\n".join([chunk.content for chunk in chunks])
-                elif deps.sections_to_analyze:
-                    # Use specific sections
-                    content_parts = []
-                    for section_name in deps.sections_to_analyze:
-                        sections = deps.document.get_sections_by_name([section_name])
-                        if sections:
-                            content_parts.extend([section.content for section in sections])
-                    content = "\n\n".join(content_parts)
-                else:
-                    # Use full document
-                    content = deps.document.get_full_text()
-
-                # Validate content is available
-                if not content or not content.strip():
-                    raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
-
-                # Process content
-                content = remove_references_func(content)
-                content = clean_academic_text(content)
-
-                # Validate processed content
-                if not content or not content.strip():
-                    raise ModelRetry(
-                        f"Content processing failed for {deps.analysis_type} analysis. "
-                        "The document may lack substantial content after processing."
-                    )
-
-                # Build analysis prompt using the appropriate prompt builder
-                if "prompt_builder" in config:
-                    return config["prompt_builder"](content)
-                else:
-                    return build_generic_analysis_prompt(content)
+                get_logger(__name__).warning(f"Expert content assembly failed for {deps.analysis_type}: {e}")
+                raise ModelRetry(f"Unable to assemble content for {deps.analysis_type}.") from e
 
         return agent
 

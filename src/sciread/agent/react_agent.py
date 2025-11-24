@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
 from typing import List
+from typing import Optional
 
 from pydantic_ai import Agent
 from pydantic_ai import ModelRetry
@@ -148,24 +149,81 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
     if not section_names:
         return ""
 
-    sections_chunks = document.get_sections_by_name(section_names)
-    if not sections_chunks:
-        logger.warning(f"No chunks found for sections: {section_names}")
+    sections = document.get_sections_content(section_names=section_names, clean_text=True)
+    if not sections:
+        logger.warning(f"No content found for sections: {section_names}")
         return ""
 
-    # Sort chunks by position to maintain reading order
-    sections_chunks.sort(key=lambda chunk: chunk.position)
-
-    # Combine content with section headers
     content_parts = []
-    for chunk in sections_chunks:
-        section_name = chunk.chunk_name if chunk.chunk_name != "unknown" else "unknown"
-        content_parts.append(f"=== {section_name.upper()} ===\n{chunk.content}")
+    for name, content in sections:
+        section_name = name if name != "unknown" else "unknown"
+        content_parts.append(f"=== {section_name.upper()} ===\n{content}")
 
     combined_content = "\n\n".join(content_parts)
     logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
+
+
+def build_react_content(
+    document: Document,
+    current_report: str,
+    processed_sections: Optional[list[str]],
+    current_sections: Optional[list[str]],
+    max_tokens: Optional[int] = None,
+) -> str:
+    """Compose content block for ReAct iteration using Document helpers."""
+    content_parts: list[str] = []
+    if current_report:
+        content_parts.append("CURRENT ANALYSIS:")
+        content_parts.append(current_report)
+        content_parts.append("")
+
+    all_sections = document.get_section_names()
+    processed = processed_sections or []
+    unprocessed = [s for s in all_sections if s not in processed]
+
+    if not unprocessed:
+        content_parts.append("No more unprocessed sections available.")
+        return "\n\n".join(content_parts)
+
+    next_sections: list[str]
+    if current_sections:
+        # Use provided selection but limit to available
+        next_sections = [s for s in current_sections if s in all_sections]
+    else:
+        next_sections = []
+
+    if not next_sections:
+        next_sections = unprocessed[:1]
+
+    # Fetch content with cleaning and truncation
+    sections = document.get_sections_content(
+        section_names=next_sections,
+        clean_text=True,
+        max_chars_per_section=2000,
+    )
+
+    token_limit = max_tokens * 4 if max_tokens else None
+    total_chars = sum(len(part) for part in content_parts)
+
+    content_parts.append("NEXT SECTION(S) TO ANALYZE:")
+    content_parts.append(f"Processed: {len(processed)}")
+    content_parts.append(f"Remaining: {len(unprocessed)}")
+    content_parts.append("")
+
+    for name, content in sections:
+        section_text = f"=== {name.upper()} ===\n{content}"
+        if token_limit and total_chars + len(section_text) > token_limit:
+            remaining = token_limit - total_chars - 20
+            if remaining > 100:
+                section_text = f"=== {name.upper()} ===\n{content[:remaining]}...[truncated due to token limit]"
+            else:
+                break
+        content_parts.append(section_text)
+        total_chars += len(section_text)
+
+    return "\n\n".join(content_parts)
 
 
 def analyze_document_with_react(
@@ -245,59 +303,30 @@ class ReActAgent:
             """Generate system prompt with current analysis state."""
             deps = ctx.deps
 
-            try:
-                # Use unified document method for ReAct-optimized content
-                section_content = deps.document.get_for_react_agent(
-                    current_report=deps.current_report,
-                    processed_sections=deps.processed_sections,
-                    next_section_hint=deps.current_sections[0] if deps.current_sections else None,
-                    max_tokens=4000,  # Reasonable limit for iterative analysis
+            section_content = build_react_content(
+                document=deps.document,
+                current_report=deps.current_report,
+                processed_sections=deps.processed_sections,
+                current_sections=deps.current_sections,
+                max_tokens=4000,
+            )
+
+            if not section_content.strip():
+                raise ModelRetry(
+                    f"No content found for sections: {deps.current_sections}. "
+                    "Please select different sections or provide more specific guidance."
                 )
 
-                if not section_content.strip():
-                    raise ModelRetry(
-                        f"No content found for sections: {deps.current_sections}. "
-                        "Please select different sections or provide more specific guidance."
-                    )
+            status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
 
-                # Format status summary
-                status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
-
-                # Format the agent prompt with all necessary information
-                return format_agent_prompt(
-                    task=deps.task,
-                    available_sections=deps.document.get_section_names(),
-                    status=status,
-                    section_content=section_content,
-                    current_report=deps.current_report,
-                    processed_sections=deps.processed_sections.copy(),
-                )
-
-            except Exception as e:
-                self.logger.warning(f"Unified method failed, falling back to legacy approach: {e}")
-
-                # Fallback to original approach if unified method fails
-                status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
-
-                # Get content for current sections using legacy method
-                section_content = ""
-                if deps.current_sections:
-                    section_content = get_section_content(deps.document, deps.current_sections)
-                    if not section_content.strip():
-                        raise ModelRetry(
-                            f"No content found for sections: {deps.current_sections}. "
-                            "Please select different sections or provide more specific guidance."
-                        )
-
-                # Format the agent prompt with all necessary information
-                return format_agent_prompt(
-                    task=deps.task,
-                    available_sections=deps.document.get_section_names(),
-                    status=status,
-                    section_content=section_content,
-                    current_report=deps.current_report,
-                    processed_sections=deps.processed_sections.copy(),
-                )
+            return format_agent_prompt(
+                task=deps.task,
+                available_sections=deps.document.get_section_names(),
+                status=status,
+                section_content=section_content,
+                current_report=deps.current_report,
+                processed_sections=deps.processed_sections.copy(),
+            )
 
         self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
 

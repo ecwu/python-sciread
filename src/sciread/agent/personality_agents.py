@@ -276,56 +276,30 @@ Select sections that will help you provide the most valuable insights from your 
         self, document: Document, section_names: List[str]
     ) -> Dict[str, str]:
         """Get the actual content of selected sections using unified section handling."""
-        try:
-            # Use unified personality-based section selection
-            personality_sections = document.get_sections_for_personality(
-                personality_type=self.personality.value,
-                max_sections=len(section_names) + 2,  # Allow a few extra sections
-                max_chars_per_section=3000,  # Match current limit
-                include_fallback=True,
+        content_dict: Dict[str, str] = {}
+
+        sections = document.get_sections_content(
+            section_names=section_names,
+            clean_text=True,
+            max_chars_per_section=3000,
+        )
+        for name, content in sections:
+            content_dict[name] = content
+
+        available = document.get_section_names()
+        missing = [s for s in section_names if s not in content_dict]
+        if missing:
+            fallback_names = self._get_default_sections(available)
+            fallback_sections = document.get_sections_content(
+                section_names=fallback_names,
+                clean_text=True,
+                max_chars_per_section=3000,
             )
+            for name, content in fallback_sections:
+                if name not in content_dict:
+                    content_dict[name] = content
 
-            content_dict = {}
-
-            # Start with personality-selected sections
-            for section_name, content in personality_sections:
-                content_dict[section_name] = content
-
-            # Add any explicitly requested sections that weren't included
-            for section_name in section_names:
-                if section_name not in content_dict:
-                    chunks = document.get_sections_by_name([section_name])
-                    if chunks:
-                        # Combine all chunks for this section
-                        section_text = "\n\n".join(chunk.content for chunk in chunks)
-                        # Limit content length to avoid token overflow
-                        if len(section_text) > 3000:
-                            section_text = (
-                                section_text[:3000] + "\n... (content truncated)"
-                            )
-                        content_dict[section_name] = section_text
-
-            return content_dict
-
-        except Exception as e:
-            self.logger.warning(
-                f"Unified personality section selection failed, falling back to legacy approach: {e}"
-            )
-
-            # Fallback to original approach
-            content_dict = {}
-
-            for section_name in section_names:
-                chunks = document.get_sections_by_name([section_name])
-                if chunks:
-                    # Combine all chunks for this section
-                    section_text = "\n\n".join(chunk.content for chunk in chunks)
-                    # Limit content length to avoid token overflow
-                    if len(section_text) > 3000:
-                        section_text = section_text[:3000] + "\n... (content truncated)"
-                    content_dict[section_name] = section_text
-
-            return content_dict
+        return content_dict
 
     async def ask_question(
         self,

@@ -8,6 +8,7 @@ from dataclasses import asdict
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import List
+from typing import Any
 from typing import Optional
 from typing import Tuple
 from typing import Union
@@ -310,6 +311,78 @@ class Document:
                 matching_chunks.append(chunk)
         return matching_chunks
 
+    def _resolve_section_names(
+        self,
+        section_names: Optional[list[str]] = None,
+        max_sections: Optional[int] = None,
+    ) -> list[str]:
+        """Resolve section names to use, honoring ordering and limits."""
+        names = section_names or self.get_section_names()
+        if max_sections is not None:
+            names = names[:max_sections]
+        return names
+
+    def _collect_sections(
+        self,
+        section_names: Optional[list[str]] = None,
+        max_sections: Optional[int] = None,
+        clean_text: bool = False,
+        max_chars_per_section: Optional[int] = None,
+    ) -> list[dict[str, Any]]:
+        """Collect section data (name, content, chunks, stats) in document order."""
+        names = self._resolve_section_names(section_names, max_sections)
+        if not names or not self._chunks:
+            return []
+
+        allowed_names = set(names)
+        grouped_chunks: dict[str, list[Chunk]] = {}
+        for chunk in self._chunks:
+            chunk_name = chunk.chunk_name
+            if chunk_name in allowed_names:
+                grouped_chunks.setdefault(chunk_name, []).append(chunk)
+
+        sections: list[dict[str, Any]] = []
+        for name in names:
+            chunks = grouped_chunks.get(name, [])
+            if not chunks:
+                continue
+
+            content = "\n\n".join(chunk.content for chunk in chunks)
+            if clean_text:
+                content = self._clean_section_content(content)
+            if max_chars_per_section and len(content) > max_chars_per_section:
+                content = content[:max_chars_per_section] + "...[truncated]"
+
+            avg_confidence = sum(chunk.confidence or 0.0 for chunk in chunks) / len(chunks)
+
+            sections.append(
+                {
+                    "name": name,
+                    "content": content,
+                    "chunks": chunks,
+                    "average_confidence": avg_confidence,
+                    "length": len(content),
+                }
+            )
+
+        return sections
+
+    def get_sections_content(
+        self,
+        section_names: Optional[list[str]] = None,
+        max_sections: Optional[int] = None,
+        clean_text: bool = False,
+        max_chars_per_section: Optional[int] = None,
+    ) -> list[tuple[str, str]]:
+        """Public helper to fetch section content with consistent ordering and cleaning."""
+        sections = self._collect_sections(
+            section_names=section_names,
+            max_sections=max_sections,
+            clean_text=clean_text,
+            max_chars_per_section=max_chars_per_section,
+        )
+        return [(section["name"], section["content"]) for section in sections]
+
     def __iter__(self) -> Iterator[Chunk]:
         """Iterate over chunks."""
         return iter(self._chunks)
@@ -514,21 +587,16 @@ class Document:
                 print(f"{colors['header']}{'='*80}{reset}")
                 print()
 
-            # Get sections to display
-            if section_names:
-                sections_chunks = self.get_sections_by_name(section_names)
-            else:
-                # Get unique sections in order
-                all_section_names = self.get_section_names()
-                if max_sections:
-                    all_section_names = all_section_names[:max_sections]
-                sections_chunks = self.get_sections_by_name(all_section_names)
+            sections = self._collect_sections(
+                section_names=section_names,
+                max_sections=max_sections,
+            )
 
             # Display each section
-            for i, chunk in enumerate(sections_chunks, 1):
-                section_name = chunk.chunk_name or "untitled"
-                content = chunk.content
-                confidence = chunk.confidence or 0.0
+            for i, section in enumerate(sections, 1):
+                section_name = section["name"] or "untitled"
+                content = section["content"]
+                confidence = section["average_confidence"]
 
                 print(f"{colors['section']}Section {i}: {section_name}{reset}")
                 if show_confidence:
@@ -547,7 +615,6 @@ class Document:
         max_tokens: Optional[int] = None,
         include_headers: bool = True,
         clean_text: bool = True,
-        personality: Optional[str] = None,
         max_chars_per_section: Optional[int] = None,
     ) -> str:
         """Get document content optimized for LLM consumption.
@@ -557,24 +624,18 @@ class Document:
             max_tokens: Approximate maximum number of tokens (rough estimation: 1 token ≈ 4 chars).
             include_headers: Whether to include section headers.
             clean_text: Whether to clean and normalize text content.
-            personality: Optional personality type for content tailoring (DiscussionAgent).
             max_chars_per_section: Maximum characters per section to prevent overflow.
 
         Returns:
             Formatted document content as string.
         """
         try:
-            # Get sections to include
-            if section_names:
-                sections_chunks = self.get_sections_by_name(section_names)
-            else:
-                all_section_names = self.get_section_names()
-                sections_chunks = self.get_sections_by_name(all_section_names)
-
-            # Apply personality-based filtering if specified
-            if personality:
-                sections_chunks = self._filter_sections_for_personality(sections_chunks, personality)
-
+            target_names = self._resolve_section_names(section_names)
+            sections = self._collect_sections(
+                section_names=target_names,
+                clean_text=clean_text,
+                max_chars_per_section=max_chars_per_section,
+            )
             # Build content
             content_parts = []
             total_chars = 0
@@ -592,17 +653,9 @@ class Document:
                     content_parts.extend(context_parts)
                     content_parts.append("")
 
-            for chunk in sections_chunks:
-                section_name = chunk.chunk_name or "untitled"
-                content = chunk.content
-
-                # Clean content if requested
-                if clean_text:
-                    content = self._clean_section_content(content)
-
-                # Limit section length if specified
-                if max_chars_per_section and len(content) > max_chars_per_section:
-                    content = content[:max_chars_per_section] + "...[truncated]"
+            for section in sections:
+                section_name = section["name"] or "untitled"
+                content = section["content"]
 
                 # Check token limit
                 section_text = f"=== {section_name.upper()} ===\n{content}\n"
@@ -644,15 +697,11 @@ class Document:
             if not include_content:
                 return (section_name, "")
 
-            # Get chunks for this section
-            section_chunks = self.get_sections_by_name([section_name])
-            if not section_chunks:
+            sections = self._collect_sections(section_names=[section_name], max_sections=1)
+            if not sections:
                 return (section_name, "")
 
-            # Combine content from all chunks in this section
-            content = "\n\n".join(chunk.content for chunk in section_chunks)
-
-            # Apply character limit if specified
+            content = sections[0]["content"]
             if max_chars and len(content) > max_chars:
                 content = content[:max_chars] + "...[truncated]"
 
@@ -891,17 +940,17 @@ class Document:
                 "document_type": "markdown" if self.is_markdown else "text",
             }
 
-            section_names = self.get_section_names()
-            overview["total_sections"] = len(section_names)
+            sections = self._collect_sections()
+            overview["total_sections"] = len(sections)
 
-            for i, section_name in enumerate(section_names):
-                section_chunks = self.get_sections_by_name([section_name])
+            for i, section in enumerate(sections):
+                section_chunks = section["chunks"]
                 total_chars = sum(len(chunk.content) for chunk in section_chunks)
-                avg_confidence = sum(chunk.confidence or 0.0 for chunk in section_chunks) / len(section_chunks) if section_chunks else 0.0
+                avg_confidence = section["average_confidence"] if section_chunks else 0.0
 
                 section_info = {
                     "index": i,
-                    "name": section_name,
+                    "name": section["name"],
                     "chunk_count": len(section_chunks),
                     "character_count": total_chars,
                 }
@@ -941,24 +990,14 @@ class Document:
             List of (section_name, content) tuples that meet criteria.
         """
         try:
-            sections = []
-            section_names = self.get_section_names()
+            qualifying_sections = []
+            sections = self._collect_sections()
 
-            for section_name in section_names:
-                section_chunks = self.get_sections_by_name([section_name])
-                if not section_chunks:
-                    continue
+            for section in sections:
+                if section["average_confidence"] >= min_confidence and section["length"] >= min_length:
+                    qualifying_sections.append((section["name"], section["content"]))
 
-                # Calculate combined confidence and length for the section
-                total_confidence = sum(chunk.confidence or 0.0 for chunk in section_chunks)
-                avg_confidence = total_confidence / len(section_chunks)
-                total_length = sum(len(chunk.content) for chunk in section_chunks)
-
-                if avg_confidence >= min_confidence and total_length >= min_length:
-                    content = "\n\n".join(chunk.content for chunk in section_chunks)
-                    sections.append((section_name, content))
-
-            return sections
+            return qualifying_sections
 
         except Exception as e:
             self.logger.error(f"Failed to get sections with confidence: {e}")
@@ -1003,279 +1042,7 @@ class Document:
         except Exception:
             return 0.0
 
-    def _filter_sections_for_personality(self, sections_chunks: List[Chunk], personality: str) -> List[Chunk]:
-        """Filter sections based on personality preferences (DiscussionAgent)."""
-        personality_preferences = {
-            "critical_evaluator": ["methodology", "experiments", "results", "evaluation", "limitations", "analysis"],
-            "innovative_insighter": ["introduction", "contributions", "novelty", "innovation", "future", "conclusion"],
-            "practical_applicator": ["experiments", "applications", "implementation", "case study", "deployment", "results"],
-            "theoretical_integrator": ["background", "related work", "theory", "analysis", "discussion", "conclusion"],
-        }
-
-        if personality.lower() not in personality_preferences:
-            return sections_chunks
-
-        preferred_keywords = personality_preferences[personality.lower()]
-        filtered_chunks = []
-
-        for chunk in sections_chunks:
-            section_name = (chunk.chunk_name or "").lower()
-            if any(keyword in section_name for keyword in preferred_keywords):
-                filtered_chunks.append(chunk)
-
-        # If no sections match preferences, return original sections
-        return filtered_chunks if filtered_chunks else sections_chunks
-
     # ========== Agent-Specific Optimization Methods ==========
-
-    def get_sections_for_personality(
-        self,
-        personality_type: str,
-        max_sections: int = 5,
-        max_chars_per_section: int = 3000,
-        include_fallback: bool = True,
-    ) -> List[Tuple[str, str]]:
-        """Get sections optimized for specific DiscussionAgent personality type.
-
-        Args:
-            personality_type: Type of personality (critical_evaluator, innovative_insighter, etc.).
-            max_sections: Maximum number of sections to return.
-            max_chars_per_section: Maximum characters per section.
-            include_fallback: Whether to include fallback sections if preferred ones aren't found.
-
-        Returns:
-            List of (section_name, content) tuples optimized for the personality.
-        """
-        try:
-            # Get all sections
-            section_names = self.get_section_names()
-            if not section_names:
-                return []
-
-            # Filter sections based on personality preferences
-            sections_chunks = self.get_sections_by_name(section_names)
-            filtered_chunks = self._filter_sections_for_personality(sections_chunks, personality_type)
-
-            # If no sections match and fallback is enabled, return most important sections
-            if not filtered_chunks and include_fallback:
-                # Priority order: abstract, introduction, methodology, results, conclusion
-                priority_sections = ["abstract", "introduction", "methodology", "results", "conclusion"]
-                for priority in priority_sections:
-                    matching_chunks = self.get_sections_by_name([priority])
-                    if matching_chunks:
-                        filtered_chunks.extend(matching_chunks)
-                        break
-
-            # Limit to max_sections
-            filtered_chunks = filtered_chunks[:max_sections]
-
-            # Convert to (name, content) tuples with length limits
-            result = []
-            for chunk in filtered_chunks:
-                section_name = chunk.chunk_name or "untitled"
-                content = chunk.content
-
-                if max_chars_per_section and len(content) > max_chars_per_section:
-                    content = content[:max_chars_per_section] + "...[truncated]"
-
-                result.append((section_name, content))
-
-            return result
-
-        except Exception as e:
-            self.logger.error(f"Failed to get sections for personality '{personality_type}': {e}")
-            return []
-
-    def get_for_simple_agent(
-        self,
-        include_metadata: bool = True,
-        clean_references: bool = True,
-        max_tokens: Optional[int] = None,
-    ) -> str:
-        """Get document content optimized for SimpleAgent.
-
-        Args:
-            include_metadata: Whether to include document metadata.
-            clean_references: Whether to remove references section.
-            max_tokens: Maximum number of tokens to include.
-
-        Returns:
-            Formatted content for SimpleAgent processing.
-        """
-        try:
-            # Use full text approach for SimpleAgent (maintain simplicity)
-            content_parts = []
-
-            if include_metadata:
-                metadata_parts = []
-                if self.metadata.title:
-                    metadata_parts.append(f"Title: {self.metadata.title}")
-                if self.metadata.author:
-                    metadata_parts.append(f"Author: {self.metadata.author}")
-                if metadata_parts:
-                    content_parts.append("DOCUMENT INFORMATION:")
-                    content_parts.extend(metadata_parts)
-                    content_parts.append("")
-
-            # Get full text (SimpleAgent's approach)
-            if self._chunks:
-                full_text = self.get_full_text()
-            else:
-                full_text = self._raw_text
-
-            # Clean references if requested
-            if clean_references:
-                full_text = self._remove_references_section(full_text)
-
-            # Clean academic text artifacts
-            full_text = self._clean_section_content(full_text)
-
-            # Apply token limit if specified
-            if max_tokens and len(full_text) > max_tokens * 4:
-                full_text = full_text[:max_tokens * 4] + "...[truncated due to token limit]"
-
-            content_parts.append(full_text)
-            return "\n\n".join(content_parts)
-
-        except Exception as e:
-            self.logger.error(f"Failed to get content for SimpleAgent: {e}")
-            return f"Error retrieving content: {e}"
-
-    def get_for_coordinate_agent(
-        self,
-        expert_type: str,
-        planned_sections: Optional[List[str]] = None,
-        max_tokens: Optional[int] = None,
-    ) -> str:
-        """Get document content optimized for CoordinateAgent expert type.
-
-        Args:
-            expert_type: Type of expert (metadata, methodology, experiments, evaluation, etc.).
-            planned_sections: Pre-planned sections for this expert type.
-            max_tokens: Maximum number of tokens to include.
-
-        Returns:
-            Formatted content optimized for specific expert analysis.
-        """
-        try:
-            # Expert-type section preferences
-            expert_sections = {
-                "metadata": ["abstract", "introduction", "title"],
-                "methodology": ["methodology", "method", "approach", "design", "technical approach"],
-                "experiments": ["experiments", "experimental setup", "evaluation", "study design", "case study"],
-                "evaluation": ["results", "evaluation", "findings", "outcomes", "performance"],
-                "contributions": ["introduction", "contributions", "novelty", "innovation"],
-                "limitations": ["limitations", "discussion", "conclusion", "future work"],
-            }
-
-            # Determine which sections to include
-            if planned_sections:
-                target_sections = planned_sections
-            elif expert_type in expert_sections:
-                target_sections = expert_sections[expert_type]
-            else:
-                # Default to key sections
-                target_sections = ["abstract", "introduction", "methodology", "results", "conclusion"]
-
-            # Find matching sections
-            matched_sections = []
-            for target in target_sections:
-                match = self.get_closest_section_name(target, threshold=0.7)
-                if match and match not in matched_sections:
-                    matched_sections.append(match)
-
-            if not matched_sections:
-                # Fallback to first few sections
-                all_sections = self.get_section_names()
-                matched_sections = all_sections[:3]
-
-            # Get formatted content for matched sections
-            return self.get_for_llm(
-                section_names=matched_sections,
-                max_tokens=max_tokens,
-                include_headers=True,
-                clean_text=True,
-                max_chars_per_section=2500,  # Slightly larger for expert analysis
-            )
-
-        except Exception as e:
-            self.logger.error(f"Failed to get content for CoordinateAgent expert '{expert_type}': {e}")
-            return f"Error retrieving content for {expert_type}: {e}"
-
-    def get_for_react_agent(
-        self,
-        current_report: str = "",
-        processed_sections: Optional[List[str]] = None,
-        next_section_hint: Optional[str] = None,
-        max_tokens: Optional[int] = None,
-    ) -> str:
-        """Get document content optimized for ReActAgent iterative exploration.
-
-        Args:
-            current_report: Current analysis report to provide context.
-            processed_sections: List of already processed section names.
-            next_section_hint: Hint for which section to explore next.
-            max_tokens: Maximum number of tokens for the content.
-
-        Returns:
-            Formatted content for ReActAgent next iteration.
-        """
-        try:
-            content_parts = []
-
-            # Add current report context
-            if current_report:
-                content_parts.append("CURRENT ANALYSIS:")
-                content_parts.append(current_report)
-                content_parts.append("")
-
-            # Determine which sections haven't been processed yet
-            all_sections = self.get_section_names()
-            unprocessed = []
-            if processed_sections:
-                for section in all_sections:
-                    if section not in processed_sections:
-                        unprocessed.append(section)
-            else:
-                unprocessed = all_sections
-
-            # Select next section(s) to explore
-            if next_section_hint:
-                # Try to find section matching the hint
-                hinted_match = self.get_closest_section_name(next_section_hint, threshold=0.7)
-                if hinted_match and hinted_match in unprocessed:
-                    next_sections = [hinted_match]
-                else:
-                    next_sections = unprocessed[:1] if unprocessed else []
-            else:
-                # Choose next unprocessed section
-                next_sections = unprocessed[:1] if unprocessed else []
-
-            if not next_sections:
-                content_parts.append("No more unprocessed sections available.")
-                return "\n\n".join(content_parts)
-
-            # Add context about remaining sections
-            content_parts.append(f"NEXT SECTION(S) TO ANALYZE:")
-            content_parts.append(f"Processed: {len(processed_sections) if processed_sections else 0}")
-            content_parts.append(f"Remaining: {len(unprocessed)}")
-            content_parts.append("")
-
-            # Get content for next sections
-            section_content = self.get_for_llm(
-                section_names=next_sections,
-                max_tokens=max_tokens,
-                include_headers=True,
-                clean_text=True,
-                max_chars_per_section=2000,  # Smaller for iterative processing
-            )
-
-            content_parts.append(section_content)
-            return "\n\n".join(content_parts)
-
-        except Exception as e:
-            self.logger.error(f"Failed to get content for ReActAgent: {e}")
-            return f"Error retrieving content: {e}"
 
     def _remove_references_section(self, text: str) -> str:
         """Remove references and bibliography sections from text."""
