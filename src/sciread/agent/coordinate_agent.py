@@ -361,12 +361,12 @@ class CoordinateAgent:
                 else:
                     sections = getattr(analysis_plan, sections_field) or ["All sections"]
                     if sections == ["All sections"]:
-                        sections_display = f"All sections {YELLOW}⚠️  (fallback){RESET}"
+                        sections_display = f"All sections {YELLOW}(fallback){RESET}"
                     else:
                         sections_display = f"{', '.join(sections)}"
 
                 # Combined display with colors
-                plan_display.append(f"{GREEN}✓ {BOLD}{agent_name}{RESET}{GREEN} → {BLUE}{sections_display}{RESET}")
+                plan_display.append(f"{GREEN}[OK] {BOLD}{agent_name}{RESET}{GREEN} -> {BLUE}{sections_display}{RESET}")
                 plan_display.append("")
 
         # Add reasoning section with color
@@ -393,7 +393,7 @@ class CoordinateAgent:
         if total_sections_selected == 0:
             plan_display.extend(
                 [
-                    f"{YELLOW}⚠️  WARNING: No specific sections selected. All agents will use 'All sections'.{RESET}",
+                    f"{YELLOW}WARNING: No specific sections selected. All agents will use 'All sections'.{RESET}",
                     f"{YELLOW}   This may result in longer processing times and less focused analysis.{RESET}",
                     "",
                 ]
@@ -401,14 +401,14 @@ class CoordinateAgent:
         elif total_sections_selected > 25:
             plan_display.extend(
                 [
-                    f"{BLUE}ℹ️  INFO: Many sections selected ({total_sections_selected}). Ensure all are relevant.{RESET}",
+                    f"{BLUE}INFO: Many sections selected ({total_sections_selected}). Ensure all are relevant.{RESET}",
                     "",
                 ]
             )
         else:
             plan_display.extend(
                 [
-                    f"{GREEN}✅ Good: Comprehensive section selection with {total_sections_selected} relevant sections.{RESET}",
+                    f"{GREEN}Good: Comprehensive section selection with {total_sections_selected} relevant sections.{RESET}",
                     "",
                 ]
             )

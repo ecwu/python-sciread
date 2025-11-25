@@ -11,23 +11,23 @@ from sciread.llm_provider import ModelFactory
 
 def main():
     """Demonstrate LLM provider usage."""
-    print("🤖 SciRead LLM Provider Example")
+    print("SciRead LLM Provider Example")
     print("=" * 50)
 
     # Show all supported models
-    print("\n📋 Supported Models:")
+    print("\nSupported Models:")
     models = ModelFactory.list_all_supported_models()
     for model in models:
-        print(f"  • {model}")
+        print(f"  - {model}")
 
     # Show supported providers
-    print("\n🏢 Supported Providers:")
+    print("\nSupported Providers:")
     providers = ModelFactory.get_supported_providers()
     for provider, models in providers.items():
-        print(f"  • {provider}: {', '.join(models.keys())}")
+        print(f"  - {provider}: {', '.join(models.keys())}")
 
     # Demonstrate model creation
-    print("\n🔧 Model Creation Examples:")
+    print("\nModel Creation Examples:")
 
     examples = [
         "deepseek/deepseek-chat",
@@ -42,23 +42,23 @@ def main():
         try:
             print(f"\n  Creating model: {model_id}")
             provider, model_name = ModelFactory.parse_model_identifier(model_id)
-            print(f"    → Provider: {provider}")
-            print(f"    → Model: {model_name}")
+            print(f"    -> Provider: {provider}")
+            print(f"    -> Model: {model_name}")
 
             # Note: Actual model creation requires API keys
             # model = get_model(model_id)
-            # print(f"    → ✅ Model instance created")
+            # print(f"    -> Model instance created")
 
         except Exception as e:
-            print(f"    → ❌ Error: {e}")
+            print(f"    -> Error: {e}")
 
-    print("\n⚙️  Configuration:")
+    print("\nConfiguration:")
     print("  Set these environment variables for API keys:")
-    print("    • DEEPSEEK_API_KEY")
-    print("    • ZHIPU_API_KEY")
-    print("  • Ollama doesn't require an API key (local)")
+    print("    - DEEPSEEK_API_KEY")
+    print("    - ZHIPU_API_KEY")
+    print("  - Ollama doesn't require an API key (local)")
 
-    print("\n📝 Usage in your code:")
+    print("\nUsage in your code:")
     print("""
 from sciread.llm_provider import get_model
 

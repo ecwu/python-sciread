@@ -49,15 +49,15 @@ def build_vector_index_with_parallel_support(
         return
 
     print(f"\n{'=' * 60}")
-    print("🔨 Building Vector Index")
+    print("Building Vector Index")
     print(f"{'=' * 60}")
-    print(f"📝 Total chunks: {len(document.chunks)}")
-    print(f"🤖 Embedding model: {embedding_model}")
+    print(f"Total chunks: {len(document.chunks)}")
+    print(f"Embedding model: {embedding_model}")
     logger.info(f"Building vector index from {len(document.chunks)} chunks...")
 
     # Check if the embedding model supports concurrent requests
     supports_concurrent = EmbeddingFactory.supports_concurrent_requests(embedding_model)
-    print(f"🔧 Concurrent support: {supports_concurrent}")
+    print(f"Concurrent support: {supports_concurrent}")
 
     # Create embedding client
     embedding_client = get_embedding_client(
@@ -67,15 +67,15 @@ def build_vector_index_with_parallel_support(
 
     if supports_concurrent:
         logger.info(f"Using parallel embedding requests for {embedding_model} (concurrent support: True)")
-        print("⚡ Using parallel embedding requests (concurrent mode)")
+        print("Using parallel embedding requests (concurrent mode)")
         embeddings = _get_embeddings_parallel(embedding_client, [c.content for c in document.chunks])
     else:
         logger.info(f"Using sequential embedding requests for {embedding_model} (concurrent support: False)")
-        print("🔄 Using sequential embedding requests")
+        print("Using sequential embedding requests")
         print(f"  Processing {len(document.chunks)} chunks...")
         batch_size = 10  # Default batch size
         embeddings = embedding_client.get_embeddings([c.content for c in document.chunks], batch_size=batch_size)
-        print("✅ Completed embedding generation\n")
+        print("Completed embedding generation\n")
 
     # Prepare collection name
     collection_name = document.metadata.file_hash or (
@@ -83,12 +83,12 @@ def build_vector_index_with_parallel_support(
     )
 
     # Create vector index
-    print("📊 Building vector index...")
+    print("Building vector index...")
     document.vector_index = VectorIndex(collection_name=collection_name)
     document.vector_index.add_chunks(document.chunks, embeddings)
     document._embedding_client = embedding_client
 
-    print(f"✅ Vector index built successfully with {len(embeddings)} embeddings\n")
+    print(f"Vector index built successfully with {len(embeddings)} embeddings\n")
     logger.info("Vector index built successfully with parallel support.")
 
 
@@ -105,7 +105,7 @@ def _get_embeddings_parallel(embedding_client, texts: list[str], max_workers: in
     """
     total_texts = len(texts)
     logger.info(f"Getting embeddings for {total_texts} texts with {max_workers} workers")
-    print(f"\n🔄 Processing {total_texts} chunks in parallel...")
+    print(f"\nProcessing {total_texts} chunks in parallel...")
 
     # Create a mapping from index to embedding
     embeddings_map = {}
@@ -141,7 +141,7 @@ def _get_embeddings_parallel(embedding_client, texts: list[str], max_workers: in
 
     # Return embeddings in original order
     embeddings = [embeddings_map[i] for i in range(len(texts))]
-    print(f"✅ Successfully obtained {len(embeddings)} embeddings\n")
+    print(f"Successfully obtained {len(embeddings)} embeddings\n")
     logger.info(f"Successfully obtained {len(embeddings)} embeddings")
     return embeddings
 

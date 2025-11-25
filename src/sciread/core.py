@@ -134,7 +134,7 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
 
     # Display section information to user
     if section_names:
-        print("\n📋 Document Structure Analysis")
+        print("\nDocument Structure Analysis")
         print(f"Found {len(section_names)} main sections:")
         for i, section_name in enumerate(section_names, 1):
             section_chunks = doc.get_sections_by_name([section_name])
@@ -149,7 +149,7 @@ async def comprehensive_analysis(pdf_file_path: str, model: str = "deepseek/deep
             section_distribution[section_name] = len(section_chunks)
         logger.info(f"Section distribution: {section_distribution}")
     else:
-        print("\n📋 Document Structure Analysis")
+        print("\nDocument Structure Analysis")
         print("No named sections found - document will be analyzed as continuous text")
         print()
         logger.info("No named sections found - document will be analyzed as continuous text")
@@ -278,7 +278,7 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     logger.debug(f"Discovered {len(section_names)} sections: {section_names}")
 
     # Display document information to user
-    print("\n📋 Document Analysis - Discussion Mode")
+    print("\nDocument Analysis - Discussion Mode")
     print(f"Document: {doc.metadata.title or 'Untitled'}")
     print(f"Total Content: {len(doc.text)} characters")
     print(f"Chunks: {len(doc.chunks)}")
@@ -301,10 +301,10 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     # Display information about the discussion agents
     from .agent.models.discussion_models import AgentPersonality
 
-    print("🤖 Discussion Agents:")
+    print("Discussion Agents:")
     for personality in AgentPersonality:
         role_name = personality.value.replace("_", " ").title()
-        print(f"  • {role_name} - Analyzes from their unique perspective")
+        print(f"  - {role_name} - Analyzes from their unique perspective")
     print()
 
     # Run discussion-based analysis
@@ -312,7 +312,7 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     logger.info("Agents will engage in discussion, questioning, and consensus-building")
 
     try:
-        print("🔄 Starting multi-agent discussion analysis...")
+        print("Starting multi-agent discussion analysis...")
         print("This may take several minutes as agents collaborate and build consensus...")
         print()
 
