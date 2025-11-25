@@ -1,566 +1,274 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+<!-- ========================================================================== -->
+<!-- PROJECT OVERVIEW -->
+<!-- ========================================================================== -->
 
-## Project Overview
+**Project**: `sciread` - Python package for understanding academic papers using LLM-driven agents
 
-This is a Python package called `sciread` designed to understand papers with LLM-driven agents. It provides comprehensive document processing capabilities including loading academic papers from various formats, intelligent text splitting, and chunk-based processing for LLM analysis.
+**Core Capabilities**: Document processing, intelligent text splitting, chunk-based LLM analysis, multi-agent coordination
+
+**Key Technologies**: pydantic-ai, ChromaDB, async/await patterns, factory pattern for providers
+
+<!-- ========================================================================== -->
+<!-- CONTEXT & BOUNDARIES -->
+<!-- ========================================================================== -->
 
 ## When to Use Context7
 
 Always use context7 when I need code generation, setup or configuration steps, or library/API documentation. This means you should automatically use the Context7 MCP tools to resolve library id and get library docs without me having to explicitly ask.
 
-## Common Development Commands
+## Boundaries & Things NOT to Do
 
-### Testing
-- Run all tests: `tox`
-- Run specific test file: `pytest tests/test_core.py`
-- Run tests with coverage: `pytest --cov --cov-report=term-missing tests`
-- Run single test with verbose output: `pytest -v tests/test_core.py::test_name`
+**Protected Areas** - DO NOT MODIFY without explicit permission:
+- Tests in `tests/` directory - maintain test integrity
+- Database migrations or schema changes
+- Security-critical code and authentication mechanisms
+- API contracts and interface definitions
+- Configuration files with secrets or production settings
 
-### Code Quality
-- Run linting and formatting checks: `tox -e check`
-- Format code with ruff: `ruff format src/ tests/`
-- Lint code with ruff: `ruff check src/ tests/`
+**Code Style Boundaries**:
+- Follow existing patterns (don't introduce new frameworks without discussion)
+- Maintain async/await patterns in core modules
+- Use existing factory patterns for providers
+- Preserve type hints and error handling patterns
 
-### Documentation
-- Build documentation: `tox -e docs`
-- View docs locally: Open `dist/docs/index.html` after building
+**When to Ask**:
+- Before adding new dependencies to pyproject.toml
+- Before making breaking changes to public APIs
+- Before modifying core agent coordination logic
+- When uncertain about security implications
 
-### Installation
-- Install in development mode: `pip install -e .`
-- Install test dependencies: `pip install -e ".[test]"`
+<!-- ========================================================================== -->
+<!-- DEVELOPMENT WORKFLOW -->
+<!-- ========================================================================== -->
 
-## Architecture
+## Quick Start Commands
 
-### Package Structure
-```
-src/sciread/
-├── __init__.py      # Package initialization, exports main functions
-├── agent/          # Agent module for LLM-driven processing
-│   ├── __init__.py
-│   ├── simple_agent.py   # Single SimpleAgent for basic analysis
-│   ├── coordinate_agent.py # Multi-agent CoordinateAgent system for comprehensive analysis
-│   ├── react_agent.py    # ReAct agent for intelligent iterative analysis
-│   ├── text_utils.py     # Text processing utilities
-│   └── prompts/          # Organized prompt templates for all agents
-│       ├── __init__.py
-│       ├── simple.py     # SimpleAgent prompts
-│       ├── coordinate.py # CoordinateAgent prompts
-│       └── react.py      # ReActAgent prompts
-├── cli.py          # Command-line interface entry point
-├── config.py       # Configuration management for API keys and provider settings
-├── core.py         # Core functionality (compute function)
-├── document/       # Document processing module
-│   ├── __init__.py # Document module exports
-│   ├── document.py # Main Document class for managing document lifecycle
-│   ├── document_builder.py # DocumentBuilder and DocumentFactory classes
-│   ├── external_clients.py # External API clients (Mineru)
-│   ├── factory.py   # DocumentFactory for creating documents with custom settings
-│   ├── mineru_cache.py # Caching for Mineru API responses
-│   ├── models.py   # Core data models (Chunk, DocumentMetadata, etc.)
-│   ├── loaders/    # Document loaders for different file formats
-│   │   ├── __init__.py
-│   │   ├── base.py      # Base loader interface
-│   │   ├── pdf_loader.py # PDF file loader with Mineru support
-│   │   └── txt_loader.py # Text file loader
-│   └── splitters/   # Text splitters for chunking documents
-│       ├── __init__.py
-│       ├── base.py         # Base splitter interface
-│       ├── consecutive_flow.py   # Consecutive similarity-based splitter
-│       ├── cumulative_flow.py    # Cumulative similarity-based splitter
-│       ├── markdown_splitter.py # Markdown-aware splitter
-│       ├── regex_section_splitter.py # Regex-based academic paper splitter
-│       └── semantic_splitter.py   # Semantic splitter using embeddings
-├── embedding_provider/ # Embedding provider module with factory pattern
-│   ├── __init__.py  # Main interface exports get_embedding_client() function
-│   ├── factory.py   # EmbeddingFactory for creating embedding client instances
-│   ├── ollama.py    # Ollama local embedding provider implementation
-│   └── siliconflow.py # SiliconFlow cloud embedding provider implementation
-├── llm_provider/   # LLM provider module with factory pattern
-│   ├── __init__.py  # Main interface exports get_model() function
-│   ├── factory.py   # ModelFactory for creating model instances
-│   ├── deepseek.py  # DeepSeek provider implementation
-│   ├── zhipu.py     # Zhipu GLM provider implementation
-│   └── ollama.py    # Ollama local provider implementation
-├── logging_config.py # Logging configuration with loguru
-└── __main__.py     # Module execution entry point
+```bash
+# Development setup
+pip install -e ".[test]"
+
+# Testing
+tox                           # All environments
+pytest tests/test_core.py     # Specific file
+pytest --cov src/             # With coverage
+
+# Code quality
+tox -e check                  # Lint + format
+ruff format src/ tests/       # Format
+ruff check src/ tests/        # Lint
+
+# Documentation
+tox -e docs && open dist/docs/index.html
 ```
 
-### Key Components
-- **Core Functions**: `main()`, `comprehensive_analysis()`, `run_react_analysis()` in `src/sciread/core.py` - main async-first analysis operations
-- **CLI Entry**: `run()` in `src/sciread/cli.py` - handles command-line execution with three modes (simple, coordinate, react) using direct async calls
-- **Package Interface**: `__init__.py` exports core async functions and utilities as the main API
-- **Configuration**: `config.py` manages API keys and provider settings via TOML configuration
-- **Document Module**: `document/` provides comprehensive document processing capabilities
-- **Agent Module**: `agent/` provides LLM-driven document analysis agents
-- **Embedding Provider Module**: `embedding_provider/` provides unified interface for multiple embedding model providers
-- **LLM Provider Module**: `llm_provider/` provides unified interface for multiple LLM providers
+## Key Files to Understand
 
-#### Agent System
-The `agent` module provides a complete LLM-driven analysis system:
+**Core Architecture**:
+- `src/sciread/core.py` - Main async analysis functions
+- `src/sciread/cli.py` - CLI entry point with mode routing
+- `src/sciread/config.py` - TOML-based configuration management
 
-**Multi-Agent CoordinateAgent**: `CoordinateAgent` in `src/sciread/agent/coordinate_agent.py`
-- Coordinates multiple expert sub-agents for comprehensive analysis
-- Expert agents: metadata extraction, methodology analysis, experiments evaluation, etc.
-- Intelligent analysis planning based on document structure
-- Comprehensive report synthesis from sub-agent results
-- Built-in debug logging with detailed interaction traces
+@src/sciread/core.py
+@src/sciread/cli.py
+@src/sciread/config.py
 
-**Single SimpleAgent**: `SimpleAgent` in `src/sciread/agent/simple_agent.py`
-- Simple, single-agent analysis for basic document processing
-- Configurable analysis tasks and prompts
-- Direct LLM interaction for straightforward analysis needs
+**Agent System**:
+- `src/sciread/agent/coordinate_agent.py` - Multi-agent coordination
+- `src/sciread/agent/rag_react_agent.py` - RAG+ReAct implementation
+- `src/sciread/agent/discussion_agent.py` - Multi-agent discussions
+- `src/sciread/agent/simple_agent.py` - Basic single-agent analysis
+- `src/sciread/agent/personality_agents.py` - Personality-based expert agents
+- `src/sciread/agent/consensus_builder.py` - Consensus building from discussions
+- `src/sciread/agent/task_queue.py` - Task queue management system
 
-**ReAct Agent**: `ReActAgent` in `src/sciread/agent/react_agent.py`
-- Reasoning and Acting pattern for intelligent iterative analysis
-- Dynamic analysis strategy adaptation
-- Custom task execution with reasoning steps
-- Progress tracking and loop control
-- Unified implementation with integrated Pydantic models
+@src/sciread/agent/react_agent.py
+@src/sciread/agent/coordinate_agent.py
+@src/sciread/agent/rag_react_agent.py
+@src/sciread/agent/discussion_agent.py
+@src/sciread/agent/simple_agent.py
 
-**Prompt Organization**: All prompts are organized in `src/sciread/agent/prompts/`
-- `prompts/simple.py` - SimpleAgent system prompts and templates
-- `prompts/coordinate.py` - CoordinateAgent expert agent prompts and planning templates
-- `prompts/react.py` - ReActAgent system prompts and formatting functions
-- Centralized prompt management for easy maintenance and updates
+**Document Processing**:
+- `src/sciread/document/document.py` - Main Document class
+- `src/sciread/document/vector_index.py` - ChromaDB integration
+- `src/sciread/document/splitters/` - Text chunking strategies
+- `src/sciread/document/document_builder.py` - Document builder pattern
+- `src/sciread/document/external_clients.py` - External API clients (Mineru)
+- `src/sciread/document/models.py` - Core data models
 
-**Debug Logging**: All agents support detailed debug logging
-- Enable with `LOG_LEVEL=DEBUG` environment variable
-- Shows detailed prompts, outputs, and agent interactions
-- Example: `LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf`
+@src/sciread/document/document.py
+@src/sciread/document/vector_index.py
+@src/sciread/document/document_builder.py
+@src/sciread/document/external_clients.py
+@src/sciread/document/models.py
 
-#### Document Processing System
-The `document` module provides a complete pipeline for processing academic papers:
+**Text Splitters**:
+- `src/sciread/document/splitters/semantic_splitter.py` - Embedding-based chunking
+- `src/sciread/document/splitters/consecutive_flow.py` - Flow-based splitting
+- `src/sciread/document/splitters/cumulative_flow.py` - Cumulative flow splitting
+- `src/sciread/document/splitters/markdown_splitter.py` - Markdown-aware splitting
+- `src/sciread/document/splitters/regex_section_splitter.py` - Academic paper sections
 
-**Main Document Class**: `Document` in `src/sciread/document/document.py`
-- Factory methods: `Document.from_file(path, to_markdown=False)` and `Document.from_text(text)`
-- Unified chunk access with flexible filtering via `get_chunks()`
-- State tracking: loading status, splitting status, processing history
-- Markdown conversion support for PDFs via Mineru API
-- Comprehensive chunk management operations
+@src/sciread/document/splitters/semantic_splitter.py
+@src/sciread/document/splitters/consecutive_flow.py
+@src/sciread/document/splitters/cumulative_flow.py
+@src/sciread/document/splitters/markdown_splitter.py
 
-**Document Creation and Management**: `DocumentBuilder` and `DocumentFactory` in `src/sciread/document/document_builder.py`
-- **DocumentBuilder**: Builder pattern for custom document processing pipelines
-- **DocumentFactory**: Static factory methods for creating documents from files or text
-- Support for external clients (Mineru, Ollama) and custom processing components
+**Provider Systems**:
+- `src/sciread/llm_provider/factory.py` - LLM factory pattern
+- `src/sciread/embedding_provider/factory.py` - Embedding factory pattern
+- `src/sciread/llm_provider/deepseek.py` - DeepSeek provider
+- `src/sciread/llm_provider/zhipu.py` - Zhipu provider
+- `src/sciread/embedding_provider/siliconflow.py` - SiliconFlow provider
 
-**Core Data Models** in `src/sciread/document/models.py`:
-- **Chunk**: Text chunk with metadata (content, type, position, confidence, processing status)
-- **DocumentMetadata**: Document metadata (file info, timestamps, title, author, page count)
-- **ProcessingState**: Processing lifecycle tracking (timestamps, notes, version)
+@src/sciread/llm_provider/factory.py
+@src/sciread/embedding_provider/factory.py
+@src/sciread/llm_provider/deepseek.py
+@src/sciread/embedding_provider/siliconflow.py
 
-**External API Clients** in `src/sciread/document/external_clients.py`:
-- **MineruClient**: Client for PDF-to-markdown conversion via Mineru API
-- **OllamaClient**: Client for embedding operations using Ollama models
-- Caching support for API responses (`mineru_cache.py`)
+<!-- ========================================================================== -->
+<!-- ARCHITECTURE OVERVIEW -->
+<!-- ========================================================================== -->
 
-**Document Loaders** in `src/sciread/document/loaders/`:
-- **BaseLoader**: Abstract interface with common functionality
-- **PdfLoader**: PDF loading with Mineru markdown conversion and fallback extraction methods
-- **TxtLoader**: Text file loading with encoding detection
-- LoadResult: Standardized result format with text, metadata, warnings, and errors
+## Architecture Overview
 
-**Text Splitters** in `src/sciread/document/splitters/`:
-- **BaseSplitter**: Abstract interface for text splitting strategies
-- **MarkdownSplitter**: Markdown-aware splitter for structured content
-- **RegexSectionSplitter**: Advanced regex-based academic paper section detection
-- **SemanticSplitter**: Semantic splitter using embeddings for intelligent chunking
-- **ConsecutiveFlowSplitter**: Sentence splitter using consecutive similarity (adjacent sentences)
-- **CumulativeFlowSplitter**: Sentence splitter using cumulative similarity (segment vs next sentence)
+**Core Design Patterns**:
+- Factory pattern for LLM/embedding providers
+- Async-first design throughout core modules
+- Agent-based architecture with pydantic-ai
+- Builder pattern for document processing pipelines
 
-**Key Features**:
-- Multi-format document loading (PDF, TXT) with markdown conversion support
-- Intelligent text splitting optimized for academic papers with multiple strategies
-- Comprehensive metadata tracking and state management
-- External API integration for enhanced processing capabilities
-- Error handling with detailed warnings and extraction statistics
-- Processing pipeline with chunk-level operations
-- Coverage tracking and progress monitoring
-- Flexible chunk filtering and management system
-
-#### LLM Provider System
-The `llm_provider` module implements a factory pattern for working with different LLM providers using pydantic-ai:
-
-**Main Interface**: `get_model(model_identifier: str) -> Model`
-- Explicit provider: `get_model("deepseek/deepseek-chat")`
-- Default provider: `get_model("deepseek-chat")` (uses deepseek provider)
-
-**Supported Providers**:
-- **DeepSeek**: `deepseek-chat`, `deepseek-reasoner` (uses OpenAI-compatible API)
-- **Zhipu GLM**: `glm-4.6`, `glm-4.5` (uses Anthropic-compatible API)
-- **Ollama**: Local models like `qwen3:4b`, `llama3:8b` (localhost:11434)
-
-**Key Features**:
-- Factory pattern for model creation (`src/sciread/llm_provider/factory.py:89`)
-- Automatic provider detection for known models
-- Configuration-driven API key management
-- Model validation and error handling
-- Support for custom base URLs and provider settings
-
-#### Embedding Provider System
-The `embedding_provider` module implements a factory pattern for working with different embedding model providers for semantic search and text splitting operations:
-
-**Main Interface**: `get_embedding_client(embedding_identifier: str) -> EmbeddingClient`
-- Explicit provider: `get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")`
-- Inferred provider: `get_embedding_client("embeddinggemma:latest")` (uses ollama provider)
-- Factory method: `EmbeddingFactory.create_client("ollama/nomic-embed-text")`
-
-**Supported Providers**:
-- **Ollama**: Local embedding models like `nomic-embed-text`, `embeddinggemma:latest` (localhost:11434)
-- **SiliconFlow**: Cloud embedding models like `Qwen/Qwen3-Embedding-8B`, `BAAI/bge-large-en-v1.5`
-
-**Key Features**:
-- Factory pattern for embedding client creation (`src/sciread/embedding_provider/factory.py:101`)
-- Automatic provider inference from model names
-- Support for concurrent requests (provider-dependent)
-- Model validation and error handling
-- Comprehensive model support checking with `EmbeddingFactory.supports_concurrent_requests()`
-- Configuration-driven API key and base URL management
-
-**Usage Examples**:
+**Main Components**:
 
 ```python
-from sciread.embedding_provider import get_embedding_client, EmbeddingFactory
+# Core interfaces - main entry points
+src/sciread/core.py         # Main analysis functions
+src/sciread/cli.py          # CLI routing
+src/sciread/config.py       # Configuration management
 
-# Create embedding clients with explicit provider
-ollama_client = get_embedding_client("ollama/nomic-embed-text")
-siliconflow_client = get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")
+# Agent system - LLM-driven analysis
+src/sciread/agent/
+├── coordinate_agent.py    # Multi-agent coordination
+├── rag_react_agent.py     # RAG+ReAct with ChromaDB
+├── discussion_agent.py    # Personality-based discussions
+└── prompts/               # Organized prompt templates
 
-# Create clients with inferred provider (default to ollama)
-client = get_embedding_client("embeddinggemma:latest")
+# Document processing - pipeline for papers
+src/sciread/document/
+├── document.py            # Main Document class
+├── vector_index.py        # ChromaDB semantic search
+├── splitters/             # Text chunking strategies
+└── loaders/               # File format support
 
-# Check for concurrent request support
-if EmbeddingFactory.supports_concurrent_requests("siliconflow/Qwen/Qwen3-Embedding-8B"):
-    # Can make parallel embedding requests
-    pass
-
-# List all supported models
-all_models = EmbeddingFactory.list_all_supported_models()
+# Provider systems - pluggable integrations
+src/sciread/llm_provider/      # LLM factory (DeepSeek, Zhipu, Ollama)
+src/sciread/embedding_provider/ # Embedding factory (Ollama, SiliconFlow)
 ```
 
-**Integration with Text Splitters**: The embedding provider is used by semantic and flow-based text splitters for intelligent chunking:
-- `SemanticSplitter` - Uses embeddings for semantic similarity-based text splitting
-- `ConsecutiveFlowSplitter` - Uses consecutive sentence similarity for chunking
-- `CumulativeFlowSplitter` - Uses cumulative segment similarity for chunking
+**Agent Types**:
+- **SimpleAgent**: Basic single-agent analysis
+- **CoordinateAgent**: Multi-agent expert coordination
+- **ReActAgent**: Reasoning+Acting iterative analysis
+- **RAG+ReActAgent**: Semantic search + ReAct pattern
+- **DiscussionAgent**: Multi-personality consensus building
 
-### Configuration
-- **pyproject.toml**: Modern Python packaging configuration with ruff linting/formatting rules
-- **tox.ini**: Multi-environment testing setup (Python 3.9-3.13, PyPy)
-- **pytest.ini**: Test configuration with doctest support and strict warnings
-- **GitHub Actions**: CI/CD pipeline testing across multiple Python versions and platforms
-- **config/sciread.toml**: TOML configuration file for API keys and provider settings
+**Text Splitters**:
+- **Flow-based**: `consecutive_flow.py`, `cumulative_flow.py` - sentence similarity
+- **Semantic**: `semantic_splitter.py` - embedding-based chunking
+- **Structure-based**: `markdown_splitter.py`, `regex_section_splitter.py`
 
-#### Configuration Structure
-The `config/sciread.toml` file supports:
-- `[default]` section for default provider configuration
-- Provider-specific sections (`[deepseek]`, `[zhipu]`, `[ollama]`)
-- API key management
-- Base URL customization
-- Model-specific settings
-- Splitter configurations for different chunking strategies
+<!-- ========================================================================== -->
+<!-- CONFIGURATION & USAGE -->
+<!-- ========================================================================== -->
 
-**Splitter Configuration Example**:
+## Configuration
 
-```toml
-[document_splitter]
-default_splitter = "consecutive_flow"
+**Main Config**: `config/sciread.toml` - API keys, provider settings, splitter defaults
 
-[document_splitter.consecutive_flow]
-model = "embeddinggemma:latest"
-base_url = "http://localhost:11434"
-similarity_threshold = 0.45
-min_segment_sentences = 2
-min_segment_chars = 200
-max_segment_chars = 2000
+**Environment Variables**:
+- `LOG_LEVEL=DEBUG` - Enable detailed agent interaction logging
+- API keys set in config file or environment
 
-[document_splitter.cumulative_flow]
-model = "embeddinggemma:latest"
-base_url = "http://localhost:11434"
-similarity_threshold = 0.45
-min_segment_sentences = 2
-min_segment_chars = 200
-max_segment_chars = 2000
+**Supported Models**:
+- `deepseek-chat`, `deepseek-reasoner` (default)
+- `glm-4`, `glm-4.5` (Zhipu)
+- `ollama/qwen3:4b` (local models)
+
+## CLI Usage
+
+```bash
+# Multi-agent comprehensive analysis (recommended)
+python -msciread coordinate paper.pdf
+
+# Single-agent basic analysis
+python -msciread simple paper.pdf
+
+# Intelligent iterative analysis
+python -msciread react paper.pdf "Custom analysis task"
+
+# Debug logging (shows all agent interactions)
+LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf
 ```
 
-#### Logging System
-The project uses loguru for structured logging with comprehensive configuration options:
+<!-- ========================================================================== -->
+<!-- CODE EXAMPLES -->
+<!-- ========================================================================== -->
 
-**Logging Configuration Module**: `src/sciread/logging_config.py`
-- **Default setup**: INFO level to console with colored output
-- **Flexible configuration**: Support for file logging, rotation, and custom formats
-- **Module-specific loggers**: Each module can get its own logger instance
-- **Convenience functions**: Direct access to debug, info, warning, error, critical
+## Common Patterns
 
-**Key Features**:
-- Structured logging with timestamps, levels, and source location
-- Console output with colors and file logging with rotation
-- Configurable log levels (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-- Automatic setup on import with sensible defaults
-
-**Log Level Guidelines**:
-
-- **DEBUG**: Detailed diagnostic information for development
-  - Function entry/exit with parameters
-  - Internal state changes
-  - Detailed processing steps
-  - Use cases: Debugging complex algorithms, tracking data flow
-
-- **INFO**: General information about application progress
-  - Successful completion of major operations
-  - Application startup/shutdown
-  - Configuration loaded
-  - File processing started/completed
-  - Use cases: Monitoring application progress, user-facing status updates
-
-- **WARNING**: Potentially problematic situations that don't prevent execution
-  - Fallback to alternative methods (e.g., PDF extraction method changes)
-  - Missing metadata that can be defaulted
-  - Performance concerns (slow operations, large file sizes)
-  - Non-critical data quality issues
-  - Use cases: Alerting about recoverable issues, performance monitoring
-
-- **ERROR**: Serious problems that prevent specific operations from completing
-  - Failed file loading/parsing
-  - Network/API request failures
-  - Validation errors
-  - Missing required dependencies
-  - Use cases: Error tracking, debugging failures, user error messages
-
-- **CRITICAL**: Severe errors that may cause application termination
-  - Out of memory errors
-  - Critical system failures
-  - Unrecoverable data corruption
-  - Use cases: System monitoring, emergency alerts
-
-**Usage Examples**:
-
-```python
-# Basic usage (uses default configuration)
-from sciread import get_logger
-logger = get_logger(__name__)
-logger.info("Operation completed successfully")
-
-# Custom logging setup
-from sciread import setup_logging
-setup_logging(
-    level="DEBUG",
-    log_file="app.log",
-    rotation="10 MB",
-    retention="7 days"
-)
-
-# Convenience functions
-from sciread.logging_config import debug, info, warning, error
-debug("Detailed diagnostic information")
-info("General progress information")
-warning("Potential issue detected")
-error("Operation failed")
-
-# In class methods
-class MyClass:
-    def __init__(self):
-        self.logger = get_logger(__name__)
-
-    def process(self):
-        self.logger.info("Starting processing")
-        try:
-            # ... processing logic
-            self.logger.info("Processing completed")
-        except Exception as e:
-            self.logger.error(f"Processing failed: {e}")
-            raise
-```
-
-**Default Configuration**:
-- Console output with colors
-- INFO level logging
-- Format: `time | level | module:function:line | message`
-- Automatic backtrace and diagnose for errors
-
-### Code Style
-- **Line Length**: 140 characters
-- **Quote Style**: Double quotes
-- **Import Sorting**: Single line, forced separation for conftest
-- **Linting**: Uses ruff with extensive rule set (flake8, bandit, pylint, etc.)
-- **Testing**: pytest with coverage reporting
-
-## Development Notes
-
-- The project uses setuptools with namespace packages in `src/` layout
-- Tests are located in `tests/` directory and included in coverage reports
-- The package is designed to be cross-platform (Windows, macOS, Linux)
-- The document module provides a complete foundation for LLM-driven paper analysis
-- All components follow modern Python practices with type hints and comprehensive error handling
-- The architecture is designed to be extensible for new file formats and processing strategies
-- The codebase uses an async-first design pattern throughout the core modules
-
-### Document Module Usage Examples
+**Document Processing**:
 
 ```python
 from sciread.document import Document
-from pathlib import Path
 
-# Load and process a document
-doc = Document.from_file("paper.pdf", to_markdown=True)  # Convert PDF to markdown
-
-# Get all chunks with flexible filtering
-all_chunks = doc.get_chunks()
-unprocessed_chunks = doc.get_chunks(processed=False)
-high_quality_chunks = doc.get_chunks(confidence_threshold=0.7, min_length=100)
-
-# Get chunks by name
-abstract_chunks = doc.get_chunks(chunk_name="abstract")
-introduction_chunks = doc.get_chunks(chunk_name="introduction")
-
-# Mark chunks as processed based on quality criteria
-processed_count = doc.mark_chunks_processed(confidence_threshold=0.5, min_length=50)
-
-# Get chunks by content (alternative to search)
-# Can use get_chunks() with content filtering or section-based access
-matching_chunks = doc.get_sections_by_name(["abstract", "introduction"])
-
-# Work with sections
-section_names = doc.get_section_names()
-sections_by_name = doc.get_sections_by_name(["abstract", "introduction"])
+# Load and process document
+doc = Document.from_file("paper.pdf", to_markdown=True)
+chunks = doc.get_chunks(confidence_threshold=0.7)
 ```
 
-### Using DocumentBuilder for Custom Processing
+**Custom Agent Usage**:
 
 ```python
-from sciread.document import DocumentBuilder
-from sciread.document.external_clients import MineruClient, OllamaClient
-from sciread.document.splitters import SemanticSplitter, ConsecutiveFlowSplitter, CumulativeFlowSplitter
+from sciread.agent import CoordinateAgent
+from sciread.llm_provider import get_model
 
-# Create custom processing pipeline with flow splitters
-builder = DocumentBuilder(
-    splitter=ConsecutiveFlowSplitter(ollama_client=OllamaClient(), similarity_threshold=0.4),
-    mineru_client=MineruClient()
-)
-
-# Alternative: Use cumulative flow splitter
-builder = DocumentBuilder(
-    splitter=CumulativeFlowSplitter(ollama_client=OllamaClient(), similarity_threshold=0.5),
-    mineru_client=MineruClient()
-)
-
-# Traditional semantic splitter
-builder = DocumentBuilder(
-    splitter=SemanticSplitter(ollama_client=OllamaClient()),
-    mineru_client=MineruClient()
-)
-
-# Build document with custom settings
-doc = builder.from_file("paper.pdf", to_markdown=True, auto_split=True)
+agent = CoordinateAgent(model=get_model("deepseek-chat"))
+result = await agent.analyze_document(doc)
 ```
 
-### Using DocumentFactory with Flow Splitters
+**Provider Factory**:
 
 ```python
-from sciread.document import DocumentFactory
-from sciread.document.external_clients import OllamaClient
+from sciread.embedding_provider import get_embedding_client
+from sciread.llm_provider import get_model
 
-# Create document using consecutive flow splitting
-doc = DocumentFactory.create_consecutive_flow_document(
-    "paper.pdf",
-    ollama_client=OllamaClient(),
-    similarity_threshold=0.45,
-    min_segment_chars=200
-)
-
-# Create document using cumulative flow splitting
-doc = DocumentFactory.create_cumulative_flow_document(
-    "paper.pdf",
-    ollama_client=OllamaClient(),
-    similarity_threshold=0.4,
-    max_segment_chars=1500
-)
+# Automatic provider detection
+llm = get_model("deepseek-chat")
+embeddings = get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")
 ```
 
-### Flow Splitter Configuration
+<!-- ========================================================================== -->
+<!-- TESTING & DEBUGGING -->
+<!-- ========================================================================== -->
 
-```python
-from sciread.document import ConsecutiveFlowSplitter, CumulativeFlowSplitter
-from sciread.document.external_clients import OllamaClient
+## Testing Strategy
 
-# ConsecutiveFlowSplitter - compares adjacent sentences
-consecutive_splitter = ConsecutiveFlowSplitter(
-    ollama_client=OllamaClient(),
-    similarity_threshold=0.45,  # Split when similarity < threshold
-    min_segment_sentences=2,    # Minimum sentences per segment
-    min_segment_chars=200,      # Minimum characters per segment
-    max_segment_chars=2000,     # Hard budget limit
-    embedding_batch_size=10     # Batch size for embeddings
-)
+**Test Structure**: `tests/` mirrors `src/sciread/` structure
+- Unit tests for individual components
+- Integration tests for agent workflows
+- Provider tests for external APIs
 
-# CumulativeFlowSplitter - compares segment with next sentence
-cumulative_splitter = CumulativeFlowSplitter(
-    ollama_client=OllamaClient(),
-    similarity_threshold=0.45,  # Split when similarity < threshold
-    min_segment_sentences=2,    # Minimum sentences per segment
-    min_segment_chars=200,      # Minimum characters per segment
-    max_segment_chars=2000,     # Hard budget limit
-    embedding_batch_size=10     # Batch size for embeddings
-)
-```
-
-### Adding Custom Loaders and Splitters
-
-The document module is designed to be extensible:
-
-```python
-from sciread.document.loaders import BaseLoader
-from sciread.document.splitters import BaseSplitter
-
-class CustomLoader(BaseLoader):
-    def load(self, file_path: Path) -> LoadResult:
-        # Implement loading logic for new format
-        pass
-
-class CustomSplitter(BaseSplitter):
-    def split(self, text: str) -> list[Chunk]:
-        # Implement custom splitting strategy
-        pass
-
-# Use with DocumentBuilder
-builder = DocumentBuilder(loader=CustomLoader(), splitter=CustomSplitter())
-doc = builder.from_file("custom.ext")
-```
-
-### CLI Usage Examples
-
-The sciread package provides a comprehensive command-line interface with three analysis modes:
-
+**Debug Commands**:
 ```bash
-# Coordinate mode - Multi-agent comprehensive analysis (recommended for academic papers)
-python -msciread coordinate paper.pdf
-python -msciread coordinate paper.pdf deepseek/reasoner
-
-# Simple mode - Single agent basic analysis
-python -msciread simple paper.pdf
-python -msciread simple paper.txt
-
-# ReAct mode - Intelligent iterative analysis with custom tasks
-python -msciread react paper.pdf
-python -msciread react paper.pdf "What are the main contributions?"
-python -msciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
-```
-
-**Debug Logging**: Enable detailed agent interactions and prompts:
-
-```bash
-# Enable debug logging to see all agent interactions
+# Agent interaction debugging
 LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf
 
-# Debug logging works with all modes
-LOG_LEVEL=DEBUG python -msciread simple paper.pdf
-LOG_LEVEL=DEBUG python -msciread react paper.pdf "Custom task"
+# Specific test debugging
+pytest -v -s tests/test_agent.py::test_coordinate_agent
 ```
 
-**Available Models**:
-- `deepseek/deepseek-chat` (default)
-- `deepseek/deepseek-reasoner`
-- `glm-4`, `glm-4.5`
-- `ollama/qwen3:4b` (local models)
-
-The CLI automatically handles document loading, text splitting, and agent coordination. Debug logging shows detailed prompts, outputs, and agent decision-making processes.
+**Common Debug Points**:
+- Agent prompt/response flow (use LOG_LEVEL=DEBUG)
+- Document chunking quality (check chunk confidence scores)
+- Provider API connectivity (verify config settings)
