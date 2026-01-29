@@ -173,20 +173,31 @@ Iteration: {discussion_context.get("iteration", 1)}
 Total Insights Generated So Far: {discussion_context.get("total_insights", 0)}
 
 **Your Task:**
-Generate 2-3 most significant insights from your personality's perspective based on the content you've read. Each insight should:
-1. Reflect your unique analytical approach and focus area
-2. Be specific and well-supported by evidence from the paper sections provided above
-3. Include an importance score (0.0-1.0) indicating how critical this insight is
-4. Include a confidence score (0.0-1.0) indicating your confidence in this insight
-5. List supporting evidence or quote specific parts from the sections
-6. Identify questions this insight raises for other agents
+Generate 2-3 most significant insights from your personality's perspective based on the content you've read.
 
-For each insight, provide:
-- Clear statement of the insight
-- Importance and confidence scores
-- Supporting evidence from the paper (cite specific sections)
-- Questions for other personality types to consider
+**REQUIRED FORMAT - You MUST use this exact format for each insight:**
+```
+Insight: <Your insight statement here - be specific and substantive>
+Importance: <0.0-1.0 score indicating how critical this insight is>
+Confidence: <0.0-1.0 score indicating your confidence in this insight>
+Evidence: <Direct quote or specific reference from the paper sections above>
+Questions: <Questions this raises for other agents to consider>
+```
 
-Focus on insights that are most likely to be valuable for understanding the paper's contributions, limitations, and significance from your unique perspective."""
+**Example:**
+```
+Insight: The study's sample size of 50 participants is insufficient to detect small effect sizes with adequate statistical power.
+Importance: 0.8
+Confidence: 0.9
+Evidence: "We recruited 50 participants from a single university campus" (Methods section)
+Questions: How would larger sample sizes affect the generalizability of findings?
+```
+
+**Guidelines:**
+1. Each insight MUST start with "Insight:" on its own line
+2. Include ALL five fields (Insight, Importance, Confidence, Evidence, Questions) for each insight
+3. Be specific - cite actual text from the paper sections provided above
+4. Importance/Confidence scores should be decimal numbers between 0.0 and 1.0
+5. Focus on insights most valuable for understanding the paper's contributions, limitations, and significance from your unique perspective"""
 
     return user_prompt

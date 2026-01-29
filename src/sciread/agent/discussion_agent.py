@@ -204,19 +204,20 @@ class DiscussionAgent:
 
         question_tasks = []
 
-        # Generate questions TO each agent ABOUT their insights
         for target_personality, insights in self.agent_insights.items():
             if not insights:
                 continue
 
-            # Select most important insights to be questioned
             top_insights = sorted(insights, key=lambda i: i.importance_score, reverse=True)[:2]
 
             for insight in top_insights:
-                # Let other agents question this target personality's insights
+                prior_qa_for_insight = self._get_prior_qa_for_insight(insight)
+
                 for from_personality in AgentPersonality:
                     if from_personality == target_personality:
-                        continue  # Don't question yourself
+                        continue
+
+                    my_prior_questions = [qa for qa in prior_qa_for_insight if qa["from_agent"] == from_personality.value]
 
                     task_id = self.task_manager.create_task(
                         queue_name="main_discussion",
@@ -229,11 +230,13 @@ class DiscussionAgent:
                                 "phase": "questioning",
                                 "iteration": self.discussion_state.iteration_count,
                                 "total_questions": len(self.all_questions),
+                                "prior_qa_for_insight": prior_qa_for_insight,
+                                "my_prior_questions": my_prior_questions,
                             },
                         },
                         priority=TaskPriority.MEDIUM,
                         assigned_to=from_personality,
-                        timeout_seconds=120,  # 2 minutes
+                        timeout_seconds=120,
                         context={"model_name": self.model_name},
                     )
                     question_tasks.append(task_id)
@@ -454,6 +457,27 @@ class DiscussionAgent:
                 scores.append(score)
 
         return sum(scores) / len(scores) if scores else 0.5
+
+    def _get_prior_qa_for_insight(self, insight) -> List[Dict]:
+        """Build Q&A thread for a specific insight by matching questions and responses."""
+        insight_snippet = insight.content[:50]
+
+        related_questions = [q for q in self.all_questions if q.target_insight == insight_snippet]
+
+        qa_pairs = []
+        for q in related_questions:
+            matching_response = next((r for r in self.all_responses if r.question_id == q.question_id), None)
+            qa_pairs.append(
+                {
+                    "from_agent": q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value,
+                    "to_agent": q.to_agent if isinstance(q.to_agent, str) else q.to_agent.value,
+                    "question": q.content,
+                    "response": matching_response.content if matching_response else None,
+                    "response_stance": matching_response.stance if matching_response else None,
+                }
+            )
+
+        return qa_pairs
 
     async def _build_final_result(self, document: Document) -> DiscussionResult:
         """Build final discussion result."""
