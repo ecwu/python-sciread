@@ -3,7 +3,6 @@
 import asyncio
 from datetime import datetime
 from datetime import timedelta
-from typing import Optional
 
 from pydantic_ai import Agent
 
@@ -48,10 +47,10 @@ class DiscussionAgent:
 
         # Task management
         self.task_manager = TaskQueueManager(max_concurrent_tasks=4)
-        self.discussion_queue: Optional[TaskQueue] = None
+        self.discussion_queue: TaskQueue | None = None
 
         # State tracking
-        self.discussion_state: Optional[DiscussionState] = None
+        self.discussion_state: DiscussionState | None = None
         self.agent_insights: dict[AgentPersonality, list] = {}
         self.all_questions: list = []
         self.all_responses: list = []

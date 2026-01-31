@@ -1,7 +1,6 @@
 """Semantic splitter combining academic paper and markdown structure for intelligent chunking."""
 
 import re
-from typing import Optional
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -57,19 +56,42 @@ class SemanticSplitter(BaseSplitter):
             academic_patterns = {
                 # High confidence academic sections
                 "abstract": re.compile(r"^(?:abstract|summary)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "introduction": re.compile(r"^(?:introduction|overview|background)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
+                "introduction": re.compile(
+                    r"^(?:introduction|overview|background)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
                 "related_work": re.compile(
-                    r"^(?:related\s+work|literature\s+review|background\s+work)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE
+                    r"^(?:related\s+work|literature\s+review|background\s+work)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
                 ),
                 "methodology": re.compile(
-                    r"^(?:method(?:ology)?|approach|experimental\s+(?:method|setup|design))\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE
+                    r"^(?:method(?:ology)?|approach|experimental\s+(?:method|setup|design))\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
                 ),
-                "methods": re.compile(r"^(?:methods|materials\s+and\s+methods)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "results": re.compile(r"^(?:results|findings|evaluation|outcome)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "discussion": re.compile(r"^(?:discussion|analysis|interpretation)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "conclusion": re.compile(r"^(?:conclusion|summary|future\s+work)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "references": re.compile(r"^(?:references|bibliography|citations?)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
-                "acknowledgments": re.compile(r"^(?:acknowledgments?|acknowledge?ments?)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
+                "methods": re.compile(
+                    r"^(?:methods|materials\s+and\s+methods)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
+                "results": re.compile(
+                    r"^(?:results|findings|evaluation|outcome)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
+                "discussion": re.compile(
+                    r"^(?:discussion|analysis|interpretation)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
+                "conclusion": re.compile(
+                    r"^(?:conclusion|summary|future\s+work)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
+                "references": re.compile(
+                    r"^(?:references|bibliography|citations?)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
+                "acknowledgments": re.compile(
+                    r"^(?:acknowledgments?|acknowledge?ments?)\s*[:\-]?\s*$",
+                    re.IGNORECASE | re.MULTILINE,
+                ),
                 # Medium confidence academic patterns
                 "section": re.compile(r"^(\d+)\.?\s+([^\n]+)$", re.MULTILINE),
                 "subsection": re.compile(r"^(\d+\.\d+)\.?\s+([^\n]+)$", re.MULTILINE),
@@ -302,7 +324,14 @@ class SemanticSplitter(BaseSplitter):
                     content_section_name = None
                     if _i == 0:
                         content_section_name = "preamble"
-                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence, content_section_name)
+                    chunk = self._create_chunk_from_content(
+                        chunk_text,
+                        prev_pos,
+                        pos,
+                        element_type,
+                        confidence,
+                        content_section_name,
+                    )
                     chunks.append(chunk)
             prev_pos = pos
 
@@ -324,7 +353,7 @@ class SemanticSplitter(BaseSplitter):
         end_pos: int,
         split_reason: str,
         default_confidence: float,
-        section_name: Optional[str] = None,
+        section_name: str | None = None,
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
@@ -345,7 +374,7 @@ class SemanticSplitter(BaseSplitter):
 
         return chunk
 
-    def _extract_section_from_content(self, content: str) -> Optional[str]:
+    def _extract_section_from_content(self, content: str) -> str | None:
         """Extract section name from content if it starts with a header."""
         first_line = content.split("\n")[0].strip()
 

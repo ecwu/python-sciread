@@ -6,7 +6,6 @@ from datetime import datetime
 from datetime import timedelta
 from typing import Any
 from typing import Callable
-from typing import Optional
 
 from ..logging_config import get_logger
 from .models.discussion_models import AgentPersonality
@@ -29,10 +28,10 @@ class TaskQueueManager:
         self.max_concurrent_tasks = max_concurrent_tasks
         self.task_callbacks: dict[TaskType, Callable] = {}
         self.is_running = False
-        self._background_task: Optional[asyncio.Task] = None
+        self._background_task: asyncio.Task | None = None
         self.task_execution_history: list[dict[str, Any]] = []
 
-    def create_queue(self, name: str, description: Optional[str] = None) -> TaskQueue:
+    def create_queue(self, name: str, description: str | None = None) -> TaskQueue:
         """Create a new task queue."""
         if name in self.queues:
             raise ValueError(f"Task queue '{name}' already exists")
@@ -46,7 +45,7 @@ class TaskQueueManager:
         logger.info(f"Created task queue '{name}'")
         return queue
 
-    def get_queue(self, name: str) -> Optional[TaskQueue]:
+    def get_queue(self, name: str) -> TaskQueue | None:
         """Get a task queue by name."""
         return self.queues.get(name)
 
@@ -71,12 +70,12 @@ class TaskQueueManager:
         task_type: TaskType,
         parameters: dict[str, Any],
         priority: TaskPriority = TaskPriority.MEDIUM,
-        assigned_to: Optional[AgentPersonality] = None,
-        created_by: Optional[AgentPersonality] = None,
-        depends_on: Optional[list[str]] = None,
-        timeout_seconds: Optional[int] = None,
+        assigned_to: AgentPersonality | None = None,
+        created_by: AgentPersonality | None = None,
+        depends_on: list[str] | None = None,
+        timeout_seconds: int | None = None,
         max_retries: int = 3,
-        context: Optional[dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
     ) -> str:
         """Create and add a new task to a queue."""
         task = Task(
@@ -92,7 +91,7 @@ class TaskQueueManager:
         )
         return self.add_task(queue_name, task)
 
-    def get_next_task_for_agent(self, agent: AgentPersonality, queue_name: Optional[str] = None) -> Optional[Task]:
+    def get_next_task_for_agent(self, agent: AgentPersonality, queue_name: str | None = None) -> Task | None:
         """Get the next available task for a specific agent."""
         # If queue_name is specified, only check that queue
         if queue_name:
@@ -163,7 +162,7 @@ class TaskQueueManager:
                 task_id=task.task_id,
                 success=False,
                 execution_time=(datetime.now() - start_time).total_seconds(),
-                error_message=error_msg,
+                analysis_result=error_msg,
                 confidence=0.0,
             )
 
@@ -259,7 +258,7 @@ class TaskQueueManager:
                 return False
         return True
 
-    def get_queue_statistics(self, queue_name: str) -> Optional[dict[str, Any]]:
+    def get_queue_statistics(self, queue_name: str) -> dict[str, Any] | None:
         """Get statistics for a specific queue."""
         queue = self.get_queue(queue_name)
         if not queue:

@@ -2,8 +2,6 @@
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import Optional
-from typing import Union
 
 if TYPE_CHECKING:
     from .document import Document
@@ -25,10 +23,10 @@ class DocumentBuilder:
 
     def __init__(
         self,
-        loader: Optional[BaseLoader] = None,
-        splitter: Optional[BaseSplitter] = None,
-        ollama_client: Optional[OllamaClient] = None,
-        mineru_client: Optional[MineruClient] = None,
+        loader: BaseLoader | None = None,
+        splitter: BaseSplitter | None = None,
+        ollama_client: OllamaClient | None = None,
+        mineru_client: MineruClient | None = None,
     ):
         """
         Initialize document builder.
@@ -47,7 +45,7 @@ class DocumentBuilder:
 
     def from_file(
         self,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         to_markdown: bool = False,
         auto_split: bool = True,
         **split_kwargs,
@@ -106,7 +104,7 @@ class DocumentBuilder:
     def from_text(
         self,
         text: str,
-        metadata: Optional[DocumentMetadata] = None,
+        metadata: DocumentMetadata | None = None,
         auto_split: bool = True,
         is_markdown: bool = False,
         **split_kwargs,
@@ -164,7 +162,7 @@ class DocumentBuilder:
 
             raise ValueError(f"Unsupported file format: {suffix}")
 
-    def _split_document(self, doc: "Document", splitter: Optional[BaseSplitter] = None, **split_kwargs) -> None:
+    def _split_document(self, doc: "Document", splitter: BaseSplitter | None = None, **split_kwargs) -> None:
         """
         Split document into chunks.
 

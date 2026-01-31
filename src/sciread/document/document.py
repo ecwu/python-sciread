@@ -8,9 +8,6 @@ from dataclasses import asdict
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
-from typing import Optional
-from typing import Tuple
-from typing import Union
 
 from ..config import get_config
 from ..embedding_provider import get_embedding_client
@@ -27,10 +24,10 @@ class Document:
 
     def __init__(
         self,
-        source_path: Optional[Path] = None,
-        text: Optional[str] = None,
-        metadata: Optional[DocumentMetadata] = None,
-        processing_state: Optional[ProcessingState] = None,
+        source_path: Path | None = None,
+        text: str | None = None,
+        metadata: DocumentMetadata | None = None,
+        processing_state: ProcessingState | None = None,
         _is_markdown: bool = False,
     ):
         """Initialize a Document instance.
@@ -56,12 +53,12 @@ class Document:
         self._chunks_by_id: dict[str, Chunk] = {}
         self._split = False
         self._is_markdown = _is_markdown
-        self.vector_index: Optional[VectorIndex] = None
+        self.vector_index: VectorIndex | None = None
 
     @classmethod
     def from_file(
         cls,
-        file_path: Union[str, Path],
+        file_path: str | Path,
         to_markdown: bool = False,
         auto_split: bool = True,
         **split_kwargs,
@@ -84,7 +81,7 @@ class Document:
     def from_text(
         cls,
         text: str,
-        metadata: Optional[DocumentMetadata] = None,
+        metadata: DocumentMetadata | None = None,
         auto_split: bool = True,
         **split_kwargs,
     ) -> "Document":
@@ -124,12 +121,12 @@ class Document:
 
     def get_chunks(
         self,
-        processed: Optional[bool] = None,
-        chunk_name: Optional[str] = None,
-        limit: Optional[int] = None,
-        confidence_threshold: Optional[float] = None,
-        min_length: Optional[int] = None,
-        exclude_types: Optional[set[str]] = None,
+        processed: bool | None = None,
+        chunk_name: str | None = None,
+        limit: int | None = None,
+        confidence_threshold: float | None = None,
+        min_length: int | None = None,
+        exclude_types: set[str] | None = None,
     ) -> list[Chunk]:
         """
         Get chunks with flexible filtering criteria.
@@ -190,7 +187,7 @@ class Document:
 
         return chunks
 
-    def get_unprocessed_chunks(self, limit: Optional[int] = None) -> list[Chunk]:
+    def get_unprocessed_chunks(self, limit: int | None = None) -> list[Chunk]:
         """Get unprocessed chunks. Convenience method for get_chunks(processed=False)."""
         return self.get_chunks(processed=False, limit=limit)
 
@@ -198,8 +195,8 @@ class Document:
         self,
         confidence_threshold: float = 0.5,
         min_length: int = 50,
-        exclude_types: Optional[set[str]] = None,
-        processed: Optional[bool] = None,
+        exclude_types: set[str] | None = None,
+        processed: bool | None = None,
     ) -> list[Chunk]:
         """Get high-quality chunks based on quality criteria. Convenience method."""
         return self.get_chunks(
@@ -215,9 +212,9 @@ class Document:
 
     def mark_chunks_processed(
         self,
-        confidence_threshold: Optional[float] = None,
-        min_length: Optional[int] = None,
-        exclude_types: Optional[set[str]] = None,
+        confidence_threshold: float | None = None,
+        min_length: int | None = None,
+        exclude_types: set[str] | None = None,
     ) -> int:
         """
         Mark chunks as processed based on filtering criteria.
@@ -249,7 +246,7 @@ class Document:
 
         return len(chunks_to_mark)
 
-    def next_unprocessed(self) -> Optional[Chunk]:
+    def next_unprocessed(self) -> Chunk | None:
         """Get the next unprocessed chunk."""
         unprocessed = self.get_unprocessed_chunks(limit=1)
         return unprocessed[0] if unprocessed else None
@@ -312,8 +309,8 @@ class Document:
 
     def _resolve_section_names(
         self,
-        section_names: Optional[list[str]] = None,
-        max_sections: Optional[int] = None,
+        section_names: list[str] | None = None,
+        max_sections: int | None = None,
     ) -> list[str]:
         """Resolve section names to use, honoring ordering and limits."""
         names = section_names or self.get_section_names()
@@ -323,10 +320,10 @@ class Document:
 
     def _collect_sections(
         self,
-        section_names: Optional[list[str]] = None,
-        max_sections: Optional[int] = None,
+        section_names: list[str] | None = None,
+        max_sections: int | None = None,
         clean_text: bool = False,
-        max_chars_per_section: Optional[int] = None,
+        max_chars_per_section: int | None = None,
     ) -> list[dict[str, Any]]:
         """Collect section data (name, content, chunks, stats) in document order."""
         names = self._resolve_section_names(section_names, max_sections)
@@ -368,10 +365,10 @@ class Document:
 
     def get_sections_content(
         self,
-        section_names: Optional[list[str]] = None,
-        max_sections: Optional[int] = None,
+        section_names: list[str] | None = None,
+        max_sections: int | None = None,
         clean_text: bool = False,
-        max_chars_per_section: Optional[int] = None,
+        max_chars_per_section: int | None = None,
     ) -> list[tuple[str, str]]:
         """Public helper to fetch section content with consistent ordering and cleaning."""
         sections = self._collect_sections(
@@ -390,7 +387,7 @@ class Document:
         """Get the number of chunks."""
         return len(self._chunks)
 
-    def __getitem__(self, index: Union[int, slice]) -> Union[Chunk, list[Chunk]]:
+    def __getitem__(self, index: int | slice) -> Chunk | list[Chunk]:
         """Get chunk by index."""
         return self._chunks[index]
 
@@ -473,7 +470,7 @@ class Document:
             self.logger.error(f"Failed to build vector index: {e}")
             raise RuntimeError(f"Failed to build vector index: {e}") from e
 
-    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> Union[list[Chunk], list[tuple[Chunk, float]]]:
+    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> list[Chunk] | list[tuple[Chunk, float]]:
         """Performs a semantic search on the document chunks using cosine similarity.
 
         This method uses cosine similarity for ranking, which is length-invariant
@@ -542,8 +539,8 @@ class Document:
 
     def print_for_human(
         self,
-        section_names: Optional[list[str]] = None,
-        max_sections: Optional[int] = None,
+        section_names: list[str] | None = None,
+        max_sections: int | None = None,
         show_metadata: bool = True,
         show_confidence: bool = True,
         use_colors: bool = True,
@@ -570,7 +567,10 @@ class Document:
                 }
                 reset = "\033[0m"
             else:
-                colors = dict.fromkeys(["header", "title", "section", "confidence", "content", "metadata"], "")
+                colors = dict.fromkeys(
+                    ["header", "title", "section", "confidence", "content", "metadata"],
+                    "",
+                )
                 reset = ""
 
             # Show document metadata
@@ -610,11 +610,11 @@ class Document:
 
     def get_for_llm(
         self,
-        section_names: Optional[list[str]] = None,
-        max_tokens: Optional[int] = None,
+        section_names: list[str] | None = None,
+        max_tokens: int | None = None,
         include_headers: bool = True,
         clean_text: bool = True,
-        max_chars_per_section: Optional[int] = None,
+        max_chars_per_section: int | None = None,
     ) -> str:
         """Get document content optimized for LLM consumption.
 
@@ -676,7 +676,7 @@ class Document:
             self.logger.error(f"Failed to get content for LLM: {e}")
             return f"Error retrieving content: {e}"
 
-    def get_section_by_number(self, index: int, include_content: bool = True, max_chars: Optional[int] = None) -> Optional[Tuple[str, str]]:
+    def get_section_by_number(self, index: int, include_content: bool = True, max_chars: int | None = None) -> tuple[str, str] | None:
         """Get section by numerical index.
 
         Args:
@@ -716,7 +716,7 @@ class Document:
         fuzzy: bool = True,
         case_sensitive: bool = False,
         threshold: float = 0.8,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> tuple[str, str] | None:
         """Get section by name with optional fuzzy matching.
 
         Args:
@@ -759,11 +759,11 @@ class Document:
     def get_closest_section_name(
         self,
         target_name: str,
-        available_names: Optional[list[str]] = None,
+        available_names: list[str] | None = None,
         case_sensitive: bool = False,
         threshold: float = 0.8,
         use_embedding: bool = False,
-    ) -> Optional[str]:
+    ) -> str | None:
         """Find closest matching section name using various similarity measures.
 
         Args:
@@ -841,18 +841,40 @@ class Document:
             self.logger.error(f"Failed to find closest section name for '{target_name}': {e}")
             return None
 
-    def _match_section_pattern(self, search_name: str, normalized_names: list[str], original_names: list[str]) -> Optional[str]:
+    def _match_section_pattern(self, search_name: str, normalized_names: list[str], original_names: list[str]) -> str | None:
         """Match section using common academic paper patterns."""
         # Common academic section patterns and their variations
         section_patterns = {
             # Introduction variations
-            "introduction": ["intro", "introduction", "background", "overview", "prelude", "preamble"],
+            "introduction": [
+                "intro",
+                "introduction",
+                "background",
+                "overview",
+                "prelude",
+                "preamble",
+            ],
             # Abstract variations
             "abstract": ["abstract", "summary", "executive summary", "overview"],
             # Related work variations
-            "related work": ["related work", "background", "literature review", "survey", "previous work", "state of the art"],
+            "related work": [
+                "related work",
+                "background",
+                "literature review",
+                "survey",
+                "previous work",
+                "state of the art",
+            ],
             # Methodology variations
-            "methodology": ["methodology", "method", "methods", "approach", "methodology and approach", "technical approach", "design"],
+            "methodology": [
+                "methodology",
+                "method",
+                "methods",
+                "approach",
+                "methodology and approach",
+                "technical approach",
+                "design",
+            ],
             # Experiments variations
             "experiments": [
                 "experiment",
@@ -864,15 +886,40 @@ class Document:
                 "case study",
             ],
             # Results variations
-            "results": ["results", "findings", "outcomes", "performance", "evaluation results", "experimental results"],
+            "results": [
+                "results",
+                "findings",
+                "outcomes",
+                "performance",
+                "evaluation results",
+                "experimental results",
+            ],
             # Discussion variations
             "discussion": ["discussion", "analysis", "interpretation", "implications"],
             # Conclusion variations
-            "conclusion": ["conclusion", "conclusions", "summary", "future work", "concluding remarks"],
+            "conclusion": [
+                "conclusion",
+                "conclusions",
+                "summary",
+                "future work",
+                "concluding remarks",
+            ],
             # References/Bibliography variations
-            "references": ["references", "bibliography", "citations", "works cited", "bibliography and references"],
+            "references": [
+                "references",
+                "bibliography",
+                "citations",
+                "works cited",
+                "bibliography and references",
+            ],
             # Appendix variations
-            "appendix": ["appendix", "appendices", "supplementary material", "supplemental material", "additional information"],
+            "appendix": [
+                "appendix",
+                "appendices",
+                "supplementary material",
+                "supplemental material",
+                "additional information",
+            ],
         }
 
         # Check each pattern
@@ -967,9 +1014,9 @@ class Document:
                     chunk_lengths = [len(chunk.content) for chunk in section_chunks]
                     section_info.update(
                         {
-                            "min_chunk_size": min(chunk_lengths) if chunk_lengths else 0,
-                            "max_chunk_size": max(chunk_lengths) if chunk_lengths else 0,
-                            "avg_chunk_size": sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0,
+                            "min_chunk_size": (min(chunk_lengths) if chunk_lengths else 0),
+                            "max_chunk_size": (max(chunk_lengths) if chunk_lengths else 0),
+                            "avg_chunk_size": (sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0),
                         }
                     )
 

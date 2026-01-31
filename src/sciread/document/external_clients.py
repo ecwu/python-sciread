@@ -5,7 +5,6 @@ import time
 import uuid
 import zipfile
 from pathlib import Path
-from typing import Optional
 
 import requests
 
@@ -25,7 +24,7 @@ class MineruClient:
         timeout: int = 300,
         poll_interval: int = 10,
         enable_cache: bool = True,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
     ):
         """
         Initialize Mineru client.
@@ -116,7 +115,7 @@ class MineruClient:
             self.logger.info(f"Successfully extracted {len(markdown_content)} characters from cached zip")
             return markdown_content
 
-    def _call_mineru_api(self, file_path: Path) -> tuple[str, Optional[bytes]]:
+    def _call_mineru_api(self, file_path: Path) -> tuple[str, bytes | None]:
         """
         Call Mineru API to extract markdown from PDF.
 

@@ -8,7 +8,6 @@ import traceback
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import Optional
 
 from pydantic_ai import Agent
 from pydantic_ai import ModelRetry
@@ -167,9 +166,9 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
 def build_react_content(
     document: Document,
     current_report: str,
-    processed_sections: Optional[list[str]],
-    current_sections: Optional[list[str]],
-    max_tokens: Optional[int] = None,
+    processed_sections: list[str] | None,
+    current_sections: list[str] | None,
+    max_tokens: int | None = None,
 ) -> str:
     """Compose content block for ReAct iteration using Document helpers."""
     content_parts: list[str] = []

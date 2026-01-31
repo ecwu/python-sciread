@@ -5,7 +5,6 @@ import json
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 from ..logging_config import get_logger
 
@@ -23,7 +22,7 @@ class CacheEntry:
 class MineruCacheManager:
     """Manages caching of Mineru API responses."""
 
-    def __init__(self, cache_dir: Optional[Path] = None):
+    def __init__(self, cache_dir: Path | None = None):
         """
         Initialize the cache manager.
 
@@ -95,7 +94,7 @@ class MineruCacheManager:
 
         return md5_hash.hexdigest()
 
-    def get_cached_zip(self, pdf_path: Path) -> Optional[Path]:
+    def get_cached_zip(self, pdf_path: Path) -> Path | None:
         """
         Check if a cached zip file exists for the given PDF.
 
@@ -142,7 +141,7 @@ class MineruCacheManager:
             self.logger.error(f"Error checking cache: {e}")
             return None
 
-    def save_to_cache(self, pdf_path: Path, zip_content: bytes) -> Optional[Path]:
+    def save_to_cache(self, pdf_path: Path, zip_content: bytes) -> Path | None:
         """
         Save a zip file to cache.
 

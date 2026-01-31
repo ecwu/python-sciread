@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING
-from typing import Optional
-from typing import Union
 
 if TYPE_CHECKING:
     from .document import Document
@@ -21,7 +19,7 @@ class DocumentFactory:
     """Factory class for creating documents with common configurations."""
 
     @staticmethod
-    def create_from_file(file_path: Union[str, Path], to_markdown: bool = False) -> Document:
+    def create_from_file(file_path: str | Path, to_markdown: bool = False) -> Document:
         """
         Create document from file with default configuration.
 
@@ -36,13 +34,13 @@ class DocumentFactory:
         return builder.from_file(file_path, to_markdown=to_markdown)
 
     @staticmethod
-    def create_from_text(text: str, metadata: Optional[DocumentMetadata] = None) -> Document:
+    def create_from_text(text: str, metadata: DocumentMetadata | None = None) -> Document:
         """
         Create document from text with default configuration.
 
         Args:
             text: Raw text content.
-            metadata: Optional document metadata.
+            metadata: Document metadata.
 
         Returns:
             Document instance.
@@ -52,8 +50,8 @@ class DocumentFactory:
 
     @staticmethod
     def create_consecutive_flow_document(
-        file_path: Union[str, Path],
-        ollama_client: Optional[OllamaClient] = None,
+        file_path: str | Path,
+        ollama_client: OllamaClient | None = None,
         **consecutive_flow_kwargs,
     ) -> Document:
         """
@@ -77,8 +75,8 @@ class DocumentFactory:
 
     @staticmethod
     def create_cumulative_flow_document(
-        file_path: Union[str, Path],
-        ollama_client: Optional[OllamaClient] = None,
+        file_path: str | Path,
+        ollama_client: OllamaClient | None = None,
         **cumulative_flow_kwargs,
     ) -> Document:
         """

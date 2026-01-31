@@ -2,7 +2,6 @@
 
 from pathlib import Path
 from typing import Any
-from typing import Optional
 
 import chromadb
 
@@ -12,7 +11,7 @@ from .models import Chunk
 class VectorIndex:
     """A wrapper around a vector database for semantic search."""
 
-    def __init__(self, collection_name: str, persist_path: Optional[Path] = None):
+    def __init__(self, collection_name: str, persist_path: Path | None = None):
         """Initialize the vector index.
 
         Args:

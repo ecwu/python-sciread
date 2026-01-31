@@ -6,7 +6,6 @@ from dataclasses import field
 from datetime import datetime
 from datetime import timezone
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -17,12 +16,12 @@ class Chunk:
     content: str
     chunk_name: str = "unknown"  # abstract, introduction, methods, etc.
     position: int = 0  # Sequential position in document
-    page_range: Optional[tuple[int, int]] = None  # (start_page, end_page)
-    char_range: Optional[tuple[int, int]] = None  # (start_char, end_char)
+    page_range: tuple[int, int] | None = None  # (start_page, end_page)
+    char_range: tuple[int, int] | None = None  # (start_char, end_char)
     word_count: int = 0
     confidence: float = 1.0  # Confidence in classification (0.0-1.0)
     processed: bool = False  # Processing status
-    metadata: Optional[dict] = None  # Additional metadata like cut reason
+    metadata: dict | None = None  # Additional metadata like cut reason
 
     def __post_init__(self):
         """Validate and initialize derived fields."""
@@ -55,17 +54,17 @@ class Chunk:
 
 @dataclass
 class DocumentMetadata:
-    """Metadata about the source document."""
+    """Metadata about source document."""
 
-    source_path: Optional[Path] = None
-    file_type: Optional[str] = None  # pdf, txt, etc.
-    file_size: Optional[int] = None  # in bytes
-    file_hash: Optional[str] = None  # hash of file content for identification
-    created_at: Optional[datetime] = None
-    modified_at: Optional[datetime] = None
-    title: Optional[str] = None
-    author: Optional[str] = None
-    page_count: Optional[int] = None
+    source_path: Path | None = None
+    file_type: str | None = None  # pdf, txt, etc.
+    file_size: int | None = None  # in bytes
+    file_hash: str | None = None  # hash of file content for identification
+    created_at: datetime | None = None
+    modified_at: datetime | None = None
+    title: str | None = None
+    author: str | None = None
+    page_count: int | None = None
 
     def __post_init__(self):
         """Initialize timestamps if not provided."""
@@ -80,9 +79,9 @@ class DocumentMetadata:
 class ProcessingState:
     """State information about document processing."""
 
-    loaded_at: Optional[datetime] = None
-    split_at: Optional[datetime] = None
-    last_processed_at: Optional[datetime] = None
+    loaded_at: datetime | None = None
+    split_at: datetime | None = None
+    last_processed_at: datetime | None = None
     processing_version: str = "1.0"
     notes: list[str] = field(default_factory=list)
 

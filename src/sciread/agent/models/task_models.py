@@ -3,7 +3,6 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from typing import Optional
 from uuid import uuid4
 
 from pydantic import BaseModel
@@ -58,12 +57,12 @@ class Task(BaseModel):
     status: TaskStatus = Field(default=TaskStatus.PENDING, description="Current task status")
 
     # Task assignment
-    assigned_to: Optional[AgentPersonality] = Field(None, description="Agent assigned to this task")
-    created_by: Optional[AgentPersonality] = Field(None, description="Agent that created this task")
+    assigned_to: AgentPersonality | None = Field(None, description="Agent assigned to this task")
+    created_by: AgentPersonality | None = Field(None, description="Agent that created this task")
 
     # Task parameters
     parameters: dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
-    context: dict[str, Any] = Field(default_factory=dict, description="Additional context for the task")
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional context for task")
 
     # Dependencies and relationships
     depends_on: list[str] = Field(default_factory=list, description="Task IDs this task depends on")
@@ -71,19 +70,19 @@ class Task(BaseModel):
 
     # Timing
     created_at: datetime = Field(default_factory=datetime.now, description="Task creation time")
-    assigned_at: Optional[datetime] = Field(None, description="Task assignment time")
-    started_at: Optional[datetime] = Field(None, description="Task start time")
-    completed_at: Optional[datetime] = Field(None, description="Task completion time")
-    deadline: Optional[datetime] = Field(None, description="Task deadline")
+    assigned_at: datetime | None = Field(None, description="Task assignment time")
+    started_at: datetime | None = Field(None, description="Task start time")
+    completed_at: datetime | None = Field(None, description="Task completion time")
+    deadline: datetime | None = Field(None, description="Task deadline")
 
     # Execution details
     max_retries: int = Field(default=3, description="Maximum number of retries")
     retry_count: int = Field(default=0, description="Current retry count")
-    timeout_seconds: Optional[int] = Field(None, description="Task timeout in seconds")
+    timeout_seconds: int | None = Field(None, description="Task timeout in seconds")
 
     # Results
-    result: Optional["TaskResult"] = Field(None, description="Task execution result")
-    error_message: Optional[str] = Field(None, description="Error message if task failed")
+    result: "TaskResult | None" = Field(None, description="Task execution result")
+    error_message: str | None = Field(None, description="Error message if task failed")
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -99,7 +98,7 @@ class TaskResult(BaseModel):
     insights: list[AgentInsight] = Field(default_factory=list, description="Generated insights")
     questions: list[Question] = Field(default_factory=list, description="Generated questions")
     responses: list[Response] = Field(default_factory=list, description="Generated responses")
-    analysis_result: Optional[str] = Field(None, description="General analysis result")
+    analysis_result: str | None = Field(None, description="General analysis result")
 
     # Metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
@@ -114,7 +113,7 @@ class TaskQueue(BaseModel):
     """Manages a queue of tasks for the discussion system."""
 
     name: str = Field(..., description="Name of this task queue")
-    description: Optional[str] = Field(None, description="Description of this queue")
+    description: str | None = Field(None, description="Description of this queue")
 
     # Task storage
     pending_tasks: list[Task] = Field(default_factory=list, description="Tasks waiting to be executed")
@@ -143,7 +142,7 @@ class TaskQueue(BaseModel):
         self.last_activity = datetime.now()
         return task.task_id
 
-    def get_next_task(self, agent_personality: AgentPersonality) -> Optional[Task]:
+    def get_next_task(self, agent_personality: AgentPersonality) -> Task | None:
         """Get the next available task for a specific agent."""
         # Sort pending tasks by priority and creation time
         sorted_tasks = sorted(
@@ -221,7 +220,7 @@ class TaskQueue(BaseModel):
 
         return False
 
-    def get_task(self, task_id: str) -> Optional[Task]:
+    def get_task(self, task_id: str) -> Task | None:
         """Retrieve a task by ID from any queue bucket."""
         for task_list in [
             self.pending_tasks,
@@ -234,7 +233,7 @@ class TaskQueue(BaseModel):
                     return task
         return None
 
-    def get_task_status(self, task_id: str) -> Optional[TaskStatus]:
+    def get_task_status(self, task_id: str) -> TaskStatus | None:
         """Get the status of a specific task."""
         for task_list in [
             self.pending_tasks,

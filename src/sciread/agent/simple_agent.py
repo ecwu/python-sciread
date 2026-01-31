@@ -7,8 +7,6 @@ using pydantic-ai framework and the existing LLM provider infrastructure.
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
-from typing import Optional
-from typing import Union
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
@@ -44,7 +42,7 @@ def _build_simple_content(
     include_metadata: bool,
     remove_references: bool,
     clean_text: bool,
-    max_tokens: Optional[int],
+    max_tokens: int | None,
 ) -> str:
     """Assemble document content for SimpleAgent using unified helpers."""
     section_names = document.get_section_names()
@@ -83,8 +81,8 @@ class SimpleAgent:
 
     def __init__(
         self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
-        system_prompt: Optional[str] = None,
+        model: str | OpenAIChatModel | AnthropicModel,
+        system_prompt: str | None = None,
         max_retries: int = 3,
         timeout: float = 300.0,
     ):

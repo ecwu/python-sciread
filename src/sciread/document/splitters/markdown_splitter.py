@@ -1,7 +1,6 @@
 """Markdown-specific text splitter that leverages markdown structure for accurate chunking."""
 
 import re
-from typing import Optional
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -221,7 +220,14 @@ class MarkdownSplitter(BaseSplitter):
                     content_section_name = None
                     if _i == 0:
                         content_section_name = "preamble"
-                    chunk = self._create_chunk_from_content(chunk_text, prev_pos, pos, element_type, confidence, content_section_name)
+                    chunk = self._create_chunk_from_content(
+                        chunk_text,
+                        prev_pos,
+                        pos,
+                        element_type,
+                        confidence,
+                        content_section_name,
+                    )
                     chunks.append(chunk)
             prev_pos = pos
 
@@ -243,7 +249,7 @@ class MarkdownSplitter(BaseSplitter):
         end_pos: int,
         split_reason: str,
         default_confidence: float,
-        section_name: Optional[str] = None,
+        section_name: str | None = None,
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
@@ -264,7 +270,7 @@ class MarkdownSplitter(BaseSplitter):
 
         return chunk
 
-    def _extract_section_from_content(self, content: str) -> Optional[str]:
+    def _extract_section_from_content(self, content: str) -> str | None:
         """Extract section name from content if it starts with a header."""
         first_line = content.split("\n")[0].strip()
 

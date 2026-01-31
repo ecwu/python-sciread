@@ -4,7 +4,6 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
-from typing import Optional
 
 from pydantic_ai import Agent
 
@@ -39,7 +38,7 @@ class ConsensusBuilder:
     async def build_consensus_result(
         self,
         document: Document,
-        discussion_state: Optional[DiscussionState],
+        discussion_state: DiscussionState | None,
         agent_insights: dict[AgentPersonality, list[AgentInsight]],
         questions: list[Question],
         responses: list[Response],
@@ -196,7 +195,7 @@ class ConsensusBuilder:
                     if stance not in ["disagree", "challenge", "modify"]:
                         continue
 
-                    target_insight: Optional[AgentInsight] = None
+                    target_insight: AgentInsight | None = None
 
                     target_id = getattr(question, "target_insight_id", None)
                     if target_id:

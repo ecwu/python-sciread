@@ -6,7 +6,6 @@ to be used across all agent implementations.
 
 import asyncio
 from typing import Any
-from typing import Optional
 from typing import Type
 
 from pydantic_ai import ModelRetry
@@ -19,7 +18,7 @@ logger = get_logger(__name__)
 class AgentError(Exception):
     """Base class for all agent-related errors."""
 
-    def __init__(self, message: str, cause: Optional[Exception] = None):
+    def __init__(self, message: str, cause: Exception | None = None):
         super().__init__(message)
         self.cause = cause
 
@@ -40,7 +39,7 @@ class SubAgentExecutionError(AgentError):
     """Raised when sub-agent execution fails in coordinate analysis."""
 
 
-def handle_model_retry(error: Exception, context: str, fallback_message: Optional[str] = None) -> ModelRetry:
+def handle_model_retry(error: Exception, context: str, fallback_message: str | None = None) -> ModelRetry:
     """Convert various exceptions to ModelRetry for pydantic-ai retry mechanism.
 
     Args:
@@ -182,7 +181,7 @@ def format_error_for_user(error: AgentError, operation: str) -> str:
         return f"Error in {operation}: {error}. Please try again or contact support if the issue persists."
 
 
-def create_retry_message(original_error: Exception, context: str, suggestions: Optional[list[str]] = None) -> str:
+def create_retry_message(original_error: Exception, context: str, suggestions: list[str] | None = None) -> str:
     """Create a detailed retry message for ModelRetry.
 
     Args:

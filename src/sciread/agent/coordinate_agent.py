@@ -16,8 +16,6 @@ import asyncio
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
-from typing import Optional
-from typing import Union
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
@@ -64,7 +62,7 @@ class CoordinateDeps:
     """Main dependencies for coordinate agent analysis."""
 
     document: Document
-    custom_plan: Optional[AnalysisPlan] = None
+    custom_plan: AnalysisPlan | None = None
     max_retries: int = 3
     timeout: float = 300.0
 
@@ -76,7 +74,7 @@ class ExpertAgentDeps:
     document: Document
     analysis_type: str
     sections_to_analyze: list[str] = field(default_factory=list)
-    analysis_plan: Optional[AnalysisPlan] = None
+    analysis_plan: AnalysisPlan | None = None
 
 
 @dataclass
@@ -187,7 +185,7 @@ class CoordinateAgent:
 
     def __init__(
         self,
-        model: Union[str, OpenAIChatModel, AnthropicModel],
+        model: str | OpenAIChatModel | AnthropicModel,
         max_retries: int = 3,
         timeout: float = 300.0,
     ):
@@ -881,7 +879,7 @@ class CoordinateAgent:
     async def analyze(
         self,
         document: Document,
-        custom_plan: Optional[AnalysisPlan] = None,
+        custom_plan: AnalysisPlan | None = None,
         **kwargs: Any,
     ) -> ComprehensiveAnalysisResult:
         """Perform comprehensive document analysis using expert sub-agents.

@@ -1,11 +1,10 @@
 """CoordinateAgent result models for structured outputs.
 
-This module contains Pydantic models used by the CoordinateAgent system
+This module contains Pydantic models used by CoordinateAgent system
 for structured output from various expert sub-agents.
 """
 
 from typing import Any
-from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -14,14 +13,14 @@ from pydantic import Field
 class MetadataExtractionResult(BaseModel):
     """Result of metadata extraction from academic paper."""
 
-    title: Optional[str] = Field(None, description="Paper title")
+    title: str | None = Field(None, description="Paper title")
     authors: list[str] = Field(default_factory=list, description="List of authors")
     affiliations: list[str] = Field(
         default_factory=list,
         description="Author affiliations (company, university, or lab)",
     )
-    venue: Optional[str] = Field(None, description="Publication venue (journal, conference, or arxiv)")
-    year: Optional[int] = Field(None, description="Publication year")
+    venue: str | None = Field(None, description="Publication venue (journal, conference, or arxiv)")
+    year: int | None = Field(None, description="Publication year")
     confidence: float = Field(1.0, description="Confidence in extracted metadata")
 
 
@@ -127,12 +126,12 @@ class ComprehensiveAnalysisResult(BaseModel):
     """Comprehensive result containing all sub-agent analyses."""
 
     analysis_plan: AnalysisPlan
-    metadata_result: Optional[MetadataExtractionResult] = None
-    previous_methods_result: Optional[PreviousMethodsResult] = None
-    research_questions_result: Optional[ResearchQuestionsResult] = None
-    methodology_result: Optional[MethodologyResult] = None
-    experiment_result: Optional[ExperimentResult] = None
-    future_directions_result: Optional[FutureDirectionsResult] = None
+    metadata_result: MetadataExtractionResult | None = None
+    previous_methods_result: PreviousMethodsResult | None = None
+    research_questions_result: ResearchQuestionsResult | None = None
+    methodology_result: MethodologyResult | None = None
+    experiment_result: ExperimentResult | None = None
+    future_directions_result: FutureDirectionsResult | None = None
 
     execution_summary: dict[str, Any] = Field(default_factory=dict, description="Summary of execution details")
     final_report: str = Field("", description="Synthesized final report")

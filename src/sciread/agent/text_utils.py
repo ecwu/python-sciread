@@ -5,10 +5,9 @@ including removing reference sections and cleaning up academic paper content.
 """
 
 import re
-from typing import Optional
 
 
-def remove_references(text: str, reference_keywords: Optional[list[str]] = None) -> str:
+def remove_references(text: str, reference_keywords: list[str] | None = None) -> str:
     """Remove text after the reference section in academic papers.
 
     This function attempts to identify where the reference section begins

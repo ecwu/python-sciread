@@ -3,7 +3,6 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -69,7 +68,7 @@ class Response(BaseModel):
     from_agent: AgentPersonality = Field(..., description="Agent providing the response")
     content: str = Field(..., description="The response content")
     stance: str = Field(..., description="Response stance (agree, disagree, clarify, modify)")
-    revised_insight: Optional[str] = Field(None, description="Revised insight if applicable")
+    revised_insight: str | None = Field(None, description="Revised insight if applicable")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the response")
     timestamp: datetime = Field(default_factory=datetime.now, description="When the response was given")
 

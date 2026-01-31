@@ -2,7 +2,6 @@
 
 from typing import Any
 from typing import ClassVar
-from typing import Union
 
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -87,7 +86,7 @@ class ModelFactory:
         return cls.PROVIDERS[provider_name]
 
     @classmethod
-    def create_model(cls, model_identifier: str, **kwargs: Any) -> Union[OpenAIChatModel, AnthropicModel]:
+    def create_model(cls, model_identifier: str, **kwargs: Any) -> OpenAIChatModel | AnthropicModel:
         """Create a model instance from a model identifier.
 
         Args:
@@ -140,7 +139,7 @@ class ModelFactory:
         return models
 
 
-def get_model(model_identifier: str, **kwargs: Any) -> Union[OpenAIChatModel, AnthropicModel]:
+def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel | AnthropicModel:
     """Get a model instance.
 
     This is the main public interface for creating LLM model instances.

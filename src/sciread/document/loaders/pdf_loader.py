@@ -2,7 +2,6 @@
 
 import re
 from pathlib import Path
-from typing import Optional
 
 import pdfplumber
 import pypdf
@@ -17,7 +16,7 @@ from .base import LoadResult
 class PdfLoader(BaseLoader):
     """Loader for PDF files using multiple extraction methods."""
 
-    def __init__(self, to_markdown: bool = False, mineru_client: Optional[MineruClient] = None):
+    def __init__(self, to_markdown: bool = False, mineru_client: MineruClient | None = None):
         """Initialize the PDF loader.
 
         Args:

@@ -3,7 +3,6 @@
 import math
 import os
 from typing import Any
-from typing import Optional
 
 import requests
 
@@ -18,7 +17,7 @@ class SiliconFlowClient:
         self,
         model: str = "Qwen/Qwen3-Embedding-8B",
         base_url: str = "https://api.siliconflow.cn/v1",
-        api_key: Optional[str] = None,
+        api_key: str | None = None,
         timeout: int = 30,
         cache_embeddings: bool = True,
         embedding_dimension: int = 4096,
@@ -94,7 +93,7 @@ class SiliconFlowClient:
 
         return batch_embeddings
 
-    def get_embedding(self, text: str) -> Optional[list[float]]:
+    def get_embedding(self, text: str) -> list[float] | None:
         """Get embedding for a single text from SiliconFlow API."""
         # Check cache first
         cache_key = f"{self.model}:{hash(text)}"
@@ -108,7 +107,7 @@ class SiliconFlowClient:
 
         return embedding
 
-    def _get_single_embedding(self, text: str) -> Optional[list[float]]:
+    def _get_single_embedding(self, text: str) -> list[float] | None:
         """Get embedding for a single text from SiliconFlow API using OpenAI format."""
         try:
             if not self.api_key:

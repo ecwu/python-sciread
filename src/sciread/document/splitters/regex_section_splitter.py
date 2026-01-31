@@ -4,7 +4,6 @@ import argparse
 import re
 from pathlib import Path
 from re import Pattern
-from typing import Optional
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -15,7 +14,7 @@ class RegexSectionSplitter(BaseSplitter):
 
     def __init__(
         self,
-        patterns: Optional[dict[str, str]] = None,
+        patterns: dict[str, str] | None = None,
         min_chunk_size: int = 200,
         confidence_threshold: float = 0.3,
     ):
@@ -406,7 +405,7 @@ class RegexSectionSplitter(BaseSplitter):
         """Classify a section based on its title (from RuleBasedSplitter)."""
         return self._classify_section_by_content(title)
 
-    def _extract_section_name_from_content(self, content: str) -> Optional[str]:
+    def _extract_section_name_from_content(self, content: str) -> str | None:
         """Extract the actual section name from content for display/searching."""
         lines = content.strip().split("\n")
         if not lines:

@@ -2,7 +2,6 @@
 
 import math
 from typing import Any
-from typing import Optional
 
 import requests
 
@@ -82,7 +81,7 @@ class OllamaClient:
 
         return batch_embeddings
 
-    def get_embedding(self, text: str) -> Optional[list[float]]:
+    def get_embedding(self, text: str) -> list[float] | None:
         """Get embedding for a single text from Ollama API."""
         # Check cache first
         cache_key = f"{self.model}:{hash(text)}"
@@ -96,7 +95,7 @@ class OllamaClient:
 
         return embedding
 
-    def _get_single_embedding(self, text: str) -> Optional[list[float]]:
+    def _get_single_embedding(self, text: str) -> list[float] | None:
         """Get embedding for a single text from Ollama API."""
         try:
             url = f"{self.base_url}/api/embeddings"

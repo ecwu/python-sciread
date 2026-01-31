@@ -3,7 +3,6 @@
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 from pydantic import BaseModel
 from pydantic import Field
@@ -23,8 +22,8 @@ else:
 class LLMProviderConfig(BaseModel):
     """Configuration for an LLM provider."""
 
-    api_key: Optional[str] = Field(default=None, description="API key for the provider")
-    base_url: Optional[str] = Field(default=None, description="Base URL for the provider API")
+    api_key: str | None = Field(default=None, description="API key for the provider")
+    base_url: str | None = Field(default=None, description="Base URL for the provider API")
     default_model: str = Field(description="Default model name for this provider")
 
 
@@ -76,14 +75,14 @@ class DocumentSplitterConfig(BaseModel):
 class MineruConfig(BaseModel):
     """Configuration for Mineru API."""
 
-    token: Optional[str] = Field(default=None, description="API token for Mineru service")
+    token: str | None = Field(default=None, description="API token for Mineru service")
     enable_formula: bool = Field(default=True, description="Enable formula extraction")
     enable_table: bool = Field(default=True, description="Enable table extraction")
     language: str = Field(default="ch", description="Document language (ch/en)")
     timeout: int = Field(default=600, description="Processing timeout in seconds")
     poll_interval: int = Field(default=10, description="Status poll interval in seconds")
     enable_cache: bool = Field(default=True, description="Enable caching of API responses")
-    cache_dir: Optional[str] = Field(
+    cache_dir: str | None = Field(
         default=None,
         description="Directory for cache storage (default: ~/.sciread/mineru_cache)",
     )
@@ -130,10 +129,10 @@ class ScireadConfig(BaseSettings):
     mineru: MineruConfig = Field(default_factory=MineruConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
 
-    config_file: Optional[Path] = Field(default=None, description="Path to configuration file")
+    config_file: Path | None = Field(default=None, description="Path to configuration file")
 
     @classmethod
-    def load_from_file(cls, config_path: Optional[Path] = None) -> "ScireadConfig":
+    def load_from_file(cls, config_path: Path | None = None) -> "ScireadConfig":
         """Load configuration from file and environment variables."""
 
         if config_path is None:
@@ -258,7 +257,7 @@ class ScireadConfig(BaseSettings):
 
 
 # Global configuration instance
-_config: Optional[ScireadConfig] = None
+_config: ScireadConfig | None = None
 
 
 def get_config() -> ScireadConfig:
@@ -269,7 +268,7 @@ def get_config() -> ScireadConfig:
     return _config
 
 
-def reload_config(config_path: Optional[Path] = None) -> ScireadConfig:
+def reload_config(config_path: Path | None = None) -> ScireadConfig:
     """Reload configuration from file."""
     global _config
     _config = ScireadConfig.load_from_file(config_path)

@@ -3,7 +3,6 @@
 import re
 import uuid
 from typing import Any
-from typing import Optional
 
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
@@ -268,7 +267,7 @@ Select sections that will help you provide the most valuable insights from your 
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
         discussion_context: dict[str, Any],
-    ) -> Optional[Any]:
+    ) -> Any | None:
         """Ask a question about another agent's insight."""
         try:
             self.logger.info(f"{self.personality.value} asking question to {target_agent.value}")
@@ -350,7 +349,7 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
         question: Question,
         my_insights: list[AgentInsight],
         discussion_context: dict[str, Any],
-    ) -> Optional[Response]:
+    ) -> Response | None:
         """Answer a question from another agent."""
         try:
             # Handle from_agent which might be string or enum
@@ -652,11 +651,11 @@ Recommendations: [Any suggestions for next steps]
         response: str,
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         """Parse LLM output into a structured decision about questioning."""
         try:
             fields: dict[str, str] = {}
-            current_key: Optional[str] = None
+            current_key: str | None = None
 
             for raw_line in response.splitlines():
                 line = raw_line.strip()
@@ -858,7 +857,7 @@ Recommendations: [Any suggestions for next steps]
 
         return relevant_insights
 
-    def _parse_answer_response(self, response: str, question: Question) -> Optional[Response]:
+    def _parse_answer_response(self, response: str, question: Question) -> Response | None:
         """Parse response to create a Response object."""
         try:
             response_match = re.search(r"Response:\s*(.+)", response, re.IGNORECASE | re.DOTALL)
