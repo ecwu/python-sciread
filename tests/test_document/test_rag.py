@@ -263,7 +263,7 @@ class TestDocumentRAG:
             assert output_path.exists()
 
             # Verify content
-            with open(output_path) as f:
+            with output_path.open() as f:
                 saved_data = json.load(f)
 
             assert saved_data["text"] == "test content"
@@ -284,7 +284,7 @@ class TestDocumentRAG:
 
             doc.save(output_path)
 
-            with open(output_path) as f:
+            with output_path.open() as f:
                 saved_data = json.load(f)
 
             assert saved_data["vector_index_path"] is None
@@ -322,7 +322,7 @@ class TestDocumentRAG:
 
             # Save test data
             state_path = Path(temp_dir) / "test_state.json"
-            with open(state_path, "w") as f:
+            with state_path.open("w") as f:
                 json.dump(test_data, f)
 
             # Load document
@@ -375,7 +375,7 @@ class TestDocumentRAG:
 
             # Save test data
             state_path = Path(temp_dir) / "test_state.json"
-            with open(state_path, "w") as f:
+            with state_path.open("w") as f:
                 json.dump(test_data, f)
 
             # Load document
@@ -404,10 +404,10 @@ class TestDocumentRAG:
 
             # Save test data
             state_path = Path(temp_dir) / "test_state.json"
-            with open(state_path, "w") as f:
+            with state_path.open("w") as f:
                 json.dump(test_data, f)
 
-            # Load document - should not raise error
+            # Load document
             doc = Document.load(state_path)
             assert doc.vector_index is None
 

@@ -1110,7 +1110,7 @@ class Document:
                 "vector_index_path": vector_index_path_str,
                 "is_markdown": self._is_markdown,
             }
-            with open(output_path, "w", encoding="utf-8") as f:
+            with output_path.open("w", encoding="utf-8") as f:
                 json.dump(doc_state, f, indent=4)
             self.logger.info("Document state saved successfully.")
         except Exception as e:
@@ -1124,7 +1124,7 @@ class Document:
         logger.info(f"Loading document from state file: {state_path}")
 
         try:
-            with open(state_path, encoding="utf-8") as f:
+            with state_path.open(encoding="utf-8") as f:
                 doc_state = json.load(f)
 
             # Reconstruct metadata with proper Path object and datetime handling
