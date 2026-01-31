@@ -2,6 +2,7 @@
 
 import math
 from typing import Any
+from typing import ClassVar
 
 import requests
 
@@ -173,7 +174,7 @@ class OllamaEmbeddingProvider(BaseEmbeddingProvider):
     """Ollama embedding provider for local embedding models."""
 
     # Supported models - common Ollama embedding models
-    SUPPORTED_MODELS = {
+    SUPPORTED_MODELS: ClassVar[dict[str, str]] = {
         "nomic-embed-text": "Nomic Embed Text - High quality text embeddings (768 dim)",
         "mxbai-embed-large": "MixedBread AI Large - High performance embeddings (1024 dim)",
         "all-minilm": "All MiniLM - Fast and efficient embeddings (384 dim)",

@@ -3,6 +3,7 @@
 import math
 import os
 from typing import Any
+from typing import ClassVar
 
 import requests
 
@@ -201,7 +202,7 @@ class SiliconFlowEmbeddingProvider(BaseEmbeddingProvider):
     """SiliconFlow embedding provider for cloud-based embedding models."""
 
     # Supported models - SiliconFlow embedding models
-    SUPPORTED_MODELS = {
+    SUPPORTED_MODELS: ClassVar[dict[str, str]] = {
         "Qwen/Qwen3-Embedding-8B": "Qwen3 Embedding 8B - High quality embeddings (4096 dim)",
         "BAAI/bge-large-zh-v1.5": "BGE Large Chinese - Chinese text embeddings (1024 dim)",
         "BAAI/bge-large-en-v1.5": "BGE Large English - English text embeddings (1024 dim)",
