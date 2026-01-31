@@ -118,36 +118,33 @@ class TestDocumentRAG:
     def test_build_vector_index_with_persistence(self, mock_vector_index, mock_get_embedding_client, mock_config):
         """Test building vector index with persistence."""
         # Setup mocks
-        from pathlib import Path
+        with tempfile.TemporaryDirectory(prefix="test_vector_store_") as temp_store:
+            mock_config.return_value.vector_store = Mock(
+                embedding_model="test-model",
+                batch_size=5,
+                cache_embeddings=True,
+                path=temp_store,
+            )
+            mock_embedding_client = Mock()
+            mock_get_embedding_client.return_value = mock_embedding_client
+            mock_embedding_client.get_embeddings.return_value = [[0.1, 0.2]]
 
-        Path("/tmp/test_vector_store")
+            mock_vector_index_instance = Mock()
+            mock_vector_index.return_value = mock_vector_index_instance
 
-        mock_config.return_value.vector_store = Mock(
-            embedding_model="test-model",
-            batch_size=5,
-            cache_embeddings=True,
-            path="/tmp/test_vector_store",
-        )
-        mock_embedding_client = Mock()
-        mock_get_embedding_client.return_value = mock_embedding_client
-        mock_embedding_client.get_embeddings.return_value = [[0.1, 0.2]]
+            # Create document with chunks and file hash
+            doc = Document(text="test text")
+            doc.metadata.file_hash = "test_hash_123"
+            chunks = [Chunk(content="Chunk 1")]
+            doc._set_chunks(chunks)
 
-        mock_vector_index_instance = Mock()
-        mock_vector_index.return_value = mock_vector_index_instance
+            doc.build_vector_index(persist=True)
 
-        # Create document with chunks and file hash
-        doc = Document(text="test text")
-        doc.metadata.file_hash = "test_hash_123"
-        chunks = [Chunk(content="Chunk 1")]
-        doc._set_chunks(chunks)
-
-        doc.build_vector_index(persist=True)
-
-        # Verify vector index was called with correct path
-        mock_vector_index.assert_called_once()
-        args, kwargs = mock_vector_index.call_args
-        assert kwargs["collection_name"] == "test_hash_123"
-        assert "test_hash_123" in str(kwargs["persist_path"])
+            # Verify vector index was called with correct path
+            mock_vector_index.assert_called_once()
+            args, kwargs = mock_vector_index.call_args
+            assert kwargs["collection_name"] == "test_hash_123"
+            assert "test_hash_123" in str(kwargs["persist_path"])
 
     @patch("sciread.document.document.get_config")
     def test_build_vector_index_error(self, mock_config):
