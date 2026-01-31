@@ -2,8 +2,6 @@
 
 from pathlib import Path
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 
 import chromadb
@@ -33,7 +31,7 @@ class VectorIndex:
             metadata={"hnsw:space": "cosine"},  # Use cosine similarity instead of L2
         )
 
-    def add_chunks(self, chunks: List[Chunk], embeddings: List[List[float]]) -> None:
+    def add_chunks(self, chunks: list[Chunk], embeddings: list[list[float]]) -> None:
         """Adds chunks and their embeddings to the collection.
 
         Args:
@@ -61,7 +59,7 @@ class VectorIndex:
             ids=[chunk.id for chunk in chunks],
         )
 
-    def search(self, query_embedding: List[float], top_k: int = 5) -> List[Dict[str, Any]]:
+    def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
         """Performs a semantic search and returns the top_k results.
 
         Args:
@@ -106,7 +104,7 @@ class VectorIndex:
             )
         return result_list
 
-    def get_collection_info(self) -> Dict[str, Any]:
+    def get_collection_info(self) -> dict[str, Any]:
         """Get information about the collection."""
         try:
             count = self._collection.count()

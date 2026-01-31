@@ -1,8 +1,6 @@
 """Personality-based prompts for multi-agent discussion system."""
 
 from typing import Any
-from typing import Dict
-from typing import List
 
 from ..models.discussion_models import AgentPersonality
 
@@ -139,9 +137,9 @@ def build_insight_generation_prompt(
     personality: AgentPersonality,
     document_title: str,
     document_abstract: str,
-    key_sections: List[str],
-    selected_sections_content: Dict[str, str],
-    discussion_context: Dict[str, Any],
+    key_sections: list[str],
+    selected_sections_content: dict[str, str],
+    discussion_context: dict[str, Any],
 ) -> str:
     """Build a prompt for generating insights based on personality and document."""
     system_prompt = get_personality_system_prompt(personality)

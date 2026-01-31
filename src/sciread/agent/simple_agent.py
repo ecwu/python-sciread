@@ -7,7 +7,6 @@ using pydantic-ai framework and the existing LLM provider infrastructure.
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
-from typing import Dict
 from typing import Optional
 from typing import Union
 
@@ -37,7 +36,7 @@ class SimpleAnalysisDeps:
     include_metadata: bool = True
     remove_references: bool = True
     clean_text: bool = True
-    additional_context: Dict[str, Any] = field(default_factory=dict)
+    additional_context: dict[str, Any] = field(default_factory=dict)
 
 
 def _build_simple_content(

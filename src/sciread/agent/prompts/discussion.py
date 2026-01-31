@@ -1,7 +1,6 @@
 """Discussion coordinator prompts for multi-agent system."""
 
 from typing import Any
-from typing import Dict
 
 DISCUSSION_COORDINATOR_SYSTEM_PROMPT = """You are a Discussion Coordinator for multi-agent academic paper analysis. Your role is to manage and coordinate discussions between four expert agents to achieve a comprehensive understanding of research papers.
 
@@ -95,7 +94,7 @@ CONVERGENCE_CRITERIA = """For Convergence Evaluation:
 
 
 def build_phase_evaluation_prompt(
-    current_phase: str, iteration: int, max_iterations: int, time_elapsed: str, progress_metrics: Dict[str, Any]
+    current_phase: str, iteration: int, max_iterations: int, time_elapsed: str, progress_metrics: dict[str, Any]
 ) -> str:
     """Build a prompt for evaluating phase progress."""
     phase_criteria_map = {
@@ -167,7 +166,7 @@ def build_convergence_evaluation_prompt(
     total_insights: int,
     total_questions: int,
     total_responses: int,
-    agent_participation: Dict[str, Any],
+    agent_participation: dict[str, Any],
     quality_trends: str,
     key_patterns: str,
 ) -> str:

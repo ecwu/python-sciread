@@ -12,20 +12,16 @@ if TYPE_CHECKING:
 
 from ..embedding_provider import OllamaClient
 from .document_builder import DocumentBuilder
-from .external_clients import MineruClient
 from .models import DocumentMetadata
 from .splitters.consecutive_flow import ConsecutiveFlowSplitter
 from .splitters.cumulative_flow import CumulativeFlowSplitter
-from .splitters.semantic_splitter import SemanticSplitter
 
 
 class DocumentFactory:
     """Factory class for creating documents with common configurations."""
 
     @staticmethod
-    def create_from_file(
-        file_path: Union[str, Path], to_markdown: bool = False
-    ) -> Document:
+    def create_from_file(file_path: Union[str, Path], to_markdown: bool = False) -> Document:
         """
         Create document from file with default configuration.
 
@@ -40,9 +36,7 @@ class DocumentFactory:
         return builder.from_file(file_path, to_markdown=to_markdown)
 
     @staticmethod
-    def create_from_text(
-        text: str, metadata: Optional[DocumentMetadata] = None
-    ) -> Document:
+    def create_from_text(text: str, metadata: Optional[DocumentMetadata] = None) -> Document:
         """
         Create document from text with default configuration.
 
@@ -76,9 +70,7 @@ class DocumentFactory:
         if ollama_client is None:
             ollama_client = OllamaClient()
 
-        splitter = ConsecutiveFlowSplitter(
-            ollama_client=ollama_client, **consecutive_flow_kwargs
-        )
+        splitter = ConsecutiveFlowSplitter(ollama_client=ollama_client, **consecutive_flow_kwargs)
         builder = DocumentBuilder()
         builder.splitter = splitter
         return builder.from_file(file_path, auto_split=True)
@@ -103,9 +95,7 @@ class DocumentFactory:
         if ollama_client is None:
             ollama_client = OllamaClient()
 
-        splitter = CumulativeFlowSplitter(
-            ollama_client=ollama_client, **cumulative_flow_kwargs
-        )
+        splitter = CumulativeFlowSplitter(ollama_client=ollama_client, **cumulative_flow_kwargs)
         builder = DocumentBuilder()
         builder.splitter = splitter
         return builder.from_file(file_path, auto_split=True)

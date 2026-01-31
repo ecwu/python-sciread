@@ -3,10 +3,7 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
-from uuid import uuid4
 
 from pydantic import BaseModel
 from pydantic import ConfigDict
@@ -40,9 +37,9 @@ class AgentInsight(BaseModel):
     content: str = Field(..., description="The insight content")
     importance_score: float = Field(..., ge=0.0, le=1.0, description="Importance score from 0 to 1")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence level from 0 to 1")
-    supporting_evidence: List[str] = Field(default_factory=list, description="Evidence supporting the insight")
-    related_sections: List[str] = Field(default_factory=list, description="Related document sections")
-    questions_raised: List[str] = Field(default_factory=list, description="Questions this insight raises")
+    supporting_evidence: list[str] = Field(default_factory=list, description="Evidence supporting the insight")
+    related_sections: list[str] = Field(default_factory=list, description="Related document sections")
+    questions_raised: list[str] = Field(default_factory=list, description="Questions this insight raises")
     timestamp: datetime = Field(default_factory=datetime.now, description="When the insight was generated")
 
     model_config = ConfigDict(use_enum_values=True)
@@ -85,10 +82,10 @@ class DiscussionState(BaseModel):
     current_phase: DiscussionPhase = Field(..., description="Current phase of discussion")
     iteration_count: int = Field(default=0, description="Number of iterations completed")
     max_iterations: int = Field(default=5, description="Maximum allowed iterations")
-    insights: List[AgentInsight] = Field(default_factory=list, description="All insights generated")
-    questions: List[Question] = Field(default_factory=list, description="All questions asked")
-    responses: List[Response] = Field(default_factory=list, description="All responses given")
-    phase_history: List[Dict[str, Any]] = Field(default_factory=list, description="History of phase transitions")
+    insights: list[AgentInsight] = Field(default_factory=list, description="All insights generated")
+    questions: list[Question] = Field(default_factory=list, description="All questions asked")
+    responses: list[Response] = Field(default_factory=list, description="All responses given")
+    phase_history: list[dict[str, Any]] = Field(default_factory=list, description="History of phase transitions")
     convergence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="How converged the discussion is")
     start_time: datetime = Field(default_factory=datetime.now, description="Discussion start time")
     last_activity: datetime = Field(default_factory=datetime.now, description="Last activity timestamp")
@@ -101,10 +98,10 @@ class ConsensusPoint(BaseModel):
 
     topic: str = Field(..., description="The consensus topic")
     content: str = Field(..., description="The consensus content")
-    supporting_agents: List[AgentPersonality] = Field(..., description="Agents supporting this consensus")
-    opposing_agents: List[AgentPersonality] = Field(default_factory=list, description="Agents opposing this consensus")
+    supporting_agents: list[AgentPersonality] = Field(..., description="Agents supporting this consensus")
+    opposing_agents: list[AgentPersonality] = Field(default_factory=list, description="Agents opposing this consensus")
     strength: float = Field(..., ge=0.0, le=1.0, description="Strength of consensus")
-    evidence: List[str] = Field(default_factory=list, description="Evidence supporting the consensus")
+    evidence: list[str] = Field(default_factory=list, description="Evidence supporting the consensus")
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -116,7 +113,7 @@ class DivergentView(BaseModel):
     content: str = Field(..., description="The divergent view")
     holding_agent: AgentPersonality = Field(..., description="Agent holding this view")
     reasoning: str = Field(..., description="Reasoning behind this view")
-    counter_arguments: List[str] = Field(default_factory=list, description="Counter arguments from other agents")
+    counter_arguments: list[str] = Field(default_factory=list, description="Counter arguments from other agents")
 
     model_config = ConfigDict(use_enum_values=True)
 
@@ -126,13 +123,13 @@ class DiscussionResult(BaseModel):
 
     document_title: str = Field(..., description="Title of the analyzed document")
     summary: str = Field(..., description="Summary of the discussion and findings")
-    key_contributions: List[str] = Field(default_factory=list, description="Key contributions identified")
+    key_contributions: list[str] = Field(default_factory=list, description="Key contributions identified")
     significance: str = Field(..., description="Overall significance assessment")
-    consensus_points: List[ConsensusPoint] = Field(default_factory=list, description="Points of consensus")
-    divergent_views: List[DivergentView] = Field(default_factory=list, description="Unresolved divergent views")
-    final_insights: List[AgentInsight] = Field(default_factory=list, description="Most important insights")
+    consensus_points: list[ConsensusPoint] = Field(default_factory=list, description="Points of consensus")
+    divergent_views: list[DivergentView] = Field(default_factory=list, description="Unresolved divergent views")
+    final_insights: list[AgentInsight] = Field(default_factory=list, description="Most important insights")
     confidence_score: float = Field(..., ge=0.0, le=1.0, description="Overall confidence in results")
-    discussion_metadata: Dict[str, Any] = Field(default_factory=dict, description="Discussion metadata")
+    discussion_metadata: dict[str, Any] = Field(default_factory=dict, description="Discussion metadata")
     completion_time: datetime = Field(default_factory=datetime.now, description="When discussion completed")
 
     model_config = ConfigDict(use_enum_values=True)

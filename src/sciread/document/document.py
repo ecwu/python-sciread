@@ -7,7 +7,6 @@ from collections.abc import Iterator
 from dataclasses import asdict
 from difflib import SequenceMatcher
 from pathlib import Path
-from typing import List
 from typing import Any
 from typing import Optional
 from typing import Tuple
@@ -412,7 +411,7 @@ class Document:
         """Update the _chunks_by_id dictionary to match current chunks."""
         self._chunks_by_id = {chunk.id: chunk for chunk in self._chunks}
 
-    def _set_chunks(self, chunks: List[Chunk]) -> None:
+    def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
         self._chunks = chunks
         self._update_chunks_by_id()
@@ -474,7 +473,7 @@ class Document:
             self.logger.error(f"Failed to build vector index: {e}")
             raise RuntimeError(f"Failed to build vector index: {e}") from e
 
-    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> Union[List[Chunk], List[tuple[Chunk, float]]]:
+    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> Union[list[Chunk], list[tuple[Chunk, float]]]:
         """Performs a semantic search on the document chunks using cosine similarity.
 
         This method uses cosine similarity for ranking, which is length-invariant
@@ -543,7 +542,7 @@ class Document:
 
     def print_for_human(
         self,
-        section_names: Optional[List[str]] = None,
+        section_names: Optional[list[str]] = None,
         max_sections: Optional[int] = None,
         show_metadata: bool = True,
         show_confidence: bool = True,
@@ -571,12 +570,12 @@ class Document:
                 }
                 reset = "\033[0m"
             else:
-                colors = {k: "" for k in ["header", "title", "section", "confidence", "content", "metadata"]}
+                colors = dict.fromkeys(["header", "title", "section", "confidence", "content", "metadata"], "")
                 reset = ""
 
             # Show document metadata
             if show_metadata:
-                print(f"{colors['header']}{'='*80}{reset}")
+                print(f"{colors['header']}{'=' * 80}{reset}")
                 print(f"{colors['title']}Document: {self.metadata.title or 'Untitled'}{reset}")
                 if self.metadata.author:
                     print(f"{colors['metadata']}Author: {self.metadata.author}{reset}")
@@ -584,7 +583,7 @@ class Document:
                     print(f"{colors['metadata']}Source: {self.metadata.source_path}{reset}")
                 if self.metadata.page_count:
                     print(f"{colors['metadata']}Pages: {self.metadata.page_count}{reset}")
-                print(f"{colors['header']}{'='*80}{reset}")
+                print(f"{colors['header']}{'=' * 80}{reset}")
                 print()
 
             sections = self._collect_sections(
@@ -601,7 +600,7 @@ class Document:
                 print(f"{colors['section']}Section {i}: {section_name}{reset}")
                 if show_confidence:
                     print(f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}")
-                print(f"{colors['header']}{'-'*60}{reset}")
+                print(f"{colors['header']}{'-' * 60}{reset}")
                 print(f"{colors['content']}{content}{reset}")
                 print()
 
@@ -611,7 +610,7 @@ class Document:
 
     def get_for_llm(
         self,
-        section_names: Optional[List[str]] = None,
+        section_names: Optional[list[str]] = None,
         max_tokens: Optional[int] = None,
         include_headers: bool = True,
         clean_text: bool = True,
@@ -760,7 +759,7 @@ class Document:
     def get_closest_section_name(
         self,
         target_name: str,
-        available_names: Optional[List[str]] = None,
+        available_names: Optional[list[str]] = None,
         case_sensitive: bool = False,
         threshold: float = 0.8,
         use_embedding: bool = False,
@@ -805,7 +804,7 @@ class Document:
                 return pattern_match
 
             # Step 3: Try semantic similarity first if requested and available
-            if use_embedding and hasattr(self, '_embedding_client'):
+            if use_embedding and hasattr(self, "_embedding_client"):
                 try:
                     target_embedding = self._embedding_client.get_embedding(search_name)
                     if target_embedding:
@@ -842,39 +841,38 @@ class Document:
             self.logger.error(f"Failed to find closest section name for '{target_name}': {e}")
             return None
 
-    def _match_section_pattern(self, search_name: str, normalized_names: List[str], original_names: List[str]) -> Optional[str]:
+    def _match_section_pattern(self, search_name: str, normalized_names: list[str], original_names: list[str]) -> Optional[str]:
         """Match section using common academic paper patterns."""
         # Common academic section patterns and their variations
         section_patterns = {
             # Introduction variations
-            'introduction': ['intro', 'introduction', 'background', 'overview', 'prelude', 'preamble'],
-
+            "introduction": ["intro", "introduction", "background", "overview", "prelude", "preamble"],
             # Abstract variations
-            'abstract': ['abstract', 'summary', 'executive summary', 'overview'],
-
+            "abstract": ["abstract", "summary", "executive summary", "overview"],
             # Related work variations
-            'related work': ['related work', 'background', 'literature review', 'survey', 'previous work', 'state of the art'],
-
+            "related work": ["related work", "background", "literature review", "survey", "previous work", "state of the art"],
             # Methodology variations
-            'methodology': ['methodology', 'method', 'methods', 'approach', 'methodology and approach', 'technical approach', 'design'],
-
+            "methodology": ["methodology", "method", "methods", "approach", "methodology and approach", "technical approach", "design"],
             # Experiments variations
-            'experiments': ['experiment', 'experiments', 'experimental setup', 'evaluation', 'empirical evaluation', 'study design', 'case study'],
-
+            "experiments": [
+                "experiment",
+                "experiments",
+                "experimental setup",
+                "evaluation",
+                "empirical evaluation",
+                "study design",
+                "case study",
+            ],
             # Results variations
-            'results': ['results', 'findings', 'outcomes', 'performance', 'evaluation results', 'experimental results'],
-
+            "results": ["results", "findings", "outcomes", "performance", "evaluation results", "experimental results"],
             # Discussion variations
-            'discussion': ['discussion', 'analysis', 'interpretation', 'implications'],
-
+            "discussion": ["discussion", "analysis", "interpretation", "implications"],
             # Conclusion variations
-            'conclusion': ['conclusion', 'conclusions', 'summary', 'future work', 'concluding remarks'],
-
+            "conclusion": ["conclusion", "conclusions", "summary", "future work", "concluding remarks"],
             # References/Bibliography variations
-            'references': ['references', 'bibliography', 'citations', 'works cited', 'bibliography and references'],
-
+            "references": ["references", "bibliography", "citations", "works cited", "bibliography and references"],
             # Appendix variations
-            'appendix': ['appendix', 'appendices', 'supplementary material', 'supplemental material', 'additional information'],
+            "appendix": ["appendix", "appendices", "supplementary material", "supplemental material", "additional information"],
         }
 
         # Check each pattern
@@ -956,20 +954,24 @@ class Document:
                 }
 
                 if include_quality:
-                    section_info.update({
-                        "average_confidence": avg_confidence,
-                        "high_quality_chunks": sum(1 for chunk in section_chunks if (chunk.confidence or 0.0) >= 0.7),
-                        "processed_chunks": sum(1 for chunk in section_chunks if chunk.processed),
-                    })
+                    section_info.update(
+                        {
+                            "average_confidence": avg_confidence,
+                            "high_quality_chunks": sum(1 for chunk in section_chunks if (chunk.confidence or 0.0) >= 0.7),
+                            "processed_chunks": sum(1 for chunk in section_chunks if chunk.processed),
+                        }
+                    )
 
                 if include_stats:
                     # Add additional statistics if requested
                     chunk_lengths = [len(chunk.content) for chunk in section_chunks]
-                    section_info.update({
-                        "min_chunk_size": min(chunk_lengths) if chunk_lengths else 0,
-                        "max_chunk_size": max(chunk_lengths) if chunk_lengths else 0,
-                        "avg_chunk_size": sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0,
-                    })
+                    section_info.update(
+                        {
+                            "min_chunk_size": min(chunk_lengths) if chunk_lengths else 0,
+                            "max_chunk_size": max(chunk_lengths) if chunk_lengths else 0,
+                            "avg_chunk_size": sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0,
+                        }
+                    )
 
                 overview["sections"].append(section_info)
 
@@ -979,7 +981,7 @@ class Document:
             self.logger.error(f"Failed to get section overview: {e}")
             return {"error": str(e)}
 
-    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> List[Tuple[str, str]]:
+    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> list[tuple[str, str]]:
         """Get sections that meet minimum quality criteria.
 
         Args:
@@ -1009,17 +1011,17 @@ class Document:
         """Clean and normalize section content."""
         try:
             # Remove excessive whitespace
-            content = re.sub(r'\n\s*\n\s*\n', '\n\n', content)
+            content = re.sub(r"\n\s*\n\s*\n", "\n\n", content)
 
             # Fix common PDF extraction artifacts
-            content = re.sub(r'\b(\w+)-\s*\n\s*(\w+)\b', r'\1\2', content)  # Fix hyphenated words
+            content = re.sub(r"\b(\w+)-\s*\n\s*(\w+)\b", r"\1\2", content)  # Fix hyphenated words
 
             # Normalize quotes (using string replacement instead of regex)
             content = content.replace('"', '"').replace('"', '"')
             content = content.replace("'", "'").replace("'", "'")
 
             # Remove excessive spaces
-            content = re.sub(r' +', ' ', content)
+            content = re.sub(r" +", " ", content)
 
             return content.strip()
 
@@ -1049,10 +1051,10 @@ class Document:
         try:
             # Common patterns for references sections
             ref_patterns = [
-                r'\n\s*(?:references|bibliography|citations|works\s+cited)\s*\n',
-                r'\n\s*references\s*$',
-                r'\n\s*bibliography\s*$',
-                r'\n\s*citations\s*$',
+                r"\n\s*(?:references|bibliography|citations|works\s+cited)\s*\n",
+                r"\n\s*references\s*$",
+                r"\n\s*bibliography\s*$",
+                r"\n\s*citations\s*$",
             ]
 
             # Find the earliest occurrence of a references section

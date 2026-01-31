@@ -15,18 +15,30 @@ class TestUnifiedSectionHandling:
         """Create a sample document with sections for testing."""
         # Create chunks with different section names
         chunks = [
-            Chunk(content="This is the abstract of the paper with enough content to meet minimum length requirements.", chunk_name="abstract", position=0, confidence=0.9),
-            Chunk(content="This is the introduction section that is also sufficiently long to pass the minimum length check.", chunk_name="introduction", position=1, confidence=0.8),
-            Chunk(content="This describes our methodology in detail with sufficient length.", chunk_name="methodology", position=2, confidence=0.85),
+            Chunk(
+                content="This is the abstract of the paper with enough content to meet minimum length requirements.",
+                chunk_name="abstract",
+                position=0,
+                confidence=0.9,
+            ),
+            Chunk(
+                content="This is the introduction section that is also sufficiently long to pass the minimum length check.",
+                chunk_name="introduction",
+                position=1,
+                confidence=0.8,
+            ),
+            Chunk(
+                content="This describes our methodology in detail with sufficient length.",
+                chunk_name="methodology",
+                position=2,
+                confidence=0.85,
+            ),
             Chunk(content="These are our experimental results with detailed findings.", chunk_name="results", position=3, confidence=0.9),
             Chunk(content="Here we discuss the findings and their implications.", chunk_name="discussion", position=4, confidence=0.8),
             Chunk(content="We conclude the paper and summarize our contributions.", chunk_name="conclusion", position=5, confidence=0.85),
         ]
 
-        doc = Document(
-            text="Full document text...",
-            metadata=DocumentMetadata(title="Sample Paper")
-        )
+        doc = Document(text="Full document text...", metadata=DocumentMetadata(title="Sample Paper"))
         doc._set_chunks(chunks)
         return doc
 
@@ -171,12 +183,7 @@ class TestUnifiedSectionHandling:
 
         # Create chunk with cleaning artifacts
         dirty_content = "This  has    extra  spaces\n\n\nand newlines."
-        chunk = Chunk(
-            content=dirty_content,
-            chunk_name="test_section",
-            position=0,
-            confidence=0.9
-        )
+        chunk = Chunk(content=dirty_content, chunk_name="test_section", position=0, confidence=0.9)
         doc._set_chunks([chunk])
 
         content = doc.get_for_llm(clean_text=True)

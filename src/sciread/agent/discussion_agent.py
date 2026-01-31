@@ -3,8 +3,6 @@
 import asyncio
 from datetime import datetime
 from datetime import timedelta
-from typing import Dict
-from typing import List
 from typing import Optional
 
 from pydantic_ai import Agent
@@ -54,9 +52,9 @@ class DiscussionAgent:
 
         # State tracking
         self.discussion_state: Optional[DiscussionState] = None
-        self.agent_insights: Dict[AgentPersonality, List] = {}
-        self.all_questions: List = []
-        self.all_responses: List = []
+        self.agent_insights: dict[AgentPersonality, list] = {}
+        self.all_questions: list = []
+        self.all_responses: list = []
 
         # Register task tools
         self._register_task_tools()
@@ -370,7 +368,7 @@ class DiscussionAgent:
 
         return False
 
-    async def _wait_for_tasks_completion(self, task_ids: List[str], timeout_minutes: int = 5):
+    async def _wait_for_tasks_completion(self, task_ids: list[str], timeout_minutes: int = 5):
         """Wait for specified tasks to complete."""
         if not task_ids:
             return
@@ -401,7 +399,7 @@ class DiscussionAgent:
             if status == TaskStatus.FAILED:
                 logger.warning(f"Task {task_id} failed")
 
-    async def _collect_insights_from_tasks(self, task_ids: List[str]):
+    async def _collect_insights_from_tasks(self, task_ids: list[str]):
         """Collect insights from specified tasks only."""
         if not self.discussion_queue:
             return
@@ -417,7 +415,7 @@ class DiscussionAgent:
                     # Also add to discussion state
                     self.discussion_state.insights.extend(task.result.insights)
 
-    async def _collect_questions_from_tasks(self, task_ids: List[str]):
+    async def _collect_questions_from_tasks(self, task_ids: list[str]):
         """Collect questions from specified tasks only."""
         if not self.discussion_queue:
             return
@@ -430,7 +428,7 @@ class DiscussionAgent:
                 # Also add to discussion state
                 self.discussion_state.questions.extend(task.result.questions)
 
-    async def _collect_responses_from_tasks(self, task_ids: List[str]):
+    async def _collect_responses_from_tasks(self, task_ids: list[str]):
         """Collect responses from specified tasks only."""
         if not self.discussion_queue:
             return
@@ -443,7 +441,7 @@ class DiscussionAgent:
                 # Also add to discussion state
                 self.discussion_state.responses.extend(task.result.responses)
 
-    async def _calculate_overall_convergence(self, task_ids: List[str]) -> float:
+    async def _calculate_overall_convergence(self, task_ids: list[str]) -> float:
         """Calculate overall convergence score from given convergence tasks."""
         if not self.discussion_queue:
             return 0.5
@@ -458,7 +456,7 @@ class DiscussionAgent:
 
         return sum(scores) / len(scores) if scores else 0.5
 
-    def _get_prior_qa_for_insight(self, insight) -> List[Dict]:
+    def _get_prior_qa_for_insight(self, insight) -> list[dict]:
         """Build Q&A thread for a specific insight by matching questions and responses."""
         insight_snippet = insight.content[:50]
 
@@ -469,11 +467,11 @@ class DiscussionAgent:
             matching_response = next((r for r in self.all_responses if r.question_id == q.question_id), None)
             qa_pairs.append(
                 {
-                    "from_agent": q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value,
-                    "to_agent": q.to_agent if isinstance(q.to_agent, str) else q.to_agent.value,
+                    "from_agent": (q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value),
+                    "to_agent": (q.to_agent if isinstance(q.to_agent, str) else q.to_agent.value),
                     "question": q.content,
-                    "response": matching_response.content if matching_response else None,
-                    "response_stance": matching_response.stance if matching_response else None,
+                    "response": (matching_response.content if matching_response else None),
+                    "response_stance": (matching_response.stance if matching_response else None),
                 }
             )
 

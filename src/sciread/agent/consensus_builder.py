@@ -4,8 +4,6 @@ import re
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 
 from pydantic_ai import Agent
@@ -42,9 +40,9 @@ class ConsensusBuilder:
         self,
         document: Document,
         discussion_state: Optional[DiscussionState],
-        agent_insights: Dict[AgentPersonality, List[AgentInsight]],
-        questions: List[Question],
-        responses: List[Response],
+        agent_insights: dict[AgentPersonality, list[AgentInsight]],
+        questions: list[Question],
+        responses: list[Response],
     ) -> DiscussionResult:
         """Build final consensus result from discussion data."""
         try:
@@ -108,9 +106,9 @@ class ConsensusBuilder:
 
     def _extract_top_insights(
         self,
-        agent_insights: Dict[AgentPersonality, List[AgentInsight]],
+        agent_insights: dict[AgentPersonality, list[AgentInsight]],
         limit: int = 10,
-    ) -> List[AgentInsight]:
+    ) -> list[AgentInsight]:
         """Extract the most important insights across all agents."""
         all_insights = []
 
@@ -128,10 +126,10 @@ class ConsensusBuilder:
 
     async def _identify_consensus_points(
         self,
-        agent_insights: Dict[AgentPersonality, List[AgentInsight]],
-        questions: List[Question],
-        responses: List[Response],
-    ) -> List[ConsensusPoint]:
+        agent_insights: dict[AgentPersonality, list[AgentInsight]],
+        questions: list[Question],
+        responses: list[Response],
+    ) -> list[ConsensusPoint]:
         """Identify points of consensus among agents."""
         try:
             # Group insights by topics/themes
@@ -165,15 +163,15 @@ class ConsensusBuilder:
 
     async def _identify_divergent_views(
         self,
-        agent_insights: Dict[AgentPersonality, List[AgentInsight]],
-        questions: List[Question],
-        responses: List[Response],
-    ) -> List[DivergentView]:
+        agent_insights: dict[AgentPersonality, list[AgentInsight]],
+        questions: list[Question],
+        responses: list[Response],
+    ) -> list[DivergentView]:
         """Identify significant divergent views."""
         try:
             # Build lookup so we can recover the original insight from a question reference
-            insight_lookup_by_id: Dict[str, AgentInsight] = {}
-            insight_lookup_by_snippet: Dict[str, List[AgentInsight]] = defaultdict(list)
+            insight_lookup_by_id: dict[str, AgentInsight] = {}
+            insight_lookup_by_snippet: dict[str, list[AgentInsight]] = defaultdict(list)
 
             for insights in agent_insights.values():
                 for insight in insights:
@@ -245,9 +243,9 @@ class ConsensusBuilder:
     async def _generate_summary_and_significance(
         self,
         document: Document,
-        top_insights: List[AgentInsight],
-        consensus_points: List[ConsensusPoint],
-        divergent_views: List[DivergentView],
+        top_insights: list[AgentInsight],
+        consensus_points: list[ConsensusPoint],
+        divergent_views: list[DivergentView],
     ) -> tuple[str, str]:
         """Generate overall summary and significance assessment."""
         try:
@@ -300,9 +298,9 @@ SIGNIFICANCE:
     async def _extract_key_contributions(
         self,
         document: Document,
-        top_insights: List[AgentInsight],
-        consensus_points: List[ConsensusPoint],
-    ) -> List[str]:
+        top_insights: list[AgentInsight],
+        consensus_points: list[ConsensusPoint],
+    ) -> list[str]:
         """Extract key contributions identified in the analysis."""
         try:
             contributions = set()
@@ -339,7 +337,7 @@ SIGNIFICANCE:
             self.logger.error(f"Error extracting key contributions: {e}")
             return []
 
-    def _calculate_overall_confidence(self, top_insights: List[AgentInsight], consensus_points: List[ConsensusPoint]) -> float:
+    def _calculate_overall_confidence(self, top_insights: list[AgentInsight], consensus_points: list[ConsensusPoint]) -> float:
         """Calculate overall confidence in the analysis results."""
         if not top_insights:
             return 0.0
@@ -355,7 +353,7 @@ SIGNIFICANCE:
 
         return min(overall_confidence, 1.0)
 
-    def _group_insights_by_topic(self, agent_insights: Dict[AgentPersonality, List[AgentInsight]]) -> Dict[str, List[AgentInsight]]:
+    def _group_insights_by_topic(self, agent_insights: dict[AgentPersonality, list[AgentInsight]]) -> dict[str, list[AgentInsight]]:
         """Group insights by topics/themes."""
         topic_groups = defaultdict(list)
 
@@ -390,10 +388,10 @@ SIGNIFICANCE:
     async def _evaluate_topic_consensus(
         self,
         topic: str,
-        insights: List[AgentInsight],
-        questions: List[Question],
-        responses: List[Response],
-    ) -> Dict[str, Any]:
+        insights: list[AgentInsight],
+        questions: list[Question],
+        responses: list[Response],
+    ) -> dict[str, Any]:
         """Evaluate if there's consensus on a specific topic."""
         try:
             if len(insights) < 2:  # Need at least 2 insights for consensus
@@ -401,7 +399,9 @@ SIGNIFICANCE:
 
             # Check for conflicting responses related to this topic
             conflicting_responses = [
-                resp for resp in responses if resp.stance.lower() in ["disagree", "challenge", "modify"] and topic.lower() in resp.content.lower()
+                resp
+                for resp in responses
+                if resp.stance.lower() in ["disagree", "challenge", "modify"] and topic.lower() in resp.content.lower()
             ]
 
             if len(conflicting_responses) > len(insights) / 2:
@@ -430,7 +430,7 @@ SIGNIFICANCE:
             self.logger.error(f"Error evaluating topic consensus: {e}")
             return {"has_consensus": False}
 
-    def _group_conflicts_by_topic(self, challenged_insights: List[Dict]) -> Dict[str, Dict]:
+    def _group_conflicts_by_topic(self, challenged_insights: list[dict]) -> dict[str, dict]:
         """Group conflicts by topic."""
         conflicts = defaultdict(list)
 

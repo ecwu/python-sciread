@@ -3,8 +3,6 @@
 from datetime import datetime
 from enum import Enum
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 from uuid import uuid4
 
@@ -64,12 +62,12 @@ class Task(BaseModel):
     created_by: Optional[AgentPersonality] = Field(None, description="Agent that created this task")
 
     # Task parameters
-    parameters: Dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
-    context: Dict[str, Any] = Field(default_factory=dict, description="Additional context for the task")
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Task-specific parameters")
+    context: dict[str, Any] = Field(default_factory=dict, description="Additional context for the task")
 
     # Dependencies and relationships
-    depends_on: List[str] = Field(default_factory=list, description="Task IDs this task depends on")
-    related_tasks: List[str] = Field(default_factory=list, description="Related task IDs")
+    depends_on: list[str] = Field(default_factory=list, description="Task IDs this task depends on")
+    related_tasks: list[str] = Field(default_factory=list, description="Related task IDs")
 
     # Timing
     created_at: datetime = Field(default_factory=datetime.now, description="Task creation time")
@@ -98,15 +96,15 @@ class TaskResult(BaseModel):
     execution_time: float = Field(..., description="Time taken to execute the task in seconds")
 
     # Task-specific results
-    insights: List[AgentInsight] = Field(default_factory=list, description="Generated insights")
-    questions: List[Question] = Field(default_factory=list, description="Generated questions")
-    responses: List[Response] = Field(default_factory=list, description="Generated responses")
+    insights: list[AgentInsight] = Field(default_factory=list, description="Generated insights")
+    questions: list[Question] = Field(default_factory=list, description="Generated questions")
+    responses: list[Response] = Field(default_factory=list, description="Generated responses")
     analysis_result: Optional[str] = Field(None, description="General analysis result")
 
     # Metadata
-    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
+    metadata: dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the result")
-    notes: List[str] = Field(default_factory=list, description="Additional notes about the result")
+    notes: list[str] = Field(default_factory=list, description="Additional notes about the result")
     timestamp: datetime = Field(default_factory=datetime.now, description="Result timestamp")
 
     model_config = ConfigDict(use_enum_values=True)
@@ -119,10 +117,10 @@ class TaskQueue(BaseModel):
     description: Optional[str] = Field(None, description="Description of this queue")
 
     # Task storage
-    pending_tasks: List[Task] = Field(default_factory=list, description="Tasks waiting to be executed")
-    active_tasks: List[Task] = Field(default_factory=list, description="Tasks currently being executed")
-    completed_tasks: List[Task] = Field(default_factory=list, description="Completed tasks")
-    failed_tasks: List[Task] = Field(default_factory=list, description="Failed tasks")
+    pending_tasks: list[Task] = Field(default_factory=list, description="Tasks waiting to be executed")
+    active_tasks: list[Task] = Field(default_factory=list, description="Tasks currently being executed")
+    completed_tasks: list[Task] = Field(default_factory=list, description="Completed tasks")
+    failed_tasks: list[Task] = Field(default_factory=list, description="Failed tasks")
 
     # Queue metadata
     created_at: datetime = Field(default_factory=datetime.now, description="Queue creation time")

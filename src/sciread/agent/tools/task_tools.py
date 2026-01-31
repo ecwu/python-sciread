@@ -2,7 +2,6 @@
 
 from datetime import datetime
 from typing import Any
-from typing import Dict
 
 from ...logging_config import get_logger
 from ..models.discussion_models import AgentPersonality
@@ -15,12 +14,10 @@ from ..personality_agents import create_personality_agent
 logger = get_logger(__name__)
 
 # Global cache for personality agents to maintain chat history
-AGENT_CACHE: Dict[str, PersonalityAgent] = {}
+AGENT_CACHE: dict[str, PersonalityAgent] = {}
 
 
-def get_cached_agent(
-    personality: AgentPersonality, model_name: str = "deepseek-chat"
-) -> PersonalityAgent:
+def get_cached_agent(personality: AgentPersonality, model_name: str = "deepseek-chat") -> PersonalityAgent:
     """Get cached agent instance or create new one if not exists."""
     if personality is None:
         raise ValueError("Personality cannot be None")
@@ -28,14 +25,10 @@ def get_cached_agent(
     cache_key = f"{personality.value}_{model_name}"
 
     if cache_key not in AGENT_CACHE:
-        logger.debug(
-            f"Creating new agent instance for {personality.value} with model {model_name}"
-        )
+        logger.debug(f"Creating new agent instance for {personality.value} with model {model_name}")
         AGENT_CACHE[cache_key] = create_personality_agent(personality, model_name)
     else:
-        logger.debug(
-            f"Reusing cached agent for {personality.value} with model {model_name}"
-        )
+        logger.debug(f"Reusing cached agent for {personality.value} with model {model_name}")
 
     return AGENT_CACHE[cache_key]
 
@@ -47,7 +40,7 @@ def clear_agent_cache():
     logger.info("Agent cache cleared")
 
 
-def get_agent_cache_status() -> Dict[str, Any]:
+def get_agent_cache_status() -> dict[str, Any]:
     """Get current agent cache status for debugging."""
     return {
         "cache_size": len(AGENT_CACHE),
@@ -72,9 +65,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
         if isinstance(personality, str):
             personality = AgentPersonality(personality)
 
-        agent = get_cached_agent(
-            personality, task.context.get("model_name", "deepseek-chat")
-        )
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
 
         # Generate insights
         insights = await agent.generate_insights(document, discussion_context)
@@ -88,20 +79,11 @@ async def generate_insights_tool(task: Task) -> TaskResult:
             success=True,
             execution_time=execution_time,
             insights=insights,
-            confidence=(
-                sum(insight.confidence for insight in insights) / len(insights)
-                if insights
-                else 0.0
-            ),
+            confidence=(sum(insight.confidence for insight in insights) / len(insights) if insights else 0.0),
             metadata={
                 "personality": personality.value,
                 "insights_count": len(insights),
-                "average_importance": (
-                    sum(insight.importance_score for insight in insights)
-                    / len(insights)
-                    if insights
-                    else 0.0
-                ),
+                "average_importance": (sum(insight.importance_score for insight in insights) / len(insights) if insights else 0.0),
             },
         )
 
@@ -132,9 +114,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
         discussion_context = task.parameters.get("discussion_context", {})
 
         if not all([from_agent, to_agent, target_insight]):
-            raise ValueError(
-                "Missing required parameters: from_agent, to_agent, target_insight"
-            )
+            raise ValueError("Missing required parameters: from_agent, to_agent, target_insight")
 
         # Convert to proper types
         if isinstance(from_agent, str):
@@ -143,21 +123,14 @@ async def ask_question_tool(task: Task) -> TaskResult:
             to_agent = AgentPersonality(to_agent)
 
         # Create agent
-        agent = get_cached_agent(
-            from_agent, task.context.get("model_name", "deepseek-chat")
-        )
+        agent = get_cached_agent(from_agent, task.context.get("model_name", "deepseek-chat"))
 
         # Ask question (may return a question object or a skip decision)
-        question_decision = await agent.ask_question(
-            target_insight, to_agent, discussion_context
-        )
+        question_decision = await agent.ask_question(target_insight, to_agent, discussion_context)
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
-        if (
-            isinstance(question_decision, dict)
-            and question_decision.get("decision") == "skip"
-        ):
+        if isinstance(question_decision, dict) and question_decision.get("decision") == "skip":
             logger.debug(
                 f"{from_agent.value} skipped questioning {to_agent.value}: {question_decision.get('reason', 'no reason provided')}"
             )
@@ -179,9 +152,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
         question = question_decision
 
         if question:
-            logger.debug(
-                f"Generated question from {from_agent.value} to {to_agent.value}"
-            )
+            logger.debug(f"Generated question from {from_agent.value} to {to_agent.value}")
             return TaskResult(
                 task_id=task.task_id,
                 success=True,
@@ -240,14 +211,10 @@ async def answer_question_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(personality)
 
         # Create agent
-        agent = get_cached_agent(
-            personality, task.context.get("model_name", "deepseek-chat")
-        )
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
 
         # Answer question
-        response = await agent.answer_question(
-            question, my_insights, discussion_context
-        )
+        response = await agent.answer_question(question, my_insights, discussion_context)
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
@@ -310,20 +277,14 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(personality)
 
         # Create agent
-        agent = get_cached_agent(
-            personality, task.context.get("model_name", "deepseek-chat")
-        )
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
 
         # Evaluate convergence
-        evaluation = await agent.evaluate_convergence(
-            all_insights, all_questions, all_responses, discussion_context
-        )
+        evaluation = await agent.evaluate_convergence(all_insights, all_questions, all_responses, discussion_context)
 
         execution_time = (datetime.now() - start_time).total_seconds()
 
-        logger.debug(
-            f"{personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}"
-        )
+        logger.debug(f"{personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}")
 
         return TaskResult(
             task_id=task.task_id,

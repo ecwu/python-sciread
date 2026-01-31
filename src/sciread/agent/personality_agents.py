@@ -3,8 +3,6 @@
 import re
 import uuid
 from typing import Any
-from typing import Dict
-from typing import List
 from typing import Optional
 
 from pydantic_ai import Agent
@@ -48,7 +46,7 @@ class PersonalityAgent:
         self.message_history = result.all_messages()
         return result
 
-    async def generate_insights(self, document: Document, discussion_context: Dict[str, Any]) -> List[AgentInsight]:
+    async def generate_insights(self, document: Document, discussion_context: dict[str, Any]) -> list[AgentInsight]:
         """Generate insights based on document and personality."""
         try:
             self.logger.info(f"Generating insights for {self.personality.value}")
@@ -89,7 +87,7 @@ class PersonalityAgent:
             self.logger.error(f"Error generating insights for {self.personality.value}: {e}")
             return []
 
-    async def _select_sections_to_read(self, title: str, abstract: str, available_sections: List[str]) -> List[str]:
+    async def _select_sections_to_read(self, title: str, abstract: str, available_sections: list[str]) -> list[str]:
         """Select which sections to read based on personality and paper overview."""
         try:
             prompt = f"""
@@ -140,7 +138,7 @@ Select sections that will help you provide the most valuable insights from your 
             self.logger.error(f"Error selecting sections for {self.personality.value}: {e}")
             return self._get_default_sections(available_sections)
 
-    def _get_default_sections(self, available_sections: List[str]) -> List[str]:
+    def _get_default_sections(self, available_sections: list[str]) -> list[str]:
         """Get default sections based on personality if selection fails."""
         try:
             # Use unified section matching for better results
@@ -238,9 +236,9 @@ Select sections that will help you provide the most valuable insights from your 
 
             return defaults[:5] if defaults else available_sections[:3]
 
-    def _get_section_content(self, document: Document, section_names: List[str]) -> Dict[str, str]:
+    def _get_section_content(self, document: Document, section_names: list[str]) -> dict[str, str]:
         """Get the actual content of selected sections using unified section handling."""
-        content_dict: Dict[str, str] = {}
+        content_dict: dict[str, str] = {}
 
         sections = document.get_sections_content(
             section_names=section_names,
@@ -269,7 +267,7 @@ Select sections that will help you provide the most valuable insights from your 
         self,
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
-        discussion_context: Dict[str, Any],
+        discussion_context: dict[str, Any],
     ) -> Optional[Any]:
         """Ask a question about another agent's insight."""
         try:
@@ -350,8 +348,8 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
     async def answer_question(
         self,
         question: Question,
-        my_insights: List[AgentInsight],
-        discussion_context: Dict[str, Any],
+        my_insights: list[AgentInsight],
+        discussion_context: dict[str, Any],
     ) -> Optional[Response]:
         """Answer a question from another agent."""
         try:
@@ -404,11 +402,11 @@ Confidence: [0.0-1.0 confidence in your response]
 
     async def evaluate_convergence(
         self,
-        all_insights: List[AgentInsight],
-        all_questions: List[Question],
-        all_responses: List[Response],
-        discussion_context: Dict[str, Any],
-    ) -> Dict[str, Any]:
+        all_insights: list[AgentInsight],
+        all_questions: list[Question],
+        all_responses: list[Response],
+        discussion_context: dict[str, Any],
+    ) -> dict[str, Any]:
         """Evaluate if the discussion has reached convergence."""
         try:
             self.logger.debug(f"{self.personality.value} evaluating convergence")
@@ -457,7 +455,7 @@ Recommendations: [Any suggestions for next steps]
             self.logger.error(f"Error evaluating convergence for {self.personality.value}: {e}")
             return {"convergence_score": 0.5, "continue_discussion": True}
 
-    def _build_qa_thread_summary(self, all_questions: List[Question], all_responses: List[Response]) -> str:
+    def _build_qa_thread_summary(self, all_questions: list[Question], all_responses: list[Response]) -> str:
         """Build a summary of Q&A threads for convergence evaluation."""
         if not all_questions:
             return "(No questions asked yet)"
@@ -481,7 +479,7 @@ Recommendations: [Any suggestions for next steps]
 
         return "\n".join(lines) if lines else "(No Q&A yet)"
 
-    def _count_my_answered_questions(self, all_questions: List[Question], all_responses: List[Response]) -> Dict[str, int]:
+    def _count_my_answered_questions(self, all_questions: list[Question], all_responses: list[Response]) -> dict[str, int]:
         """Count how many of this agent's questions have been answered."""
         response_ids = {r.question_id for r in all_responses}
         my_questions = [
@@ -490,13 +488,13 @@ Recommendations: [Any suggestions for next steps]
         answered = sum(1 for q in my_questions if q.question_id in response_ids)
         return {"total": len(my_questions), "answered": answered}
 
-    def _parse_insights_response(self, response: str, document: Document) -> List[AgentInsight]:
+    def _parse_insights_response(self, response: str, document: Document) -> list[AgentInsight]:
         """Parse the agent's response to extract AgentInsight objects."""
         insights = []
 
         try:
             lines = response.split("\n")
-            current_insight: Dict[str, Any] = {}
+            current_insight: dict[str, Any] = {}
             insight_count = 0
 
             for line in lines:
@@ -594,7 +592,7 @@ Recommendations: [Any suggestions for next steps]
 
         return insights
 
-    def _create_insight_from_dict(self, insight_dict: Dict[str, Any], document: Document) -> AgentInsight:
+    def _create_insight_from_dict(self, insight_dict: dict[str, Any], document: Document) -> AgentInsight:
         """Create an AgentInsight from a dictionary."""
         return AgentInsight(
             agent_id=self.personality,
@@ -606,7 +604,7 @@ Recommendations: [Any suggestions for next steps]
             questions_raised=([insight_dict.get("questions", "")] if insight_dict.get("questions") else []),
         )
 
-    def _format_prior_qa_for_prompt(self, prior_qa: List[Dict[str, Any]]) -> str:
+    def _format_prior_qa_for_prompt(self, prior_qa: list[dict[str, Any]]) -> str:
         """Format prior Q&A pairs for inclusion in prompt."""
         if not prior_qa:
             return ""
@@ -628,7 +626,7 @@ Recommendations: [Any suggestions for next steps]
 
         return "\n".join(lines)
 
-    def _format_my_prior_questions_for_prompt(self, my_prior_questions: List[Dict[str, Any]]) -> str:
+    def _format_my_prior_questions_for_prompt(self, my_prior_questions: list[dict[str, Any]]) -> str:
         """Format the agent's own prior questions about this insight."""
         if not my_prior_questions:
             return ""
@@ -654,10 +652,10 @@ Recommendations: [Any suggestions for next steps]
         response: str,
         target_insight: AgentInsight,
         target_agent: AgentPersonality,
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, Any]]:
         """Parse LLM output into a structured decision about questioning."""
         try:
-            fields: Dict[str, str] = {}
+            fields: dict[str, str] = {}
             current_key: Optional[str] = None
 
             for raw_line in response.splitlines():
@@ -723,7 +721,7 @@ Recommendations: [Any suggestions for next steps]
             self.logger.error(f"Error parsing question response: {e}")
             return None
 
-    def _find_relevant_insights_for_question(self, my_insights: List[AgentInsight], question: Question) -> List[AgentInsight]:
+    def _find_relevant_insights_for_question(self, my_insights: list[AgentInsight], question: Question) -> list[AgentInsight]:
         """Find insights relevant to a given question using word overlap and evidence matching."""
         stop_words = {
             "the",
@@ -884,7 +882,7 @@ Recommendations: [Any suggestions for next steps]
             self.logger.error(f"Error parsing answer response: {e}")
             return None
 
-    def _parse_convergence_evaluation(self, response: str) -> Dict[str, Any]:
+    def _parse_convergence_evaluation(self, response: str) -> dict[str, Any]:
         """Parse response to extract convergence evaluation."""
         try:
             evaluation = {

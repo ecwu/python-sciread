@@ -6,16 +6,10 @@ from datetime import datetime
 from datetime import timedelta
 from typing import Any
 from typing import Callable
-from typing import Dict
-from typing import List
 from typing import Optional
-from typing import Union
 
 from ..logging_config import get_logger
-from .models.discussion_models import AgentInsight
 from .models.discussion_models import AgentPersonality
-from .models.discussion_models import Question
-from .models.discussion_models import Response
 from .models.task_models import Task
 from .models.task_models import TaskPriority
 from .models.task_models import TaskQueue
@@ -30,13 +24,13 @@ class TaskQueueManager:
     """Manages multiple task queues and task execution coordination."""
 
     def __init__(self, max_concurrent_tasks: int = 10):
-        """Initialize the task queue manager."""
-        self.queues: Dict[str, TaskQueue] = {}
+        """Initialize task queue manager."""
+        self.queues: dict[str, TaskQueue] = {}
         self.max_concurrent_tasks = max_concurrent_tasks
-        self.task_callbacks: Dict[TaskType, Callable] = {}
+        self.task_callbacks: dict[TaskType, Callable] = {}
         self.is_running = False
         self._background_task: Optional[asyncio.Task] = None
-        self.task_execution_history: List[Dict[str, Any]] = []
+        self.task_execution_history: list[dict[str, Any]] = []
 
     def create_queue(self, name: str, description: Optional[str] = None) -> TaskQueue:
         """Create a new task queue."""
@@ -75,14 +69,14 @@ class TaskQueueManager:
         self,
         queue_name: str,
         task_type: TaskType,
-        parameters: Dict[str, Any],
+        parameters: dict[str, Any],
         priority: TaskPriority = TaskPriority.MEDIUM,
         assigned_to: Optional[AgentPersonality] = None,
         created_by: Optional[AgentPersonality] = None,
-        depends_on: Optional[List[str]] = None,
+        depends_on: Optional[list[str]] = None,
         timeout_seconds: Optional[int] = None,
         max_retries: int = 3,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
     ) -> str:
         """Create and add a new task to a queue."""
         task = Task(
@@ -265,7 +259,7 @@ class TaskQueueManager:
                 return False
         return True
 
-    def get_queue_statistics(self, queue_name: str) -> Optional[Dict[str, Any]]:
+    def get_queue_statistics(self, queue_name: str) -> Optional[dict[str, Any]]:
         """Get statistics for a specific queue."""
         queue = self.get_queue(queue_name)
         if not queue:
@@ -298,7 +292,7 @@ class TaskQueueManager:
             "last_activity": queue.last_activity.isoformat(),
         }
 
-    def get_agent_workload(self, agent: AgentPersonality) -> Dict[str, int]:
+    def get_agent_workload(self, agent: AgentPersonality) -> dict[str, int]:
         """Get current workload for an agent across all queues."""
         workload = {
             "active_tasks": 0,

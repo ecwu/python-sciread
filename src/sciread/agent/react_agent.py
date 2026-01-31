@@ -8,7 +8,6 @@ import traceback
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
-from typing import List
 from typing import Optional
 
 from pydantic_ai import Agent
@@ -32,8 +31,8 @@ class ReActDeps:
     task: str
     max_loops: int = 8
     show_progress: bool = True
-    current_sections: List[str] = field(default_factory=list)
-    processed_sections: List[str] = field(default_factory=list)
+    current_sections: list[str] = field(default_factory=list)
+    processed_sections: list[str] = field(default_factory=list)
     current_report: str = ""
     loop_count: int = 0
 
@@ -42,8 +41,8 @@ class ReActDeps:
 class ReActState:
     """State management for ReAct analysis using message history."""
 
-    current_sections: List[str] = field(default_factory=list)
-    processed_sections: List[str] = field(default_factory=list)
+    current_sections: list[str] = field(default_factory=list)
+    processed_sections: list[str] = field(default_factory=list)
     current_report: str = ""
     loop_count: int = 0
 
