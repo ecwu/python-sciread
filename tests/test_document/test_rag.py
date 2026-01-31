@@ -142,7 +142,7 @@ class TestDocumentRAG:
 
             # Verify vector index was called with correct path
             mock_vector_index.assert_called_once()
-            args, kwargs = mock_vector_index.call_args
+            _args, kwargs = mock_vector_index.call_args
             assert kwargs["collection_name"] == "test_hash_123"
             assert "test_hash_123" in str(kwargs["persist_path"])
 

@@ -38,7 +38,7 @@ class TestVectorIndex:
         chunks = [Chunk(content="test1"), Chunk(content="test2")]
         embeddings = [[0.1, 0.2]]  # Only one embedding for two chunks
 
-        with pytest.raises(ValueError, match="Number of chunks .* must match number of embeddings"):
+        with pytest.raises(ValueError, match=r"Number of chunks .* must match number of embeddings"):
             vector_index.add_chunks(chunks, embeddings)
 
     def test_add_chunks_success(self):
