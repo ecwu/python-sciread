@@ -347,7 +347,7 @@ class DiscussionAgent:
         # Import here to avoid circular imports
         from .consensus_builder import ConsensusBuilder
 
-        consensus_builder = ConsensusBuilder(self.model_name)
+        ConsensusBuilder(self.model_name)
         self.discussion_state.current_phase = DiscussionPhase.COMPLETED
 
     def _should_terminate_discussion(self) -> bool:

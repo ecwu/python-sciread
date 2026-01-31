@@ -111,7 +111,7 @@ class ConsensusBuilder:
         """Extract the most important insights across all agents."""
         all_insights = []
 
-        for personality, insights in agent_insights.items():
+        for _personality, insights in agent_insights.items():
             all_insights.extend(insights)
 
         # Sort by importance score and confidence
@@ -356,7 +356,7 @@ SIGNIFICANCE:
         """Group insights by topics/themes."""
         topic_groups = defaultdict(list)
 
-        for personality, insights in agent_insights.items():
+        for _personality, insights in agent_insights.items():
             for insight in insights:
                 # Simple topic extraction based on keywords
                 topic = self._extract_topic_from_insight(insight.content)
@@ -407,8 +407,8 @@ SIGNIFICANCE:
                 return {"has_consensus": False}
 
             # Build consensus content
-            supporting_agents = list(set(insight.agent_id for insight in insights))
-            avg_importance = sum(insight.importance_score for insight in insights) / len(insights)
+            supporting_agents = list({insight.agent_id for insight in insights})
+            sum(insight.importance_score for insight in insights) / len(insights)
             avg_confidence = sum(insight.confidence for insight in insights) / len(insights)
 
             # Synthesize consensus content

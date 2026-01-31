@@ -120,7 +120,7 @@ class TestDocumentRAG:
         # Setup mocks
         from pathlib import Path
 
-        mock_store_path = Path("/tmp/test_vector_store")
+        Path("/tmp/test_vector_store")
 
         mock_config.return_value.vector_store = Mock(
             embedding_model="test-model",

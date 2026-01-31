@@ -142,7 +142,7 @@ def build_insight_generation_prompt(
     discussion_context: dict[str, Any],
 ) -> str:
     """Build a prompt for generating insights based on personality and document."""
-    system_prompt = get_personality_system_prompt(personality)
+    get_personality_system_prompt(personality)
 
     # Format selected sections content
     sections_text = ""

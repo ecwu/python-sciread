@@ -203,7 +203,6 @@ class TestUnifiedSectionHandling:
 
     def test_error_handling(self, sample_document_with_sections):
         """Test error handling in unified methods."""
-        doc = sample_document_with_sections
 
         # Test with empty document
         empty_doc = Document(text="")

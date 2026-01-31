@@ -6,7 +6,6 @@ to be used across all agent implementations.
 
 import asyncio
 from typing import Any
-from typing import Type
 
 from pydantic_ai import ModelRetry
 
@@ -129,7 +128,7 @@ def validate_section_content(document: Any, sections: list[str], analysis_type: 
         raise ContentValidationError(f"Failed to validate section content for {analysis_type} analysis: {e}") from e
 
 
-async def safe_agent_execution(coro, timeout: float, operation_name: str, error_type: Type[AgentError] = AgentError) -> Any:
+async def safe_agent_execution(coro, timeout: float, operation_name: str, error_type: type[AgentError] = AgentError) -> Any:
     """Safely execute an agent coroutine with timeout and error handling.
 
     Args:

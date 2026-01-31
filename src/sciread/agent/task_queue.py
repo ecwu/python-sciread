@@ -100,7 +100,7 @@ class TaskQueueManager:
             return self.queues[queue_name].get_next_task(agent)
 
         # Check all queues in priority order (you can customize this)
-        for name, queue in sorted(self.queues.items()):
+        for _name, queue in sorted(self.queues.items()):
             task = queue.get_next_task(agent)
             if task:
                 return task

@@ -923,7 +923,7 @@ class Document:
         }
 
         # Check each pattern
-        for canonical_name, variations in section_patterns.items():
+        for _canonical_name, variations in section_patterns.items():
             if search_name in variations:
                 # Now look for any of these variations in the available names
                 for variation in variations:
