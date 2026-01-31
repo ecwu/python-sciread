@@ -1,6 +1,6 @@
 """Task execution tools for multi-agent discussion system."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from ...logging_config import get_logger
@@ -50,7 +50,7 @@ def get_agent_cache_status() -> dict[str, Any]:
 
 async def generate_insights_tool(task: Task) -> TaskResult:
     """Tool for generating insights from a personality agent."""
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # Extract parameters
@@ -70,7 +70,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
         # Generate insights
         insights = await agent.generate_insights(document, discussion_context)
 
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         logger.info(f"Generated {len(insights)} insights for {personality.value}")
 
@@ -88,7 +88,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
         )
 
     except Exception as e:
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         error_msg = f"Insight generation failed: {e!s}"
         logger.error(error_msg)
 
@@ -104,7 +104,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
 
 async def ask_question_tool(task: Task) -> TaskResult:
     """Tool for asking questions between agents."""
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # Extract parameters
@@ -128,7 +128,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
         # Ask question (may return a question object or a skip decision)
         question_decision = await agent.ask_question(target_insight, to_agent, discussion_context)
 
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         if isinstance(question_decision, dict) and question_decision.get("decision") == "skip":
             logger.debug(
@@ -177,7 +177,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
             )
 
     except Exception as e:
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         error_msg = f"Question generation failed: {e!s}"
         logger.error(error_msg)
 
@@ -193,7 +193,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
 
 async def answer_question_tool(task: Task) -> TaskResult:
     """Tool for answering questions from other agents."""
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # Extract parameters
@@ -216,7 +216,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
         # Answer question
         response = await agent.answer_question(question, my_insights, discussion_context)
 
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         if response:
             logger.debug(f"Generated response from {personality.value}")
@@ -243,7 +243,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
             )
 
     except Exception as e:
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         error_msg = f"Answer generation failed: {e!s}"
         logger.error(error_msg)
 
@@ -259,7 +259,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
 
 async def evaluate_convergence_tool(task: Task) -> TaskResult:
     """Tool for evaluating discussion convergence."""
-    start_time = datetime.now()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # Extract parameters
@@ -282,7 +282,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
         # Evaluate convergence
         evaluation = await agent.evaluate_convergence(all_insights, all_questions, all_responses, discussion_context)
 
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         logger.debug(f"{personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}")
 
@@ -302,7 +302,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
         )
 
     except Exception as e:
-        execution_time = (datetime.now() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         error_msg = f"Convergence evaluation failed: {e!s}"
         logger.error(error_msg)
 

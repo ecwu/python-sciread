@@ -2,7 +2,7 @@
 
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pydantic_ai import Agent
@@ -84,7 +84,7 @@ class ConsensusBuilder:
                     "convergence_score": (discussion_state.convergence_score if discussion_state else 0.0),
                     "agent_insight_counts": {k.value: len(v) for k, v in agent_insights.items()},
                 },
-                completion_time=datetime.now(),
+                completion_time=datetime.now(timezone.utc),
             )
 
             self.logger.info(f"Consensus building completed. Confidence: {confidence_score:.2f}")
@@ -100,7 +100,7 @@ class ConsensusBuilder:
                 significance="Analysis failed",
                 confidence_score=0.0,
                 discussion_metadata={"error": str(e)},
-                completion_time=datetime.now(),
+                completion_time=datetime.now(timezone.utc),
             )
 
     def _extract_top_insights(

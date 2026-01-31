@@ -2,8 +2,7 @@
 
 import asyncio
 from collections import defaultdict
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 from typing import Callable
 
@@ -118,7 +117,7 @@ class TaskQueueManager:
     async def execute_task(self, task: Task, queue: TaskQueue) -> TaskResult:
         """Execute a single task."""
         logger.debug(f"Executing task {task.task_id} of type {task.task_type}")
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
 
         try:
             task.status = TaskStatus.IN_PROGRESS
@@ -141,7 +140,7 @@ class TaskQueueManager:
                 result = TaskResult(
                     task_id=task.task_id,
                     success=True,
-                    execution_time=(datetime.now() - start_time).total_seconds(),
+                    execution_time=(datetime.now(timezone.utc) - start_time).total_seconds(),
                     analysis_result=str(result),
                     confidence=0.8,
                 )
@@ -161,7 +160,7 @@ class TaskQueueManager:
             result = TaskResult(
                 task_id=task.task_id,
                 success=False,
-                execution_time=(datetime.now() - start_time).total_seconds(),
+                execution_time=(datetime.now(timezone.utc) - start_time).total_seconds(),
                 analysis_result=error_msg,
                 confidence=0.0,
             )
@@ -182,7 +181,7 @@ class TaskQueueManager:
                 "success": success,
                 "execution_time": result.execution_time,
                 "confidence": result.confidence,
-                "timestamp": datetime.now(),
+                "timestamp": datetime.now(timezone.utc),
             }
         )
 
@@ -300,7 +299,7 @@ class TaskQueueManager:
             "failed_today": 0,
         }
 
-        today = datetime.now().date()
+        today = datetime.now(timezone.utc).date()
         for queue in self.queues.values():
             # Active tasks
             workload["active_tasks"] += queue.get_agent_workload(agent)
@@ -330,7 +329,7 @@ class TaskQueueManager:
 
     def cleanup_old_tasks(self, days_old: int = 7) -> None:
         """Remove old completed and failed tasks from all queues."""
-        cutoff_date = datetime.now() - timedelta(days=days_old)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=days_old)
         total_removed = 0
 
         for queue in self.queues.values():

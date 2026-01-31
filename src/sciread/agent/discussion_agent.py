@@ -1,8 +1,7 @@
 """Main discussion agent for multi-agent document analysis."""
 
 import asyncio
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from pydantic_ai import Agent
 
@@ -102,7 +101,7 @@ class DiscussionAgent:
                 key_contributions=[],
                 significance="Analysis failed",
                 confidence_score=0.0,
-                completion_time=datetime.now(),
+                completion_time=datetime.now(timezone.utc),
                 discussion_metadata={"error": str(e)},
             )
 
@@ -115,7 +114,7 @@ class DiscussionAgent:
         self.discussion_state = DiscussionState(
             current_phase=DiscussionPhase.INITIAL_ANALYSIS,
             max_iterations=self.max_iterations,
-            start_time=datetime.now(),
+            start_time=datetime.now(timezone.utc),
         )
 
         # Initialize agent insights storage
@@ -147,7 +146,7 @@ class DiscussionAgent:
                     await self._run_consensus_phase(document)
 
                 # Update state
-                self.discussion_state.last_activity = datetime.now()
+                self.discussion_state.last_activity = datetime.now(timezone.utc)
 
                 # Brief pause between phases
                 await asyncio.sleep(1.0)
@@ -356,7 +355,7 @@ class DiscussionAgent:
             return True
 
         # Check time limit
-        if datetime.now() - self.discussion_state.start_time > self.max_discussion_time:
+        if datetime.now(timezone.utc) - self.discussion_state.start_time > self.max_discussion_time:
             logger.warning("Discussion time limit reached")
             return True
 
@@ -372,10 +371,10 @@ class DiscussionAgent:
         if not task_ids:
             return
 
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         timeout = timedelta(minutes=timeout_minutes)
 
-        while datetime.now() - start_time < timeout:
+        while datetime.now(timezone.utc) - start_time < timeout:
             all_completed = True
             for task_id in task_ids:
                 status = self.discussion_queue.get_task_status(task_id) if self.discussion_queue else None
