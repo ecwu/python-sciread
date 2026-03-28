@@ -16,8 +16,6 @@ from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 
 from ..document import Document
-from ..document.loaders.pdf_loader import PdfLoader
-from ..document.splitters.cumulative_flow import CumulativeFlowSplitter
 from ..document.vector_index import VectorIndex
 from ..embedding_provider import EmbeddingFactory
 from ..embedding_provider import get_embedding_client
@@ -178,8 +176,9 @@ class RAGReActState:
 def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool = False) -> Document:
     """Load and process document specifically for RAG analysis.
 
-    This function loads PDFs without using Mineru API and uses CumulativeFlowSplitter
-    for intelligent chunking based on semantic similarity.
+    This function relies on standard document generation which automatically
+    uses SemanticSplitter (or MarkdownSplitter) to intelligently
+    chunk text, instead of depending on local embeddings.
 
     Args:
         file_path: Path to the document file (PDF or TXT)
@@ -198,20 +197,10 @@ def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool =
     file_path = Path(file_path)
 
     if file_path.suffix.lower() == ".pdf":
-        # Load PDF without Mineru API
+        # Load PDF without Mineru API and let standard routines handle it
         logger.info("Loading PDF without Mineru API...")
-        loader = PdfLoader(to_markdown=False)
-        load_result = loader.load(file_path)
-
-        if not load_result.success:
-            raise RuntimeError(f"Failed to load PDF: {load_result.errors}")
-
-        # Create document with loaded text
-        doc = Document(
-            source_path=file_path,
-            text=load_result.text,
-            metadata=load_result.metadata,
-        )
+        # from_file implicitly uses DocumentBuilder, which uses auto semantic/markdown splitting
+        doc = Document.from_file(file_path, to_markdown=False)
         logger.info(f"Loaded {len(doc.text)} characters from PDF")
 
     elif file_path.suffix.lower() == ".txt":
@@ -224,28 +213,6 @@ def load_and_process_document_for_rag(file_path: str | Path, to_markdown: bool =
         # Try to load as general document
         logger.warning(f"Unsupported file type: {file_path.suffix}, attempting general load...")
         doc = Document.from_file(file_path, to_markdown=False)
-
-    # Use CumulativeFlowSplitter for intelligent chunking with Ollama embeddings
-    logger.info("Splitting document using CumulativeFlowSplitter...")
-    splitter = CumulativeFlowSplitter(
-        similarity_threshold=0.45,
-        min_segment_sentences=2,
-        min_segment_chars=100,
-        max_segment_chars=500,
-    )
-
-    # Test Ollama connection
-    logger.info("Testing connection to Ollama server...")
-    if not splitter.test_ollama_connection():
-        raise RuntimeError("Cannot connect to Ollama server! Make sure Ollama is running: 'ollama serve'")
-
-    logger.info(f"Using embedding model: {splitter.ollama_client.model}")
-    logger.info("Computing embeddings for sentences...")
-
-    # Split the document
-    chunks = splitter.split(doc.text)
-    doc._set_chunks(chunks)
-    logger.info(f"Created {len(doc.chunks)} chunks using CumulativeFlowSplitter")
 
     # Log chunk statistics
     if doc.chunks:

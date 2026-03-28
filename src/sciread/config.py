@@ -28,41 +28,11 @@ class RegexSectionSplitterConfig(BaseModel):
     custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
 
 
-class ConsecutiveFlowSplitterConfig(BaseModel):
-    """Configuration for ConsecutiveFlowSplitter."""
-
-    model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
-    base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
-    similarity_threshold: float = Field(default=0.45, description="Threshold for consecutive similarity (adjacent sentences)")
-    min_segment_sentences: int = Field(default=2, description="Minimum sentences per segment")
-    min_segment_chars: int = Field(default=200, description="Minimum characters per segment")
-    max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
-    embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
-    timeout: int = Field(default=30, description="Request timeout in seconds")
-    cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
-
-
-class CumulativeFlowSplitterConfig(BaseModel):
-    """Configuration for CumulativeFlowSplitter."""
-
-    model: str = Field(default="embeddinggemma:latest", description="Ollama model for embeddings")
-    base_url: str = Field(default="http://localhost:11434", description="Ollama API base URL")
-    similarity_threshold: float = Field(default=0.45, description="Threshold for cumulative similarity (segment vs next sentence)")
-    min_segment_sentences: int = Field(default=2, description="Minimum sentences per segment")
-    min_segment_chars: int = Field(default=200, description="Minimum characters per segment")
-    max_segment_chars: int = Field(default=2000, description="Maximum characters per segment (hard budget limit)")
-    embedding_batch_size: int = Field(default=10, description="Batch size for embedding requests")
-    timeout: int = Field(default=30, description="Request timeout in seconds")
-    cache_embeddings: bool = Field(default=True, description="Whether to cache embeddings")
-
-
 class DocumentSplitterConfig(BaseModel):
     """Configuration for document splitters."""
 
-    default_splitter: str = Field(default="consecutive_flow", description="Default splitter to use")
+    default_splitter: str = Field(default="regex_section", description="Default splitter to use")
     regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
-    consecutive_flow: ConsecutiveFlowSplitterConfig = Field(default_factory=ConsecutiveFlowSplitterConfig)
-    cumulative_flow: CumulativeFlowSplitterConfig = Field(default_factory=CumulativeFlowSplitterConfig)
 
 
 class MineruConfig(BaseModel):
