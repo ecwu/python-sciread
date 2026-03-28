@@ -19,7 +19,9 @@ class TestDocument:
         assert doc.text == text
         assert doc.metadata.title == "Test Document"
         assert doc.source_path is None
-        assert doc.processing_state.loaded_at is not None  # Document is automatically loaded
+        assert (
+            doc.processing_state.loaded_at is not None
+        )  # Document is automatically loaded
         assert doc.is_split  # Document is automatically split
 
     def test_document_from_file(self, sample_txt_file):
@@ -27,7 +29,9 @@ class TestDocument:
         doc = Document.from_file(sample_txt_file)
 
         assert doc.source_path == sample_txt_file
-        assert doc.processing_state.loaded_at is not None  # Document is automatically loaded
+        assert (
+            doc.processing_state.loaded_at is not None
+        )  # Document is automatically loaded
         assert doc.is_split  # Document is automatically split
 
     def test_load_txt_file(self, sample_txt_file):
@@ -92,7 +96,9 @@ class TestDocument:
 
         # Get unprocessed chunks
         unprocessed = doc.get_chunks(processed=False)
-        assert len(unprocessed) == len(all_chunks)  # All should be unprocessed initially
+        assert len(unprocessed) == len(
+            all_chunks
+        )  # All should be unprocessed initially
 
         # Get processed chunks (should be empty initially)
         processed = doc.get_chunks(processed=True)
@@ -236,7 +242,9 @@ class TestDocument:
     def test_chunk_enrichment_preserves_custom_citation_key(self):
         """Test custom citation keys are preserved during enrichment."""
         doc = Document.from_text("placeholder")
-        chunk = Chunk(content="Chunk one", chunk_name="intro", citation_key="custom:cite")
+        chunk = Chunk(
+            content="Chunk one", chunk_name="intro", citation_key="custom:cite"
+        )
 
         doc._set_chunks([chunk])
 

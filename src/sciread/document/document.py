@@ -171,7 +171,11 @@ class Document:
 
         # Filter by confidence threshold
         if confidence_threshold is not None:
-            chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
+            chunks = [
+                chunk
+                for chunk in chunks
+                if (chunk.confidence or 0.0) >= confidence_threshold
+            ]
 
         # Filter by minimum length
         if min_length is not None:
@@ -179,7 +183,9 @@ class Document:
 
         # Exclude specific chunk types
         if exclude_types:
-            chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
+            chunks = [
+                chunk for chunk in chunks if chunk.chunk_name not in exclude_types
+            ]
 
         # Apply limit
         if limit is not None:
@@ -241,7 +247,9 @@ class Document:
             chunk.mark_processed()
 
         if chunks_to_mark:
-            self.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
+            self.processing_state.add_note(
+                f"Marked {len(chunks_to_mark)} chunks as processed"
+            )
             self.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
 
         return len(chunks_to_mark)
@@ -284,7 +292,10 @@ class Document:
                 section_name = chunk.chunk_name
                 if section_name not in section_names:  # Avoid duplicates
                     section_names.append(section_name)
-            elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
+            elif (
+                chunk.metadata.get("splitter")
+                and chunk.metadata["splitter"] != "unknown"
+            ):
                 # For chunks without explicit section names, use a generic name based on splitter type
                 splitter_type = chunk.metadata["splitter"]
                 generic_name = f"untitled_{splitter_type}"
@@ -349,7 +360,9 @@ class Document:
             if max_chars_per_section and len(content) > max_chars_per_section:
                 content = content[:max_chars_per_section] + "...[truncated]"
 
-            avg_confidence = sum(chunk.confidence or 0.0 for chunk in chunks) / len(chunks)
+            avg_confidence = sum(chunk.confidence or 0.0 for chunk in chunks) / len(
+                chunks
+            )
 
             sections.append(
                 {
@@ -410,7 +423,11 @@ class Document:
 
     def _build_doc_id(self) -> str:
         """Build a stable document ID used by chunk metadata."""
-        return self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
+        return self.metadata.file_hash or (
+            Path(self.metadata.source_path).stem
+            if self.metadata.source_path
+            else "unnamed_document"
+        )
 
     def _enrich_chunks_metadata(self, chunks: list[Chunk]) -> None:
         """Fill normalized chunk metadata fields and maintain linkage."""
@@ -435,7 +452,11 @@ class Document:
             elif chunk.page_start is not None and chunk.page_end is not None:
                 chunk.page_range = (chunk.page_start, chunk.page_end)
 
-            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
+            if (
+                not chunk.section_path
+                and chunk.chunk_name
+                and chunk.chunk_name != "unknown"
+            ):
                 chunk.section_path = [chunk.chunk_name]
 
             if not chunk.parent_section_id and chunk.section_path:
@@ -446,7 +467,9 @@ class Document:
 
         for i, chunk in enumerate(chunks):
             chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
-            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
+            chunk.next_chunk_id = (
+                chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
+            )
 
     def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
@@ -489,21 +512,29 @@ class Document:
             if hasattr(embedding_client, "embedding_batch_size"):
                 batch_size = embedding_client.embedding_batch_size
 
-            embeddings = embedding_client.get_embeddings([c.content for c in self._chunks], batch_size=batch_size)
+            embeddings = embedding_client.get_embeddings(
+                [c.content for c in self._chunks], batch_size=batch_size
+            )
 
             persist_path = None
             if persist:
                 store_path = Path(vector_config.path).expanduser()
                 store_path.mkdir(parents=True, exist_ok=True)
                 doc_id = self.metadata.file_hash or (
-                    Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
+                    Path(self.metadata.source_path).stem
+                    if self.metadata.source_path
+                    else "unnamed_document"
                 )
                 persist_path = store_path / doc_id
 
             collection_name = self.metadata.file_hash or (
-                Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document"
+                Path(self.metadata.source_path).stem
+                if self.metadata.source_path
+                else "unnamed_document"
             )
-            self.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
+            self.vector_index = VectorIndex(
+                collection_name=collection_name, persist_path=persist_path
+            )
             self.vector_index.add_chunks(self._chunks, embeddings)
             self.logger.info("Vector index built successfully.")
 
@@ -511,7 +542,9 @@ class Document:
             self.logger.error(f"Failed to build vector index: {e}")
             raise RuntimeError(f"Failed to build vector index: {e}") from e
 
-    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> list[Chunk] | list[tuple[Chunk, float]]:
+    def semantic_search(
+        self, query: str, top_k: int = 5, return_scores: bool = False
+    ) -> list[Chunk] | list[tuple[Chunk, float]]:
         """Performs a semantic search on the document chunks using cosine similarity.
 
         This method uses cosine similarity for ranking, which is length-invariant
@@ -528,7 +561,9 @@ class Document:
             Similarity scores are in range [0, 1] where 1 is most similar
         """
         if not self.vector_index:
-            self.logger.warning("Vector index not found. Please run `build_vector_index()` first.")
+            self.logger.warning(
+                "Vector index not found. Please run `build_vector_index()` first."
+            )
             return []
 
         if not self._chunks_by_id:
@@ -538,7 +573,10 @@ class Document:
 
         try:
             # Use the embedding client that was used to build the index, or create a default one
-            if hasattr(self, "_embedding_client") and self._embedding_client is not None:
+            if (
+                hasattr(self, "_embedding_client")
+                and self._embedding_client is not None
+            ):
                 embedding_client = self._embedding_client
             else:
                 config = get_config()
@@ -568,7 +606,11 @@ class Document:
                 return results_with_scores
             else:
                 # Return just the chunks (backward compatible)
-                found_chunks = [self._chunks_by_id[res["id"]] for res in search_results if res["id"] in self._chunks_by_id]
+                found_chunks = [
+                    self._chunks_by_id[res["id"]]
+                    for res in search_results
+                    if res["id"] in self._chunks_by_id
+                ]
                 self.logger.info(f"Found {len(found_chunks)} matching chunks")
                 return found_chunks
 
@@ -617,13 +659,19 @@ class Document:
             # Show document metadata
             if show_metadata:
                 print(f"{colors['header']}{'=' * 80}{reset}")
-                print(f"{colors['title']}Document: {self.metadata.title or 'Untitled'}{reset}")
+                print(
+                    f"{colors['title']}Document: {self.metadata.title or 'Untitled'}{reset}"
+                )
                 if self.metadata.author:
                     print(f"{colors['metadata']}Author: {self.metadata.author}{reset}")
                 if self.metadata.source_path:
-                    print(f"{colors['metadata']}Source: {self.metadata.source_path}{reset}")
+                    print(
+                        f"{colors['metadata']}Source: {self.metadata.source_path}{reset}"
+                    )
                 if self.metadata.page_count:
-                    print(f"{colors['metadata']}Pages: {self.metadata.page_count}{reset}")
+                    print(
+                        f"{colors['metadata']}Pages: {self.metadata.page_count}{reset}"
+                    )
                 print(f"{colors['header']}{'=' * 80}{reset}")
                 print()
 
@@ -640,7 +688,9 @@ class Document:
 
                 print(f"{colors['section']}Section {i}: {section_name}{reset}")
                 if show_confidence:
-                    print(f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}")
+                    print(
+                        f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}"
+                    )
                 print(f"{colors['header']}{'-' * 60}{reset}")
                 print(f"{colors['content']}{content}{reset}")
                 print()
@@ -701,10 +751,16 @@ class Document:
                 section_text = f"=== {section_name.upper()} ===\n{content}\n"
                 if token_limit and total_chars + len(section_text) > token_limit:
                     # Add partial section if we have space
-                    remaining = token_limit - total_chars - 50  # Reserve space for header
+                    remaining = (
+                        token_limit - total_chars - 50
+                    )  # Reserve space for header
                     if remaining > 200:  # Only add if we have meaningful space
-                        partial_content = content[:remaining] + "...[truncated due to token limit]"
-                        section_text = f"=== {section_name.upper()} ===\n{partial_content}\n"
+                        partial_content = (
+                            content[:remaining] + "...[truncated due to token limit]"
+                        )
+                        section_text = (
+                            f"=== {section_name.upper()} ===\n{partial_content}\n"
+                        )
                         content_parts.append(section_text)
                     break
 
@@ -717,7 +773,9 @@ class Document:
             self.logger.error(f"Failed to get content for LLM: {e}")
             return f"Error retrieving content: {e}"
 
-    def get_section_by_number(self, index: int, include_content: bool = True, max_chars: int | None = None) -> tuple[str, str] | None:
+    def get_section_by_number(
+        self, index: int, include_content: bool = True, max_chars: int | None = None
+    ) -> tuple[str, str] | None:
         """Get section by numerical index.
 
         Args:
@@ -737,7 +795,9 @@ class Document:
             if not include_content:
                 return (section_name, "")
 
-            sections = self._collect_sections(section_names=[section_name], max_sections=1)
+            sections = self._collect_sections(
+                section_names=[section_name], max_sections=1
+            )
             if not sections:
                 return (section_name, "")
 
@@ -787,9 +847,13 @@ class Document:
 
             # Try fuzzy matching if requested
             if fuzzy:
-                closest_match = self.get_closest_section_name(name, case_sensitive=case_sensitive, threshold=threshold)
+                closest_match = self.get_closest_section_name(
+                    name, case_sensitive=case_sensitive, threshold=threshold
+                )
                 if closest_match:
-                    return self.get_section_by_number(section_names.index(closest_match))
+                    return self.get_section_by_number(
+                        section_names.index(closest_match)
+                    )
 
             return None
 
@@ -840,7 +904,9 @@ class Document:
                 return available_names[normalized_names.index(search_name)]
 
             # Step 2: Try pattern-based matching
-            pattern_match = self._match_section_pattern(search_name, normalized_names, available_names)
+            pattern_match = self._match_section_pattern(
+                search_name, normalized_names, available_names
+            )
             if pattern_match:
                 return pattern_match
 
@@ -853,7 +919,9 @@ class Document:
                             name_embedding = self._embedding_client.get_embedding(name)
                             if name_embedding:
                                 # Calculate cosine similarity
-                                similarity = self._cosine_similarity(target_embedding, name_embedding)
+                                similarity = self._cosine_similarity(
+                                    target_embedding, name_embedding
+                                )
                                 if similarity > best_score and similarity >= threshold:
                                     best_score = similarity
                                     best_match = available_names[i]
@@ -879,10 +947,14 @@ class Document:
             return best_match
 
         except Exception as e:
-            self.logger.error(f"Failed to find closest section name for '{target_name}': {e}")
+            self.logger.error(
+                f"Failed to find closest section name for '{target_name}': {e}"
+            )
             return None
 
-    def _match_section_pattern(self, search_name: str, normalized_names: list[str], original_names: list[str]) -> str | None:
+    def _match_section_pattern(
+        self, search_name: str, normalized_names: list[str], original_names: list[str]
+    ) -> str | None:
         """Match section using common academic paper patterns."""
         # Common academic section patterns and their variations
         section_patterns = {
@@ -1007,7 +1079,9 @@ class Document:
         except Exception:
             return 0.0
 
-    def get_section_overview(self, include_stats: bool = True, include_quality: bool = True) -> dict:
+    def get_section_overview(
+        self, include_stats: bool = True, include_quality: bool = True
+    ) -> dict:
         """Get comprehensive overview of all sections.
 
         Args:
@@ -1032,7 +1106,9 @@ class Document:
             for i, section in enumerate(sections):
                 section_chunks = section["chunks"]
                 total_chars = sum(len(chunk.content) for chunk in section_chunks)
-                avg_confidence = section["average_confidence"] if section_chunks else 0.0
+                avg_confidence = (
+                    section["average_confidence"] if section_chunks else 0.0
+                )
 
                 section_info = {
                     "index": i,
@@ -1045,8 +1121,14 @@ class Document:
                     section_info.update(
                         {
                             "average_confidence": avg_confidence,
-                            "high_quality_chunks": sum(1 for chunk in section_chunks if (chunk.confidence or 0.0) >= 0.7),
-                            "processed_chunks": sum(1 for chunk in section_chunks if chunk.processed),
+                            "high_quality_chunks": sum(
+                                1
+                                for chunk in section_chunks
+                                if (chunk.confidence or 0.0) >= 0.7
+                            ),
+                            "processed_chunks": sum(
+                                1 for chunk in section_chunks if chunk.processed
+                            ),
                         }
                     )
 
@@ -1055,9 +1137,17 @@ class Document:
                     chunk_lengths = [len(chunk.content) for chunk in section_chunks]
                     section_info.update(
                         {
-                            "min_chunk_size": (min(chunk_lengths) if chunk_lengths else 0),
-                            "max_chunk_size": (max(chunk_lengths) if chunk_lengths else 0),
-                            "avg_chunk_size": (sum(chunk_lengths) / len(chunk_lengths) if chunk_lengths else 0),
+                            "min_chunk_size": (
+                                min(chunk_lengths) if chunk_lengths else 0
+                            ),
+                            "max_chunk_size": (
+                                max(chunk_lengths) if chunk_lengths else 0
+                            ),
+                            "avg_chunk_size": (
+                                sum(chunk_lengths) / len(chunk_lengths)
+                                if chunk_lengths
+                                else 0
+                            ),
                         }
                     )
 
@@ -1069,7 +1159,9 @@ class Document:
             self.logger.error(f"Failed to get section overview: {e}")
             return {"error": str(e)}
 
-    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> list[tuple[str, str]]:
+    def get_sections_with_confidence(
+        self, min_confidence: float = 0.5, min_length: int = 50
+    ) -> list[tuple[str, str]]:
         """Get sections that meet minimum quality criteria.
 
         Args:
@@ -1084,7 +1176,10 @@ class Document:
             sections = self._collect_sections()
 
             for section in sections:
-                if section["average_confidence"] >= min_confidence and section["length"] >= min_length:
+                if (
+                    section["average_confidence"] >= min_confidence
+                    and section["length"] >= min_length
+                ):
                     qualifying_sections.append((section["name"], section["content"]))
 
             return qualifying_sections
@@ -1102,7 +1197,9 @@ class Document:
             content = re.sub(r"\n\s*\n\s*\n", "\n\n", content)
 
             # Fix common PDF extraction artifacts
-            content = re.sub(r"\b(\w+)-\s*\n\s*(\w+)\b", r"\1\2", content)  # Fix hyphenated words
+            content = re.sub(
+                r"\b(\w+)-\s*\n\s*(\w+)\b", r"\1\2", content
+            )  # Fix hyphenated words
 
             # Normalize quotes (using string replacement instead of regex)
             content = content.replace('"', '"').replace('"', '"')
@@ -1169,7 +1266,9 @@ class Document:
 
         try:
             vector_index_path_str = (
-                str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
+                str(self.vector_index.persist_path.resolve())
+                if self.vector_index and self.vector_index.persist_path
+                else None
             )
 
             # Convert metadata to dict, handling Path objects and None values
@@ -1224,9 +1323,13 @@ class Document:
             from datetime import datetime
 
             if metadata_dict.get("created_at"):
-                metadata_dict["created_at"] = datetime.fromisoformat(metadata_dict["created_at"])
+                metadata_dict["created_at"] = datetime.fromisoformat(
+                    metadata_dict["created_at"]
+                )
             if metadata_dict.get("modified_at"):
-                metadata_dict["modified_at"] = datetime.fromisoformat(metadata_dict["modified_at"])
+                metadata_dict["modified_at"] = datetime.fromisoformat(
+                    metadata_dict["modified_at"]
+                )
 
             metadata = DocumentMetadata(**metadata_dict)
 
@@ -1252,7 +1355,9 @@ class Document:
                 persist_path = Path(vector_index_path_str)
                 if persist_path.exists():
                     collection_name = persist_path.stem
-                    doc.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
+                    doc.vector_index = VectorIndex(
+                        collection_name=collection_name, persist_path=persist_path
+                    )
                     logger.info("Vector index re-linked successfully")
                 else:
                     logger.warning(f"Vector index path does not exist: {persist_path}")
