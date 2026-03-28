@@ -268,3 +268,63 @@ class TestDocument:
         assert "**" not in doc.chunks[0].content_plain
         assert "[linked](https://example.com)" not in doc.chunks[0].content_plain
         assert doc.chunks[0].retrieval_text.startswith("[Section] intro\n\n")
+
+    def test_get_chunk_by_id(self):
+        """Test retrieving chunk by chunk_id."""
+        doc = Document.from_text("placeholder")
+        chunks = [
+            Chunk(content="A", chunk_name="intro"),
+            Chunk(content="B", chunk_name="methods"),
+        ]
+        doc._set_chunks(chunks)
+
+        found = doc.get_chunk_by_id(doc.chunks[1].chunk_id)
+        assert found is not None
+        assert found.content == "B"
+        assert doc.get_chunk_by_id("missing-id") is None
+
+    def test_get_chunks_by_section(self):
+        """Test retrieving chunks by section label/path."""
+        doc = Document.from_text("placeholder")
+        chunks = [
+            Chunk(content="M1", section_path=["methods"]),
+            Chunk(content="M2", section_path=["methods", "setup"]),
+            Chunk(content="R1", section_path=["results"]),
+        ]
+        doc._set_chunks(chunks)
+
+        methods_with_children = doc.get_chunks_by_section("methods")
+        assert [chunk.content for chunk in methods_with_children] == ["M1", "M2"]
+
+        methods_exact = doc.get_chunks_by_section("methods", include_subsections=False)
+        assert [chunk.content for chunk in methods_exact] == ["M1"]
+
+        setup_only = doc.get_chunks_by_section(
+            "methods > setup", include_subsections=False
+        )
+        assert [chunk.content for chunk in setup_only] == ["M2"]
+
+    def test_get_neighbor_chunks(self):
+        """Test retrieving neighboring chunks around a center chunk."""
+        doc = Document.from_text("placeholder")
+        chunks = [
+            Chunk(content="C0", chunk_name="s"),
+            Chunk(content="C1", chunk_name="s"),
+            Chunk(content="C2", chunk_name="s"),
+            Chunk(content="C3", chunk_name="s"),
+        ]
+        doc._set_chunks(chunks)
+
+        center_id = doc.chunks[1].chunk_id
+        neighbors = doc.get_neighbor_chunks(center_id, before=1, after=2)
+        assert [chunk.content for chunk in neighbors] == ["C0", "C1", "C2", "C3"]
+
+        neighbors_without_self = doc.get_neighbor_chunks(
+            center_id, before=1, after=1, include_self=False
+        )
+        assert [chunk.content for chunk in neighbors_without_self] == ["C0", "C2"]
+
+        assert doc.get_neighbor_chunks("missing-id") == []
+
+        with pytest.raises(ValueError, match="before and after must be >= 0"):
+            doc.get_neighbor_chunks(center_id, before=-1)
