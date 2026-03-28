@@ -8,6 +8,7 @@ from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 
 from ..document import Document
+from ..document.document_renderers import get_sections_content
 from ..llm_provider import get_model
 from ..logging_config import get_logger
 from .models.discussion_models import AgentInsight
@@ -23,12 +24,16 @@ logger = get_logger(__name__)
 class PersonalityAgent:
     """Base class for personality-based agents."""
 
-    def __init__(self, personality: AgentPersonality, model_name: str = "deepseek-chat"):
+    def __init__(
+        self, personality: AgentPersonality, model_name: str = "deepseek-chat"
+    ):
         """Initialize the personality agent."""
         self.personality = personality
         self.model_name = model_name
         self.model = get_model(model_name)
-        self.agent = Agent(self.model, system_prompt=get_personality_system_prompt(personality))
+        self.agent = Agent(
+            self.model, system_prompt=get_personality_system_prompt(personality)
+        )
         self.logger = get_logger(f"{__name__}.{personality.value}")
         self.message_history: list[ModelMessage] = []
 
@@ -45,20 +50,30 @@ class PersonalityAgent:
         self.message_history = result.all_messages()
         return result
 
-    async def generate_insights(self, document: Document, discussion_context: dict[str, Any]) -> list[AgentInsight]:
+    async def generate_insights(
+        self, document: Document, discussion_context: dict[str, Any]
+    ) -> list[AgentInsight]:
         """Generate insights based on document and personality."""
         try:
             self.logger.info(f"Generating insights for {self.personality.value}")
 
             # Get abstract from document
             abstract_chunks = document.get_sections_by_name(["abstract"])
-            abstract_text = " ".join(chunk.content for chunk in abstract_chunks) if abstract_chunks else "No abstract available"
+            abstract_text = (
+                " ".join(chunk.content for chunk in abstract_chunks)
+                if abstract_chunks
+                else "No abstract available"
+            )
 
             # Step 1: Let agent select which sections to read based on personality
             section_names = document.get_section_names()
-            selected_sections = await self._select_sections_to_read(document.metadata.title or "Untitled", abstract_text, section_names)
+            selected_sections = await self._select_sections_to_read(
+                document.metadata.title or "Untitled", abstract_text, section_names
+            )
 
-            self.logger.info(f"{self.personality.value} selected {len(selected_sections)} sections to read: {selected_sections}")
+            self.logger.info(
+                f"{self.personality.value} selected {len(selected_sections)} sections to read: {selected_sections}"
+            )
 
             # Step 2: Get content of selected sections
             selected_content = self._get_section_content(document, selected_sections)
@@ -79,14 +94,20 @@ class PersonalityAgent:
             # Parse the response to extract insights
             insights = self._parse_insights_response(result.output, document)
 
-            self.logger.info(f"Generated {len(insights)} insights for {self.personality.value}")
+            self.logger.info(
+                f"Generated {len(insights)} insights for {self.personality.value}"
+            )
             return insights
 
         except Exception as e:
-            self.logger.error(f"Error generating insights for {self.personality.value}: {e}")
+            self.logger.error(
+                f"Error generating insights for {self.personality.value}: {e}"
+            )
             return []
 
-    async def _select_sections_to_read(self, title: str, abstract: str, available_sections: list[str]) -> list[str]:
+    async def _select_sections_to_read(
+        self, title: str, abstract: str, available_sections: list[str]
+    ) -> list[str]:
         """Select which sections to read based on personality and paper overview."""
         try:
             prompt = f"""
@@ -122,7 +143,11 @@ Select sections that will help you provide the most valuable insights from your 
 
                 # Match against available sections (case-insensitive, flexible matching)
                 for section in available_sections:
-                    if line and (line.lower() == section.lower() or line.lower() in section.lower() or section.lower() in line.lower()):
+                    if line and (
+                        line.lower() == section.lower()
+                        or line.lower() in section.lower()
+                        or section.lower() in line.lower()
+                    ):
                         if section not in selected:
                             selected.append(section)
                             break
@@ -134,7 +159,9 @@ Select sections that will help you provide the most valuable insights from your 
             return selected[:5]  # Limit to 5 sections max
 
         except Exception as e:
-            self.logger.error(f"Error selecting sections for {self.personality.value}: {e}")
+            self.logger.error(
+                f"Error selecting sections for {self.personality.value}: {e}"
+            )
             return self._get_default_sections(available_sections)
 
     def _get_default_sections(self, available_sections: list[str]) -> list[str]:
@@ -147,9 +174,13 @@ Select sections that will help you provide the most valuable insights from your 
             # Always include abstract and introduction if available
             for section in available_sections:
                 section_lower = section.lower()
-                if "abstract" in section_lower and not any("abstract" in d.lower() for d in defaults):
+                if "abstract" in section_lower and not any(
+                    "abstract" in d.lower() for d in defaults
+                ):
                     defaults.append(section)
-                elif "introduction" in section_lower and not any("introduction" in d.lower() for d in defaults):
+                elif "introduction" in section_lower and not any(
+                    "introduction" in d.lower() for d in defaults
+                ):
                     defaults.append(section)
 
             # Add personality-specific defaults using pattern matching
@@ -194,7 +225,9 @@ Select sections that will help you provide the most valuable insights from your 
                         if (
                             target_lower in section_lower
                             or section_lower in target_lower
-                            or any(word in section_lower for word in target_lower.split())
+                            or any(
+                                word in section_lower for word in target_lower.split()
+                            )
                         ):
                             defaults.append(section)
                             break
@@ -202,7 +235,9 @@ Select sections that will help you provide the most valuable insights from your 
             return defaults[:5] if defaults else available_sections[:3]
 
         except Exception as e:
-            self.logger.warning(f"Enhanced section matching failed, using fallback approach: {e}")
+            self.logger.warning(
+                f"Enhanced section matching failed, using fallback approach: {e}"
+            )
 
             # Fallback to original approach
             defaults = []
@@ -235,11 +270,14 @@ Select sections that will help you provide the most valuable insights from your 
 
             return defaults[:5] if defaults else available_sections[:3]
 
-    def _get_section_content(self, document: Document, section_names: list[str]) -> dict[str, str]:
+    def _get_section_content(
+        self, document: Document, section_names: list[str]
+    ) -> dict[str, str]:
         """Get the actual content of selected sections using unified section handling."""
         content_dict: dict[str, str] = {}
 
-        sections = document.get_sections_content(
+        sections = get_sections_content(
+            document,
             section_names=section_names,
             clean_text=True,
             max_chars_per_section=3000,
@@ -251,7 +289,8 @@ Select sections that will help you provide the most valuable insights from your 
         missing = [s for s in section_names if s not in content_dict]
         if missing:
             fallback_names = self._get_default_sections(available)
-            fallback_sections = document.get_sections_content(
+            fallback_sections = get_sections_content(
+                document,
                 section_names=fallback_names,
                 clean_text=True,
                 max_chars_per_section=3000,
@@ -270,7 +309,9 @@ Select sections that will help you provide the most valuable insights from your 
     ) -> Any | None:
         """Ask a question about another agent's insight."""
         try:
-            self.logger.info(f"{self.personality.value} asking question to {target_agent.value}")
+            self.logger.info(
+                f"{self.personality.value} asking question to {target_agent.value}"
+            )
 
             insight_author = getattr(target_insight, "agent_id", target_agent)
             author_value = getattr(insight_author, "value", insight_author)
@@ -280,7 +321,9 @@ Select sections that will help you provide the most valuable insights from your 
             my_prior_questions = discussion_context.get("my_prior_questions", [])
 
             prior_qa_text = self._format_prior_qa_for_prompt(prior_qa)
-            my_prior_text = self._format_my_prior_questions_for_prompt(my_prior_questions)
+            my_prior_text = self._format_my_prior_questions_for_prompt(
+                my_prior_questions
+            )
 
             prompt = f"""
 As a {self.personality.value.replace("_", " ").title()}, review the following insight and decide whether a follow-up question is truly necessary.
@@ -324,7 +367,9 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
 """
 
             result = await self._run_with_history(prompt)
-            parsed = self._parse_question_response(result.output, target_insight, target_agent)
+            parsed = self._parse_question_response(
+                result.output, target_insight, target_agent
+            )
 
             if not parsed:
                 return None
@@ -337,11 +382,15 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
 
             question_obj = parsed.get("question")
             if question_obj:
-                self.logger.debug(f"Generated question from {self.personality.value} to {target_agent.value}")
+                self.logger.debug(
+                    f"Generated question from {self.personality.value} to {target_agent.value}"
+                )
             return question_obj
 
         except Exception as e:
-            self.logger.error(f"Error asking question from {self.personality.value}: {e}")
+            self.logger.error(
+                f"Error asking question from {self.personality.value}: {e}"
+            )
             return None
 
     async def answer_question(
@@ -353,11 +402,19 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
         """Answer a question from another agent."""
         try:
             # Handle from_agent which might be string or enum
-            from_agent_str = question.from_agent if isinstance(question.from_agent, str) else question.from_agent.value
+            from_agent_str = (
+                question.from_agent
+                if isinstance(question.from_agent, str)
+                else question.from_agent.value
+            )
 
-            self.logger.info(f"{self.personality.value} answering question from {from_agent_str}")
+            self.logger.info(
+                f"{self.personality.value} answering question from {from_agent_str}"
+            )
 
-            relevant_insights = self._find_relevant_insights_for_question(my_insights, question)
+            relevant_insights = self._find_relevant_insights_for_question(
+                my_insights, question
+            )
 
             prompt = f"""
 As a {self.personality.value.replace("_", " ").title()}, answer the following question from {from_agent_str.replace("_", " ").title()}:
@@ -396,7 +453,9 @@ Confidence: [0.0-1.0 confidence in your response]
             return parsed
 
         except Exception as e:
-            self.logger.error(f"Error answering question for {self.personality.value}: {e}")
+            self.logger.error(
+                f"Error answering question for {self.personality.value}: {e}"
+            )
             return None
 
     async def evaluate_convergence(
@@ -411,7 +470,9 @@ Confidence: [0.0-1.0 confidence in your response]
             self.logger.debug(f"{self.personality.value} evaluating convergence")
 
             qa_thread = self._build_qa_thread_summary(all_questions, all_responses)
-            my_questions_answered = self._count_my_answered_questions(all_questions, all_responses)
+            my_questions_answered = self._count_my_answered_questions(
+                all_questions, all_responses
+            )
 
             prompt = f"""
 As a {self.personality.value.replace("_", " ").title()}, evaluate whether the discussion has reached sufficient convergence:
@@ -447,14 +508,20 @@ Recommendations: [Any suggestions for next steps]
             result = await self._run_with_history(prompt)
             evaluation = self._parse_convergence_evaluation(result.output)
 
-            self.logger.info(f"{self.personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}")
+            self.logger.info(
+                f"{self.personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}"
+            )
             return evaluation
 
         except Exception as e:
-            self.logger.error(f"Error evaluating convergence for {self.personality.value}: {e}")
+            self.logger.error(
+                f"Error evaluating convergence for {self.personality.value}: {e}"
+            )
             return {"convergence_score": 0.5, "continue_discussion": True}
 
-    def _build_qa_thread_summary(self, all_questions: list[Question], all_responses: list[Response]) -> str:
+    def _build_qa_thread_summary(
+        self, all_questions: list[Question], all_responses: list[Response]
+    ) -> str:
         """Build a summary of Q&A threads for convergence evaluation."""
         if not all_questions:
             return "(No questions asked yet)"
@@ -463,7 +530,9 @@ Recommendations: [Any suggestions for next steps]
         lines = []
 
         for q in all_questions[-10:]:
-            from_agent = q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value
+            from_agent = (
+                q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value
+            )
             to_agent = q.to_agent if isinstance(q.to_agent, str) else q.to_agent.value
             response = response_map.get(q.question_id)
 
@@ -471,23 +540,34 @@ Recommendations: [Any suggestions for next steps]
             lines.append(f"Q ({from_agent} → {to_agent}): {q_summary}")
 
             if response:
-                r_summary = response.content[:100] + "..." if len(response.content) > 100 else response.content
+                r_summary = (
+                    response.content[:100] + "..."
+                    if len(response.content) > 100
+                    else response.content
+                )
                 lines.append(f"  A ({response.stance}): {r_summary}")
             else:
                 lines.append("  A: (Pending)")
 
         return "\n".join(lines) if lines else "(No Q&A yet)"
 
-    def _count_my_answered_questions(self, all_questions: list[Question], all_responses: list[Response]) -> dict[str, int]:
+    def _count_my_answered_questions(
+        self, all_questions: list[Question], all_responses: list[Response]
+    ) -> dict[str, int]:
         """Count how many of this agent's questions have been answered."""
         response_ids = {r.question_id for r in all_responses}
         my_questions = [
-            q for q in all_questions if (q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value) == self.personality.value
+            q
+            for q in all_questions
+            if (q.from_agent if isinstance(q.from_agent, str) else q.from_agent.value)
+            == self.personality.value
         ]
         answered = sum(1 for q in my_questions if q.question_id in response_ids)
         return {"total": len(my_questions), "answered": answered}
 
-    def _parse_insights_response(self, response: str, document: Document) -> list[AgentInsight]:
+    def _parse_insights_response(
+        self, response: str, document: Document
+    ) -> list[AgentInsight]:
         """Parse the agent's response to extract AgentInsight objects."""
         insights = []
 
@@ -501,9 +581,13 @@ Recommendations: [Any suggestions for next steps]
                 if line.startswith("```"):
                     continue
 
-                if line.lower().startswith("insight:") or line.lower().startswith("finding:"):
+                if line.lower().startswith("insight:") or line.lower().startswith(
+                    "finding:"
+                ):
                     if current_insight and "content" in current_insight:
-                        insights.append(self._create_insight_from_dict(current_insight, document))
+                        insights.append(
+                            self._create_insight_from_dict(current_insight, document)
+                        )
                         insight_count += 1
                         if insight_count >= 3:
                             break
@@ -516,7 +600,9 @@ Recommendations: [Any suggestions for next steps]
                         match = re.search(r"(\d+\.?\d*)", value_str)
                         if match:
                             score = float(match.group(1))
-                            current_insight["importance_score"] = min(max(score, 0.0), 1.0)
+                            current_insight["importance_score"] = min(
+                                max(score, 0.0), 1.0
+                            )
                         else:
                             current_insight["importance_score"] = 0.5
                     except Exception:
@@ -545,24 +631,39 @@ Recommendations: [Any suggestions for next steps]
                         line
                         and not line.startswith("-")
                         and not any(
-                            line.lower().startswith(f) for f in ["insight:", "finding:", "importance:", "confidence:", "questions:"]
+                            line.lower().startswith(f)
+                            for f in [
+                                "insight:",
+                                "finding:",
+                                "importance:",
+                                "confidence:",
+                                "questions:",
+                            ]
                         )
                     ):
-                        current_insight["evidence"] = f"{current_insight['evidence']} {line}"
+                        current_insight["evidence"] = (
+                            f"{current_insight['evidence']} {line}"
+                        )
 
             if current_insight and "content" in current_insight:
-                insights.append(self._create_insight_from_dict(current_insight, document))
+                insights.append(
+                    self._create_insight_from_dict(current_insight, document)
+                )
 
             if insights:
                 self.logger.debug(f"Parsed {len(insights)} insights from response")
                 for i, insight in enumerate(insights):
-                    has_evidence = bool(insight.supporting_evidence and insight.supporting_evidence[0])
+                    has_evidence = bool(
+                        insight.supporting_evidence and insight.supporting_evidence[0]
+                    )
                     self.logger.debug(
                         f"  Insight {i + 1}: importance={insight.importance_score}, "
                         f"confidence={insight.confidence}, has_evidence={has_evidence}"
                     )
             else:
-                self.logger.warning("No structured insights parsed from response, using fallback")
+                self.logger.warning(
+                    "No structured insights parsed from response, using fallback"
+                )
 
             if not insights:
                 insights.append(
@@ -571,7 +672,9 @@ Recommendations: [Any suggestions for next steps]
                         content=response[:500],
                         importance_score=0.5,
                         confidence=0.5,
-                        supporting_evidence=["(Unstructured response - no specific evidence extracted)"],
+                        supporting_evidence=[
+                            "(Unstructured response - no specific evidence extracted)"
+                        ],
                         related_sections=document.get_section_names()[:3],
                     )
                 )
@@ -591,16 +694,26 @@ Recommendations: [Any suggestions for next steps]
 
         return insights
 
-    def _create_insight_from_dict(self, insight_dict: dict[str, Any], document: Document) -> AgentInsight:
+    def _create_insight_from_dict(
+        self, insight_dict: dict[str, Any], document: Document
+    ) -> AgentInsight:
         """Create an AgentInsight from a dictionary."""
         return AgentInsight(
             agent_id=self.personality,
             content=insight_dict.get("content", ""),
             importance_score=insight_dict.get("importance_score", 0.5),
             confidence=insight_dict.get("confidence", 0.5),
-            supporting_evidence=([insight_dict.get("evidence", "")] if insight_dict.get("evidence") else []),
+            supporting_evidence=(
+                [insight_dict.get("evidence", "")]
+                if insight_dict.get("evidence")
+                else []
+            ),
             related_sections=document.get_section_names()[:3],
-            questions_raised=([insight_dict.get("questions", "")] if insight_dict.get("questions") else []),
+            questions_raised=(
+                [insight_dict.get("questions", "")]
+                if insight_dict.get("questions")
+                else []
+            ),
         )
 
     def _format_prior_qa_for_prompt(self, prior_qa: list[dict[str, Any]]) -> str:
@@ -617,7 +730,11 @@ Recommendations: [Any suggestions for next steps]
 
             lines.append(f"- Q from {from_agent}: {question}")
             if response:
-                lines.append(f"  A: {response[:200]}..." if len(response) > 200 else f"  A: {response}")
+                lines.append(
+                    f"  A: {response[:200]}..."
+                    if len(response) > 200
+                    else f"  A: {response}"
+                )
                 if stance:
                     lines.append(f"  Stance: {stance}")
             else:
@@ -625,7 +742,9 @@ Recommendations: [Any suggestions for next steps]
 
         return "\n".join(lines)
 
-    def _format_my_prior_questions_for_prompt(self, my_prior_questions: list[dict[str, Any]]) -> str:
+    def _format_my_prior_questions_for_prompt(
+        self, my_prior_questions: list[dict[str, Any]]
+    ) -> str:
         """Format the agent's own prior questions about this insight."""
         if not my_prior_questions:
             return ""
@@ -638,7 +757,11 @@ Recommendations: [Any suggestions for next steps]
 
             lines.append(f"- Your question: {question}")
             if response:
-                lines.append(f"  Response received: {response[:200]}..." if len(response) > 200 else f"  Response received: {response}")
+                lines.append(
+                    f"  Response received: {response[:200]}..."
+                    if len(response) > 200
+                    else f"  Response received: {response}"
+                )
                 if stance:
                     lines.append(f"  Their stance: {stance}")
             else:
@@ -720,7 +843,9 @@ Recommendations: [Any suggestions for next steps]
             self.logger.error(f"Error parsing question response: {e}")
             return None
 
-    def _find_relevant_insights_for_question(self, my_insights: list[AgentInsight], question: Question) -> list[AgentInsight]:
+    def _find_relevant_insights_for_question(
+        self, my_insights: list[AgentInsight], question: Question
+    ) -> list[AgentInsight]:
         """Find insights relevant to a given question using word overlap and evidence matching."""
         stop_words = {
             "the",
@@ -851,19 +976,30 @@ Recommendations: [Any suggestions for next steps]
                 if evidence and len(evidence) > 10:
                     evidence_lower = evidence.lower()
                     question_lower = question.content.lower()
-                    if evidence_lower in question_lower or question_lower in evidence_lower:
+                    if (
+                        evidence_lower in question_lower
+                        or question_lower in evidence_lower
+                    ):
                         relevant_insights.append(insight)
                         break
 
         return relevant_insights
 
-    def _parse_answer_response(self, response: str, question: Question) -> Response | None:
+    def _parse_answer_response(
+        self, response: str, question: Question
+    ) -> Response | None:
         """Parse response to create a Response object."""
         try:
-            response_match = re.search(r"Response:\s*(.+)", response, re.IGNORECASE | re.DOTALL)
+            response_match = re.search(
+                r"Response:\s*(.+)", response, re.IGNORECASE | re.DOTALL
+            )
             stance_match = re.search(r"Stance:\s*(\w+)", response, re.IGNORECASE)
-            revised_match = re.search(r"Revised Insight:\s*(.+)", response, re.IGNORECASE)
-            confidence_match = re.search(r"Confidence:\s*([0-9.]+)", response, re.IGNORECASE)
+            revised_match = re.search(
+                r"Revised Insight:\s*(.+)", response, re.IGNORECASE
+            )
+            confidence_match = re.search(
+                r"Confidence:\s*([0-9.]+)", response, re.IGNORECASE
+            )
 
             if response_match:
                 return Response(
@@ -873,9 +1009,14 @@ Recommendations: [Any suggestions for next steps]
                     content=response_match.group(1).strip(),
                     stance=stance_match.group(1).strip() if stance_match else "clarify",
                     revised_insight=(
-                        revised_match.group(1).strip() if revised_match and revised_match.group(1).strip().lower() != "none" else None
+                        revised_match.group(1).strip()
+                        if revised_match
+                        and revised_match.group(1).strip().lower() != "none"
+                        else None
                     ),
-                    confidence=(float(confidence_match.group(1)) if confidence_match else 0.5),
+                    confidence=(
+                        float(confidence_match.group(1)) if confidence_match else 0.5
+                    ),
                 )
         except Exception as e:
             self.logger.error(f"Error parsing answer response: {e}")
@@ -891,19 +1032,35 @@ Recommendations: [Any suggestions for next steps]
                 "recommendations": [],
             }
 
-            score_match = re.search(r"Convergence Score:\s*([0-9.]+)", response, re.IGNORECASE)
-            continue_match = re.search(r"Continue Discussion:\s*(\w+)", response, re.IGNORECASE)
-            issues_match = re.search(r"Key Issues Remaining:\s*(.+)", response, re.IGNORECASE | re.DOTALL)
-            rec_match = re.search(r"Recommendations:\s*(.+)", response, re.IGNORECASE | re.DOTALL)
+            score_match = re.search(
+                r"Convergence Score:\s*([0-9.]+)", response, re.IGNORECASE
+            )
+            continue_match = re.search(
+                r"Continue Discussion:\s*(\w+)", response, re.IGNORECASE
+            )
+            issues_match = re.search(
+                r"Key Issues Remaining:\s*(.+)", response, re.IGNORECASE | re.DOTALL
+            )
+            rec_match = re.search(
+                r"Recommendations:\s*(.+)", response, re.IGNORECASE | re.DOTALL
+            )
 
             if score_match:
                 evaluation["convergence_score"] = float(score_match.group(1))
             if continue_match:
-                evaluation["continue_discussion"] = continue_match.group(1).lower().startswith("y")
+                evaluation["continue_discussion"] = (
+                    continue_match.group(1).lower().startswith("y")
+                )
             if issues_match:
-                evaluation["key_issues"] = [issue.strip() for issue in issues_match.group(1).split("\n") if issue.strip()]
+                evaluation["key_issues"] = [
+                    issue.strip()
+                    for issue in issues_match.group(1).split("\n")
+                    if issue.strip()
+                ]
             if rec_match:
-                evaluation["recommendations"] = [rec.strip() for rec in rec_match.group(1).split("\n") if rec.strip()]
+                evaluation["recommendations"] = [
+                    rec.strip() for rec in rec_match.group(1).split("\n") if rec.strip()
+                ]
 
             return evaluation
         except Exception as e:
@@ -912,6 +1069,8 @@ Recommendations: [Any suggestions for next steps]
 
 
 # Factory function to create personality agents
-def create_personality_agent(personality: AgentPersonality, model_name: str = "deepseek-chat") -> PersonalityAgent:
+def create_personality_agent(
+    personality: AgentPersonality, model_name: str = "deepseek-chat"
+) -> PersonalityAgent:
     """Create a personality agent of the specified type."""
     return PersonalityAgent(personality, model_name)

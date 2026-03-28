@@ -3,6 +3,7 @@
 import pytest
 
 from sciread.document import Document
+from sciread.document.document_renderers import get_sections_content
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
 
@@ -33,38 +34,55 @@ class TestUnifiedSectionHandling:
                 position=2,
                 confidence=0.85,
             ),
-            Chunk(content="These are our experimental results with detailed findings.", chunk_name="results", position=3, confidence=0.9),
-            Chunk(content="Here we discuss the findings and their implications.", chunk_name="discussion", position=4, confidence=0.8),
-            Chunk(content="We conclude the paper and summarize our contributions.", chunk_name="conclusion", position=5, confidence=0.85),
+            Chunk(
+                content="These are our experimental results with detailed findings.",
+                chunk_name="results",
+                position=3,
+                confidence=0.9,
+            ),
+            Chunk(
+                content="Here we discuss the findings and their implications.",
+                chunk_name="discussion",
+                position=4,
+                confidence=0.8,
+            ),
+            Chunk(
+                content="We conclude the paper and summarize our contributions.",
+                chunk_name="conclusion",
+                position=5,
+                confidence=0.85,
+            ),
         ]
 
-        doc = Document(text="Full document text...", metadata=DocumentMetadata(title="Sample Paper"))
+        doc = Document(
+            text="Full document text...",
+            metadata=DocumentMetadata(title="Sample Paper"),
+        )
         doc._set_chunks(chunks)
         return doc
 
-    def test_print_for_human(self, sample_document_with_sections, capsys):
+    def test_print_for_human(self, sample_document_with_sections):
         """Test the print_for_human method."""
         doc = sample_document_with_sections
 
-        # Test with default parameters
-        doc.print_for_human()
-        captured = capsys.readouterr()
+        rendered = doc.print_for_human()
 
-        assert "Sample Paper" in captured.out
-        assert "Section 1: abstract" in captured.out
-        assert "Section 2: introduction" in captured.out
-        assert "Confidence:" in captured.out
+        assert "Sample Paper" in rendered
+        assert "Section 1: abstract" in rendered
+        assert "Section 2: introduction" in rendered
+        assert "Confidence:" in rendered
 
-    def test_print_for_human_with_specific_sections(self, sample_document_with_sections, capsys):
+    def test_print_for_human_with_specific_sections(
+        self, sample_document_with_sections
+    ):
         """Test print_for_human with specific sections."""
         doc = sample_document_with_sections
 
-        doc.print_for_human(section_names=["abstract", "introduction"])
-        captured = capsys.readouterr()
+        rendered = doc.print_for_human(section_names=["abstract", "introduction"])
 
-        assert "Section 1: abstract" in captured.out
-        assert "Section 2: introduction" in captured.out
-        assert "methodology" not in captured.out.lower()  # Should not be included
+        assert "Section 1: abstract" in rendered
+        assert "Section 2: introduction" in rendered
+        assert "methodology" not in rendered.lower()  # Should not be included
 
     def test_get_for_llm_basic(self, sample_document_with_sections):
         """Test basic get_for_llm functionality."""
@@ -74,48 +92,37 @@ class TestUnifiedSectionHandling:
 
         assert "=== ABSTRACT ===" in content
         assert "=== INTRODUCTION ===" in content
-        assert "This is the abstract of the paper with enough content to meet minimum length requirements." in content
+        assert (
+            "This is the abstract of the paper with enough content to meet minimum length requirements."
+            in content
+        )
         assert "DOCUMENT METADATA:" in content
         assert "Sample Paper" in content
 
-    def test_get_section_by_number(self, sample_document_with_sections):
-        """Test get_section_by_number method."""
+    def test_get_sections_by_name(self, sample_document_with_sections):
+        """Test get_sections_by_name returns matching chunks."""
         doc = sample_document_with_sections
 
-        # Test valid index
-        section_name, content = doc.get_section_by_number(0)
-        assert section_name == "abstract"
-        assert "This is the abstract of the paper with enough content to meet minimum length requirements." in content
-
-        # Test invalid index
-        result = doc.get_section_by_number(10)
-        assert result is None
-
-    def test_get_section_by_name_exact(self, sample_document_with_sections):
-        """Test get_section_by_name with exact matching."""
-        doc = sample_document_with_sections
-
-        section_name, content = doc.get_section_by_name("introduction")
-        assert section_name == "introduction"
-        assert "This is the introduction section that is also sufficiently long to pass the minimum length check." in content
-
-    def test_get_section_by_name_fuzzy(self, sample_document_with_sections):
-        """Test get_section_by_name with fuzzy matching."""
-        doc = sample_document_with_sections
-
-        # Test fuzzy matching
-        section_name, content = doc.get_section_by_name("intro", fuzzy=True)
-        assert section_name == "introduction"
-        assert "This is the introduction section that is also sufficiently long to pass the minimum length check." in content
+        intro_chunks = doc.get_sections_by_name(["introduction"])
+        assert len(intro_chunks) == 1
+        assert intro_chunks[0].chunk_name == "introduction"
+        assert (
+            "This is the introduction section that is also sufficiently long to pass the minimum length check."
+            in intro_chunks[0].content
+        )
 
     def test_get_sections_content_helper(self, sample_document_with_sections):
         """Ensure helper returns ordered, truncated content consistently."""
         doc = sample_document_with_sections
 
-        sections = doc.get_sections_content(max_sections=2)
+        sections = get_sections_content(doc, max_sections=2)
         assert [name for name, _ in sections] == ["abstract", "introduction"]
 
-        truncated = doc.get_sections_content(section_names=["abstract"], max_chars_per_section=20)
+        truncated = get_sections_content(
+            doc,
+            section_names=["abstract"],
+            max_chars_per_section=20,
+        )
         assert truncated[0][1].endswith("...[truncated]")
 
     def test_get_closest_section_name(self, sample_document_with_sections):
@@ -134,7 +141,9 @@ class TestUnifiedSectionHandling:
         match = doc.get_closest_section_name("nonexistent", threshold=0.9)
         assert match is None
 
-    def test_get_closest_section_name_with_patterns(self, sample_document_with_sections):
+    def test_get_closest_section_name_with_patterns(
+        self, sample_document_with_sections
+    ):
         """Test pattern-based section matching."""
         doc = sample_document_with_sections
 
@@ -183,7 +192,9 @@ class TestUnifiedSectionHandling:
 
         # Create chunk with cleaning artifacts
         dirty_content = "This  has    extra  spaces\n\n\nand newlines."
-        chunk = Chunk(content=dirty_content, chunk_name="test_section", position=0, confidence=0.9)
+        chunk = Chunk(
+            content=dirty_content, chunk_name="test_section", position=0, confidence=0.9
+        )
         doc._set_chunks([chunk])
 
         content = doc.get_for_llm(clean_text=True)
@@ -212,5 +223,5 @@ class TestUnifiedSectionHandling:
         assert overview["total_sections"] == 0
 
         # Should handle gracefully
-        result = empty_doc.get_section_by_number(0)
-        assert result is None
+        result = empty_doc.get_sections_by_name(["abstract"])
+        assert result == []

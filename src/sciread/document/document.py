@@ -15,7 +15,6 @@ from .document_renderers import collect_sections as collect_document_sections
 from .document_renderers import format_for_human
 from .document_renderers import format_for_llm
 from .document_renderers import get_section_overview as build_section_overview
-from .document_renderers import get_sections_content as collect_sections_content
 from .document_renderers import (
     get_sections_with_confidence as collect_sections_with_confidence,
 )
@@ -466,22 +465,6 @@ class Document:
             max_chars_per_section=max_chars_per_section,
         )
 
-    def get_sections_content(
-        self,
-        section_names: list[str] | None = None,
-        max_sections: int | None = None,
-        clean_text: bool = False,
-        max_chars_per_section: int | None = None,
-    ) -> list[tuple[str, str]]:
-        """Public helper to fetch section content with consistent ordering and cleaning."""
-        return collect_sections_content(
-            self,
-            section_names=section_names,
-            max_sections=max_sections,
-            clean_text=clean_text,
-            max_chars_per_section=max_chars_per_section,
-        )
-
     def __iter__(self) -> Iterator[Chunk]:
         """Iterate over chunks."""
         return iter(self._chunks)
@@ -665,8 +648,8 @@ class Document:
         show_metadata: bool = True,
         show_confidence: bool = True,
         use_colors: bool = True,
-    ) -> None:
-        """Print formatted document sections for human reading.
+    ) -> str:
+        """Render formatted document sections for human reading.
 
         Args:
             section_names: Specific section names to display. If None, shows all sections.
@@ -674,9 +657,12 @@ class Document:
             show_metadata: Whether to show document metadata (title, author, etc.).
             show_confidence: Whether to show confidence scores for each section.
             use_colors: Whether to use colored output (if terminal supports it).
+
+        Returns:
+            Rendered human-readable content.
         """
         try:
-            rendered = format_for_human(
+            return format_for_human(
                 self,
                 section_names=section_names,
                 max_sections=max_sections,
@@ -684,11 +670,10 @@ class Document:
                 show_confidence=show_confidence,
                 use_colors=use_colors,
             )
-            print(rendered)
 
         except Exception as e:
             self.logger.error(f"Failed to print document for human: {e}")
-            print(f"Error printing document: {e}")
+            return f"Error rendering document: {e}"
 
     def get_for_llm(
         self,
@@ -718,94 +703,6 @@ class Document:
             clean_text=clean_text,
             max_chars_per_section=max_chars_per_section,
         )
-
-    def get_section_by_number(
-        self, index: int, include_content: bool = True, max_chars: int | None = None
-    ) -> tuple[str, str] | None:
-        """Get section by numerical index.
-
-        Args:
-            index: Zero-based index of the section.
-            include_content: Whether to include section content.
-            max_chars: Maximum characters to return for content.
-
-        Returns:
-            Tuple of (section_name, content) if found, None otherwise.
-        """
-        try:
-            section_names = self.get_section_names()
-            if index < 0 or index >= len(section_names):
-                return None
-
-            section_name = section_names[index]
-            if not include_content:
-                return (section_name, "")
-
-            sections = self._collect_sections(
-                section_names=[section_name], max_sections=1
-            )
-            if not sections:
-                return (section_name, "")
-
-            content = sections[0]["content"]
-            if max_chars and len(content) > max_chars:
-                content = content[:max_chars] + "...[truncated]"
-
-            return (section_name, content)
-
-        except Exception as e:
-            self.logger.error(f"Failed to get section by number {index}: {e}")
-            return None
-
-    def get_section_by_name(
-        self,
-        name: str,
-        fuzzy: bool = True,
-        case_sensitive: bool = False,
-        threshold: float = 0.8,
-    ) -> tuple[str, str] | None:
-        """Get section by name with optional fuzzy matching.
-
-        Args:
-            name: Section name to search for.
-            fuzzy: Whether to use fuzzy matching if exact match not found.
-            case_sensitive: Whether matching should be case sensitive.
-            threshold: Similarity threshold for fuzzy matching (0.0-1.0).
-
-        Returns:
-            Tuple of (section_name, content) if found, None otherwise.
-        """
-        try:
-            section_names = self.get_section_names()
-
-            # Normalize for case sensitivity
-            if not case_sensitive:
-                search_name = name.lower()
-                normalized_names = [n.lower() for n in section_names]
-            else:
-                search_name = name
-                normalized_names = section_names
-
-            # Try exact match first
-            if search_name in normalized_names:
-                actual_name = section_names[normalized_names.index(search_name)]
-                return self.get_section_by_number(section_names.index(actual_name))
-
-            # Try fuzzy matching if requested
-            if fuzzy:
-                closest_match = self.get_closest_section_name(
-                    name, case_sensitive=case_sensitive, threshold=threshold
-                )
-                if closest_match:
-                    return self.get_section_by_number(
-                        section_names.index(closest_match)
-                    )
-
-            return None
-
-        except Exception as e:
-            self.logger.error(f"Failed to get section by name '{name}': {e}")
-            return None
 
     def get_closest_section_name(
         self,
