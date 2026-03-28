@@ -1,6 +1,7 @@
 """Markdown-specific text splitter that leverages markdown structure for accurate chunking."""
 
 import re
+import uuid
 
 from ..models import Chunk
 from .base import BaseSplitter
@@ -237,11 +238,27 @@ class MarkdownSplitter(BaseSplitter):
         if section_name is None:
             section_name = self._extract_section_from_content(content)
 
+        section_value = section_name if section_name else "unknown"
+        chunk_id = str(uuid.uuid4())
+
         chunk = Chunk(
             content=content,
-            chunk_name=section_name if section_name else "unknown",
+            chunk_id=chunk_id,
+            doc_id="",
+            content_plain=content,
+            section_path=[section_value] if section_value != "unknown" else [],
+            page_start=None,
+            page_end=None,
+            para_index=0,
+            chunk_name=section_value,
             position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
+            token_count=len(content.split()),
+            prev_chunk_id=None,
+            next_chunk_id=None,
+            parent_section_id=section_value if section_value != "unknown" else None,
+            citation_key=chunk_id,
+            retrievable=True,
             confidence=confidence,
             metadata={"splitter": chunk_type},
         )
@@ -322,11 +339,25 @@ class MarkdownSplitter(BaseSplitter):
         confidence: float,
     ) -> Chunk:
         """Create a basic chunk."""
+        chunk_id = str(uuid.uuid4())
         return Chunk(
             content=content,
+            chunk_id=chunk_id,
+            doc_id="",
+            content_plain=content,
+            section_path=[],
+            page_start=None,
+            page_end=None,
+            para_index=0,
             chunk_name="unknown",
             position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
+            token_count=len(content.split()),
+            prev_chunk_id=None,
+            next_chunk_id=None,
+            parent_section_id=None,
+            citation_key=chunk_id,
+            retrievable=True,
             confidence=confidence,
             metadata={"splitter": chunk_type},
         )

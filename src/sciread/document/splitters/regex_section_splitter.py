@@ -1,6 +1,7 @@
 """Advanced regex-based text splitter for academic documents."""
 
 import re
+import uuid
 from re import Pattern
 
 from ..models import Chunk
@@ -289,12 +290,27 @@ class RegexSectionSplitter(BaseSplitter):
 
             # Extract actual section name from content
             section_name = self._extract_section_name_from_content(content)
+            section_value = section_name if section_name else "unknown"
+            chunk_id = str(uuid.uuid4())
 
             chunk = Chunk(
                 content=content,
-                chunk_name=section_name if section_name else "unknown",
+                chunk_id=chunk_id,
+                doc_id="",
+                content_plain=content,
+                section_path=[section_value] if section_value != "unknown" else [],
+                page_start=None,
+                page_end=None,
+                para_index=i,
+                chunk_name=section_value,
                 position=i,
                 char_range=(raw_chunk["start_pos"], raw_chunk["end_pos"]),
+                token_count=len(content.split()),
+                prev_chunk_id=None,
+                next_chunk_id=None,
+                parent_section_id=section_value if section_value != "unknown" else None,
+                citation_key=chunk_id,
+                retrievable=True,
                 confidence=confidence,
                 metadata={"splitter": chunk_type},
             )

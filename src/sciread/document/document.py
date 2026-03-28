@@ -408,8 +408,49 @@ class Document:
         """Update the _chunks_by_id dictionary to match current chunks."""
         self._chunks_by_id = {chunk.id: chunk for chunk in self._chunks}
 
+    def _build_doc_id(self) -> str:
+        """Build a stable document ID used by chunk metadata."""
+        return self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
+
+    def _enrich_chunks_metadata(self, chunks: list[Chunk]) -> None:
+        """Fill normalized chunk metadata fields and maintain linkage."""
+        doc_id = self._build_doc_id()
+
+        for i, chunk in enumerate(chunks):
+            chunk.doc_id = chunk.doc_id or doc_id
+            chunk.para_index = i
+            chunk.position = i
+
+            if not chunk.content_plain:
+                chunk.content_plain = chunk.content
+
+            if chunk.token_count is None:
+                chunk.token_count = len(chunk.content_plain.split())
+
+            if chunk.page_range is not None:
+                if chunk.page_start is None:
+                    chunk.page_start = chunk.page_range[0]
+                if chunk.page_end is None:
+                    chunk.page_end = chunk.page_range[1]
+            elif chunk.page_start is not None and chunk.page_end is not None:
+                chunk.page_range = (chunk.page_start, chunk.page_end)
+
+            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
+                chunk.section_path = [chunk.chunk_name]
+
+            if not chunk.parent_section_id and chunk.section_path:
+                chunk.parent_section_id = chunk.section_path[-1]
+
+            if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
+                chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
+
+        for i, chunk in enumerate(chunks):
+            chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
+            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
+
     def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
+        self._enrich_chunks_metadata(chunks)
         self._chunks = chunks
         self._update_chunks_by_id()
         self._split = len(chunks) > 0
@@ -1201,6 +1242,7 @@ class Document:
             for chunk_data in doc_state["chunks"]:
                 chunk = Chunk(**chunk_data)
                 doc._chunks.append(chunk)
+            doc._enrich_chunks_metadata(doc._chunks)
             doc._update_chunks_by_id()
 
             # Re-link vector index if available

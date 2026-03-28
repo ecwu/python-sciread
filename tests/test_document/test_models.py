@@ -73,6 +73,47 @@ class TestChunk:
         assert chunk.processed is False
         assert chunk.is_processed is False
 
+    def test_chunk_new_metadata_defaults(self):
+        """Test default initialization for expanded chunk metadata fields."""
+        chunk = Chunk(
+            content="This is a test chunk.",
+            chunk_name="introduction",
+            position=3,
+            page_range=(1, 2),
+        )
+
+        assert chunk.chunk_id
+        assert chunk.id == chunk.chunk_id
+        assert chunk.content_plain == chunk.content
+        assert chunk.doc_id == ""
+        assert chunk.section_path == ["introduction"]
+        assert chunk.page_start == 1
+        assert chunk.page_end == 2
+        assert chunk.para_index == 3
+        assert chunk.token_count == chunk.word_count
+        assert chunk.prev_chunk_id is None
+        assert chunk.next_chunk_id is None
+        assert chunk.parent_section_id == "introduction"
+        assert chunk.citation_key == chunk.chunk_id
+        assert chunk.retrievable is True
+
+    def test_chunk_retrievable_sync_with_processed(self):
+        """Test retrievable flag syncs with processed state transitions."""
+        chunk = Chunk(content="test")
+        assert chunk.retrievable is True
+
+        chunk.mark_processed()
+        assert chunk.processed is True
+        assert chunk.retrievable is False
+
+        chunk.mark_unprocessed()
+        assert chunk.processed is False
+        assert chunk.retrievable is True
+
+        chunk.toggle_processed()
+        assert chunk.processed is True
+        assert chunk.retrievable is False
+
 
 class TestDocumentMetadata:
     """Test cases for the DocumentMetadata model."""

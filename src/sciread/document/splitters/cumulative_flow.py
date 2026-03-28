@@ -1,5 +1,6 @@
 """CumulativeFlow splitter: Cumulative sentence similarity-based chunking."""
 
+import uuid
 from typing import Any
 
 from ..models import Chunk
@@ -168,11 +169,25 @@ class CumulativeFlowSplitter(SentenceFlowSplitter):
         if similarity_score is not None:
             metadata["similarity_score"] = similarity_score
 
+        chunk_id = str(uuid.uuid4())
         chunk = Chunk(
             content=content,
+            chunk_id=chunk_id,
+            doc_id="",
+            content_plain=content,
+            section_path=["cumulative"],
+            page_start=None,
+            page_end=None,
+            para_index=0,
             chunk_name=f"cumulative_chunk_{len(content)}",
             position=0,
             char_range=(start_char, end_char),
+            token_count=len(content.split()),
+            prev_chunk_id=None,
+            next_chunk_id=None,
+            parent_section_id="cumulative",
+            citation_key=chunk_id,
+            retrievable=True,
             confidence=confidence,
             metadata=metadata,
         )

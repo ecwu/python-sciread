@@ -345,3 +345,26 @@ Third paragraph after more spacing."""
         # Should have lower confidence for paragraph-based splits
         paragraph_chunks = [c for c in chunks if c.confidence < 0.5]
         assert len(paragraph_chunks) >= 0  # May be empty if content is grouped
+
+    def test_output_chunk_contains_new_metadata_fields(self):
+        """Test regex splitter initializes expanded chunk metadata fields."""
+        text = """Abstract
+
+This is a short abstract section for testing chunk metadata."""
+
+        splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
+        chunks = splitter.split(text)
+
+        assert len(chunks) >= 1
+        chunk = chunks[0]
+
+        assert chunk.chunk_id
+        assert chunk.id == chunk.chunk_id
+        assert chunk.content_plain == chunk.content
+        assert isinstance(chunk.section_path, list)
+        assert chunk.token_count is not None
+        assert chunk.token_count > 0
+        assert chunk.prev_chunk_id is None
+        assert chunk.next_chunk_id is None
+        assert chunk.citation_key == chunk.chunk_id
+        assert chunk.retrievable is True

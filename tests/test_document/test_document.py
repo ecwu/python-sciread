@@ -209,3 +209,35 @@ class TestDocument:
         assert len(doc.processing_state.notes) >= 2
         assert any("loaded" in note.lower() for note in doc.processing_state.notes)
         assert any("split" in note.lower() for note in doc.processing_state.notes)
+
+    def test_chunk_enrichment_sets_doc_and_links(self):
+        """Test document chunk enrichment populates doc_id, citation, and neighbor links."""
+        doc = Document.from_text("placeholder")
+        chunks = [
+            Chunk(content="Chunk one", chunk_name="intro"),
+            Chunk(content="Chunk two", chunk_name="methods"),
+            Chunk(content="Chunk three", chunk_name="results"),
+        ]
+
+        doc._set_chunks(chunks)
+
+        assert len(doc.chunks) == 3
+        assert all(chunk.doc_id == "unnamed_document" for chunk in doc.chunks)
+        assert doc.chunks[0].prev_chunk_id is None
+        assert doc.chunks[0].next_chunk_id == doc.chunks[1].chunk_id
+        assert doc.chunks[1].prev_chunk_id == doc.chunks[0].chunk_id
+        assert doc.chunks[1].next_chunk_id == doc.chunks[2].chunk_id
+        assert doc.chunks[2].prev_chunk_id == doc.chunks[1].chunk_id
+        assert doc.chunks[2].next_chunk_id is None
+        assert doc.chunks[0].citation_key == "unnamed_document:0"
+        assert doc.chunks[1].citation_key == "unnamed_document:1"
+        assert doc.chunks[2].citation_key == "unnamed_document:2"
+
+    def test_chunk_enrichment_preserves_custom_citation_key(self):
+        """Test custom citation keys are preserved during enrichment."""
+        doc = Document.from_text("placeholder")
+        chunk = Chunk(content="Chunk one", chunk_name="intro", citation_key="custom:cite")
+
+        doc._set_chunks([chunk])
+
+        assert doc.chunks[0].citation_key == "custom:cite"

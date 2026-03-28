@@ -1,5 +1,6 @@
 """Base class for sentence-similarity-based text splitters."""
 
+import uuid
 from typing import Any
 
 import regex
@@ -129,11 +130,25 @@ class SentenceFlowSplitter(BaseSplitter):
 
     def _create_single_chunk(self, text: str) -> list[Chunk]:
         """Create a single chunk from text when no splitting is possible."""
+        chunk_id = str(uuid.uuid4())
         chunk = Chunk(
             content=text,
+            chunk_id=chunk_id,
+            doc_id="",
+            content_plain=text,
+            section_path=["document"],
+            page_start=None,
+            page_end=None,
+            para_index=0,
             chunk_name="document",
             position=0,
             char_range=(0, len(text)),
+            token_count=len(text.split()),
+            prev_chunk_id=None,
+            next_chunk_id=None,
+            parent_section_id="document",
+            citation_key=chunk_id,
+            retrievable=True,
             confidence=0.5,
             metadata={"splitter": "single_chunk"},
         )
@@ -145,11 +160,25 @@ class SentenceFlowSplitter(BaseSplitter):
         chunks = []
 
         for i, para in enumerate(paragraphs):
+            chunk_id = str(uuid.uuid4())
             chunk = Chunk(
                 content=para,
+                chunk_id=chunk_id,
+                doc_id="",
+                content_plain=para,
+                section_path=["paragraph"],
+                page_start=None,
+                page_end=None,
+                para_index=i,
                 chunk_name="paragraph",
                 position=i,
                 char_range=(0, len(para)),
+                token_count=len(para.split()),
+                prev_chunk_id=None,
+                next_chunk_id=None,
+                parent_section_id="paragraph",
+                citation_key=chunk_id,
+                retrievable=True,
                 confidence=0.3,
                 metadata={"splitter": "fallback_paragraphs"},
             )
@@ -187,11 +216,25 @@ class SentenceFlowSplitter(BaseSplitter):
         if similarity_score is not None:
             metadata["similarity_score"] = similarity_score
 
+        chunk_id = str(uuid.uuid4())
         chunk = Chunk(
             content=content,
+            chunk_id=chunk_id,
+            doc_id="",
+            content_plain=content,
+            section_path=["text_segment"],
+            page_start=None,
+            page_end=None,
+            para_index=0,
             chunk_name="text_segment",
             position=0,
             char_range=(start_pos, end_pos),
+            token_count=word_count,
+            prev_chunk_id=None,
+            next_chunk_id=None,
+            parent_section_id="text_segment",
+            citation_key=chunk_id,
+            retrievable=True,
             confidence=confidence,
             metadata=metadata,
             word_count=word_count,
