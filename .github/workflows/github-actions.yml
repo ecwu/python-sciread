@@ -6,7 +6,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
       - name: ruff check
         run: uv run ruff check src/ tests/
       - name: ruff format
@@ -22,7 +22,7 @@ jobs:
         python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: ${{ matrix.python }}
       - name: install dependencies
