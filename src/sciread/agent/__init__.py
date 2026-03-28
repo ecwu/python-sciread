@@ -8,11 +8,10 @@ Main Interface:
     SimpleAgent - Simple agent class for basic document analysis
     CoordinateAgent - Multi-agent controller with expert sub-agents
     ReActAgent - Reasoning and Acting agent for iterative analysis
-    RAGReActAgent - Retrieval-Augmented Generation + ReAct agent for semantic search-based analysis
     DiscussionAgent - Multi-agent discussion system with personality-driven analysis
 
 Example Usage:
-    from sciread.agent import SimpleAgent, CoordinateAgent, ReActAgent, RAGReActAgent, DiscussionAgent
+    from sciread.agent import SimpleAgent, CoordinateAgent, ReActAgent, DiscussionAgent
     from sciread.document import Document
 
     # Create a simple agent
@@ -24,10 +23,6 @@ Example Usage:
     # Create a ReAct agent
     react_agent = ReActAgent("deepseek/deepseek-chat")
 
-    # Create a RAG ReAct agent
-    rag_react_agent = RAGReActAgent("deepseek/deepseek-chat")
-
-    # Create a discussion-based multi-agent system
     discussion_agent = DiscussionAgent("deepseek/deepseek-chat")
 
     # Process a document (automatically loaded and split)
@@ -41,9 +36,6 @@ Example Usage:
 
     # Generate iterative analysis with ReAct agent
     react_result = await react_agent.analyze_document(doc, "What are the main contributions?")
-
-    # Generate semantic search-based analysis with RAG ReAct agent
-    rag_react_result = await rag_react_agent.analyze_document(doc, "What are the main contributions?")
 
     # Generate discussion-based analysis with personality agents
     discussion_result = await discussion_agent.analyze_document(doc)
@@ -74,10 +66,6 @@ from .models.discussion_models import DivergentView
 from .models.discussion_models import Question
 from .models.discussion_models import Response
 
-# RAG ReActAgent models - now imported from models folder
-from .models.rag_react_models import RAGReActAgentInput
-from .models.rag_react_models import RAGReActAgentOutput
-
 # ReActAgent models - now imported from models folder
 from .models.react_models import ReActAgentInput
 from .models.react_models import ReActAgentOutput
@@ -92,10 +80,6 @@ from .models.task_models import TaskStatus
 from .models.task_models import TaskType
 from .personality_agents import PersonalityAgent
 from .personality_agents import create_personality_agent
-
-# RAG ReActAgent and utility functions
-from .rag_react_agent import RAGReActAgent
-from .rag_react_agent import analyze_document_with_rag_react
 
 # ReActAgent and utility functions
 from .react_agent import ReActAgent
@@ -129,9 +113,6 @@ __all__ = [
     "PersonalityAgent",
     "PreviousMethodsResult",
     "Question",
-    "RAGReActAgent",
-    "RAGReActAgentInput",
-    "RAGReActAgentOutput",
     "ReActAgent",
     "ReActAgentInput",
     "ReActAgentOutput",
@@ -148,7 +129,6 @@ __all__ = [
     "TaskStatus",
     "TaskType",
     # Utility functions
-    "analyze_document_with_rag_react",
     "analyze_document_with_react",
     "create_personality_agent",
     "format_status_summary",

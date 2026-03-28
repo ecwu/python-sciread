@@ -9,41 +9,40 @@ Understand paper with LLM-driven agents.
 Installation
 ============
 
-::
+You can install ``sciread`` using ``uv``::
+
+    uv add sciread
+
+Or with standard ``pip``::
 
     pip install sciread
 
-You can also install the in-development version with::
+Development version::
 
-    pip install git+ssh://git@https://gitea.ecwu.xyz/ecwu/python-sciread.git@main
+    uv add git+https://gitea.ecwu.xyz/ecwu/python-sciread.git@main
 
 Documentation
 =============
 
-
 https://python-sciread.readthedocs.io/
-
 
 Development
 ===========
 
-To run all the tests run::
+This project uses `uv <https://docs.astral.sh/uv/>`_ for dependency management.
 
-    tox
+To set up the development environment::
 
-Note, to combine the coverage data from all the tox environments run:
+    uv sync --group test --group dev
 
-.. list-table::
-    :widths: 10 90
-    :stub-columns: 1
+To run all tests::
 
-    - - Windows
-      - ::
+    uv run pytest tests/
 
-            set PYTEST_ADDOPTS=--cov-append
-            tox
+To run tests with coverage::
 
-    - - Other
-      - ::
+    uv run pytest --cov src/ tests/
 
-            PYTEST_ADDOPTS=--cov-append tox
+To run linting (Ruff)::
+
+    uv run ruff check src/ tests/

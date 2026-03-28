@@ -1,7 +1,6 @@
 from .core import comprehensive_analysis
 from .core import compute
 from .core import main
-from .core import run_rag_react_analysis
 from .core import run_react_analysis
 from .embedding_provider import EmbeddingFactory
 from .embedding_provider import OllamaClient
@@ -23,7 +22,6 @@ __all__ = [
     "get_logger",
     "get_model",
     "main",
-    "run_rag_react_analysis",
     "run_react_analysis",
     "setup_logging",
 ]
