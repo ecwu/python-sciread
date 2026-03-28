@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
     """Calculate cosine similarity between two vectors."""
     try:
-        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=True))
         magnitude1 = sum(a * a for a in vec1) ** 0.5
         magnitude2 = sum(b * b for b in vec2) ** 0.5
 
@@ -42,9 +42,7 @@ def build_vector_index(
         document.logger.warning("No chunks to index. Please split the document first.")
         return
 
-    document.logger.info(
-        f"Building vector index from {len(document._chunks)} chunks..."
-    )
+    document.logger.info(f"Building vector index from {len(document._chunks)} chunks...")
 
     try:
         vector_config = None
@@ -99,9 +97,7 @@ def semantic_search(
 ) -> list[Chunk] | list[tuple[Chunk, float]]:
     """Perform semantic search on document chunks."""
     if not document.vector_index:
-        document.logger.warning(
-            "Vector index not found. Please run `build_vector_index()` first."
-        )
+        document.logger.warning("Vector index not found. Please run `build_vector_index()` first.")
         return []
 
     if not document._chunks_by_id:
@@ -110,10 +106,7 @@ def semantic_search(
     document.logger.info(f"Performing semantic search for: '{query}'")
 
     try:
-        if (
-            hasattr(document, "_embedding_client")
-            and document._embedding_client is not None
-        ):
+        if hasattr(document, "_embedding_client") and document._embedding_client is not None:
             embedding_client = document._embedding_client
         else:
             config = get_config_fn()
@@ -140,11 +133,7 @@ def semantic_search(
             document.logger.info(f"Found {len(results_with_scores)} matching chunks")
             return results_with_scores
 
-        found_chunks = [
-            document._chunks_by_id[res["id"]]
-            for res in search_results
-            if res["id"] in document._chunks_by_id
-        ]
+        found_chunks = [document._chunks_by_id[res["id"]] for res in search_results if res["id"] in document._chunks_by_id]
         document.logger.info(f"Found {len(found_chunks)} matching chunks")
         return found_chunks
 

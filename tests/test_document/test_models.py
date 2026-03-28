@@ -1,7 +1,7 @@
 """Tests for core data models."""
 
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from pathlib import Path
 
 import pytest
@@ -142,9 +142,9 @@ class TestDocumentMetadata:
 
     def test_metadata_auto_timestamps(self):
         """Test automatic timestamp initialization."""
-        before = datetime.now(timezone.utc)
+        before = datetime.now(UTC)
         metadata = DocumentMetadata()
-        after = datetime.now(timezone.utc)
+        after = datetime.now(UTC)
 
         assert before <= metadata.created_at <= after
         assert before <= metadata.modified_at <= after

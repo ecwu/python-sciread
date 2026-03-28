@@ -1,22 +1,15 @@
 """Configuration management for sciread package."""
 
 import os
-import sys
+
+# Handle toml library compatibility
+import tomllib
 from pathlib import Path
 
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
-
-# Handle toml library compatibility
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomllib
-    except ImportError:
-        pass
 
 
 class LLMProviderConfig(BaseModel):

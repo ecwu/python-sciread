@@ -40,9 +40,7 @@ class CumulativeFlowSplitter(SentenceFlowSplitter):
 
         return chunks
 
-    def _create_chunks_using_cumulative_similarity(
-        self, sentences: list[dict[str, Any]], embeddings: list[list[float]]
-    ) -> list[Chunk]:
+    def _create_chunks_using_cumulative_similarity(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[Chunk]:
         """Create chunks using cumulative similarity between segment and next sentence."""
         if len(sentences) != len(embeddings):
             return self._fallback_split(" ".join(s["text"] for s in sentences))
@@ -58,24 +56,17 @@ class CumulativeFlowSplitter(SentenceFlowSplitter):
             sentence_embedding = embeddings[i]
 
             # Calculate cumulative segment embedding (centroid of all sentence embeddings)
-            segment_embedding = self.ollama_client.calculate_centroid(
-                current_segment_embeddings
-            )
+            segment_embedding = self.ollama_client.calculate_centroid(current_segment_embeddings)
 
             # Calculate similarity between cumulative segment and next sentence
-            similarity_score = self.ollama_client.cosine_similarity(
-                segment_embedding, sentence_embedding
-            )
+            similarity_score = self.ollama_client.cosine_similarity(segment_embedding, sentence_embedding)
 
             # Check if adding this sentence would exceed budget
-            would_exceed_budget = (
-                current_segment_chars + sentence["length"] > self.max_segment_chars
-            )
+            would_exceed_budget = current_segment_chars + sentence["length"] > self.max_segment_chars
 
             # Check if we have enough content to make a split decision
             ready_for_split = (
-                len(current_segment_sentences) >= self.min_segment_sentences
-                and current_segment_chars >= self.min_segment_chars
+                len(current_segment_sentences) >= self.min_segment_sentences and current_segment_chars >= self.min_segment_chars
             )
 
             # Decision logic
@@ -95,11 +86,7 @@ class CumulativeFlowSplitter(SentenceFlowSplitter):
                     current_segment_sentences,
                     current_segment_start,
                     split_reason,
-                    (
-                        similarity_score
-                        if split_reason == "cumulative_similarity_drop"
-                        else None
-                    ),
+                    (similarity_score if split_reason == "cumulative_similarity_drop" else None),
                 )
                 chunks.append(chunk)
 

@@ -1,8 +1,8 @@
 """Task management models for multi-agent discussion system."""
 
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 from uuid import uuid4
 
@@ -16,7 +16,7 @@ from .discussion_models import Question
 from .discussion_models import Response
 
 
-class TaskType(str, Enum):
+class TaskType(StrEnum):
     """Different types of tasks in the discussion system."""
 
     ANALYZE_DOCUMENT = "analyze_document"
@@ -29,7 +29,7 @@ class TaskType(str, Enum):
     MONITOR_CONVERGENCE = "monitor_convergence"
 
 
-class TaskPriority(str, Enum):
+class TaskPriority(StrEnum):
     """Priority levels for tasks."""
 
     LOW = "low"
@@ -38,7 +38,7 @@ class TaskPriority(str, Enum):
     CRITICAL = "critical"
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     """Status of a task."""
 
     PENDING = "pending"
@@ -137,10 +137,10 @@ class TaskQueue(BaseModel):
 
     def add_task(self, task: Task) -> str:
         """Add a new task to the queue."""
-        task.created_at = datetime.now(timezone.utc)
+        task.created_at = datetime.now(UTC)
         self.pending_tasks.append(task)
         self.total_tasks_created += 1
-        self.last_activity = datetime.now(timezone.utc)
+        self.last_activity = datetime.now(UTC)
         return task.task_id
 
     def get_next_task(self, agent_personality: AgentPersonality) -> Task | None:
@@ -166,12 +166,12 @@ class TaskQueue(BaseModel):
             if task.task_id == task_id:
                 task.assigned_to = agent
                 task.status = TaskStatus.ASSIGNED
-                task.assigned_at = datetime.now(timezone.utc)
+                task.assigned_at = datetime.now(UTC)
 
                 # Move to active tasks
                 self.active_tasks.append(task)
                 self.pending_tasks.pop(i)
-                self.last_activity = datetime.now(timezone.utc)
+                self.last_activity = datetime.now(UTC)
                 return True
 
         return False
@@ -182,13 +182,13 @@ class TaskQueue(BaseModel):
             if task.task_id == task_id:
                 task.status = TaskStatus.COMPLETED
                 task.result = result
-                task.completed_at = datetime.now(timezone.utc)
+                task.completed_at = datetime.now(UTC)
 
                 # Move to completed tasks
                 self.completed_tasks.append(task)
                 self.active_tasks.pop(i)
                 self.total_tasks_completed += 1
-                self.last_activity = datetime.now(timezone.utc)
+                self.last_activity = datetime.now(UTC)
                 return True
 
         return False
@@ -216,7 +216,7 @@ class TaskQueue(BaseModel):
                     self.failed_tasks.append(task)
                     self.active_tasks.pop(i)
 
-                self.last_activity = datetime.now(timezone.utc)
+                self.last_activity = datetime.now(UTC)
                 return True
 
         return False

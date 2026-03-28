@@ -149,7 +149,7 @@ async def safe_agent_execution(coro, timeout: float, operation_name: str, error_
         logger.info(f"{operation_name} completed successfully")
         return result
 
-    except asyncio.TimeoutError as e:
+    except TimeoutError as e:
         logger.error(f"{operation_name} timed out after {timeout}s")
         raise error_type(f"{operation_name} timed out after {timeout} seconds. Please try with a shorter document or simpler task.") from e
 

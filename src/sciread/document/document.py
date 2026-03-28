@@ -15,9 +15,7 @@ from .document_renderers import collect_sections as collect_document_sections
 from .document_renderers import format_for_human
 from .document_renderers import format_for_llm
 from .document_renderers import get_section_overview as build_section_overview
-from .document_renderers import (
-    get_sections_with_confidence as collect_sections_with_confidence,
-)
+from .document_renderers import get_sections_with_confidence as collect_sections_with_confidence
 from .document_renderers import remove_references_section
 from .document_renderers import resolve_section_names
 from .factory import DocumentFactory
@@ -190,11 +188,7 @@ class Document:
 
         # Filter by confidence threshold
         if confidence_threshold is not None:
-            chunks = [
-                chunk
-                for chunk in chunks
-                if (chunk.confidence or 0.0) >= confidence_threshold
-            ]
+            chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
 
         # Filter by minimum length
         if min_length is not None:
@@ -202,9 +196,7 @@ class Document:
 
         # Exclude specific chunk types
         if exclude_types:
-            chunks = [
-                chunk for chunk in chunks if chunk.chunk_name not in exclude_types
-            ]
+            chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
 
         # Apply limit
         if limit is not None:
@@ -263,17 +255,13 @@ class Document:
         Returns:
             Chunks that belong to the requested section.
         """
-        normalized_target = " > ".join(
-            part.strip().lower() for part in section.split(">") if part.strip()
-        )
+        normalized_target = " > ".join(part.strip().lower() for part in section.split(">") if part.strip())
         if not normalized_target:
             return []
 
         matching_chunks: list[Chunk] = []
         for chunk in self._chunks:
-            section_parts = [
-                part.strip() for part in chunk.section_path if part.strip()
-            ]
+            section_parts = [part.strip() for part in chunk.section_path if part.strip()]
             if not section_parts and chunk.chunk_name and chunk.chunk_name != "unknown":
                 section_parts = [chunk.chunk_name]
 
@@ -366,9 +354,7 @@ class Document:
             chunk.mark_processed()
 
         if chunks_to_mark:
-            self.processing_state.add_note(
-                f"Marked {len(chunks_to_mark)} chunks as processed"
-            )
+            self.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
             self.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
 
         return len(chunks_to_mark)
@@ -411,10 +397,7 @@ class Document:
                 section_name = chunk.chunk_name
                 if section_name not in section_names:  # Avoid duplicates
                     section_names.append(section_name)
-            elif (
-                chunk.metadata.get("splitter")
-                and chunk.metadata["splitter"] != "unknown"
-            ):
+            elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
                 # For chunks without explicit section names, use a generic name based on splitter type
                 splitter_type = chunk.metadata["splitter"]
                 generic_name = f"untitled_{splitter_type}"
@@ -496,11 +479,7 @@ class Document:
 
     def _build_doc_id(self) -> str:
         """Build a stable document ID used by chunk metadata."""
-        return self.metadata.file_hash or (
-            Path(self.metadata.source_path).stem
-            if self.metadata.source_path
-            else "unnamed_document"
-        )
+        return self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
 
     def _enrich_chunks_metadata(self, chunks: list[Chunk]) -> None:
         """Fill normalized chunk metadata fields and maintain linkage."""
@@ -517,14 +496,8 @@ class Document:
             if not chunk.display_text:
                 chunk.display_text = chunk.content
 
-            if (
-                not chunk.retrieval_text
-                or chunk.retrieval_text == chunk.content
-                or chunk.retrieval_text == chunk.content_plain
-            ):
-                chunk.retrieval_text = self._build_retrieval_text(
-                    chunk.section_path, chunk.content_plain
-                )
+            if not chunk.retrieval_text or chunk.retrieval_text == chunk.content or chunk.retrieval_text == chunk.content_plain:
+                chunk.retrieval_text = self._build_retrieval_text(chunk.section_path, chunk.content_plain)
 
             if chunk.token_count is None:
                 chunk.token_count = len(chunk.content_plain.split())
@@ -537,11 +510,7 @@ class Document:
             elif chunk.page_start is not None and chunk.page_end is not None:
                 chunk.page_range = (chunk.page_start, chunk.page_end)
 
-            if (
-                not chunk.section_path
-                and chunk.chunk_name
-                and chunk.chunk_name != "unknown"
-            ):
+            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
                 chunk.section_path = [chunk.chunk_name]
 
             if not chunk.parent_section_id and chunk.section_path:
@@ -550,15 +519,11 @@ class Document:
             if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
                 chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
 
-            chunk.metadata["section_label"] = (
-                " > ".join(chunk.section_path) if chunk.section_path else ""
-            )
+            chunk.metadata["section_label"] = " > ".join(chunk.section_path) if chunk.section_path else ""
 
         for i, chunk in enumerate(chunks):
             chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
-            chunk.next_chunk_id = (
-                chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
-            )
+            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
 
     def _build_retrieval_text(self, section_path: list[str], content_plain: str) -> str:
         """Compose retrieval text used by embeddings/rerank flows."""
@@ -612,9 +577,7 @@ class Document:
             vector_index_cls=VectorIndex,
         )
 
-    def semantic_search(
-        self, query: str, top_k: int = 5, return_scores: bool = False
-    ) -> list[Chunk] | list[tuple[Chunk, float]]:
+    def semantic_search(self, query: str, top_k: int = 5, return_scores: bool = False) -> list[Chunk] | list[tuple[Chunk, float]]:
         """Performs a semantic search on the document chunks using cosine similarity.
 
         This method uses cosine similarity for ranking, which is length-invariant
@@ -733,9 +696,7 @@ class Document:
             use_embedding=use_embedding,
         )
 
-    def _match_section_pattern(
-        self, search_name: str, normalized_names: list[str], original_names: list[str]
-    ) -> str | None:
+    def _match_section_pattern(self, search_name: str, normalized_names: list[str], original_names: list[str]) -> str | None:
         """Match section using common academic paper patterns."""
         return match_section_pattern(search_name, normalized_names, original_names)
 
@@ -747,9 +708,7 @@ class Document:
         """Calculate prefix similarity between two strings."""
         return prefix_similarity(str1, str2)
 
-    def get_section_overview(
-        self, include_stats: bool = True, include_quality: bool = True
-    ) -> dict:
+    def get_section_overview(self, include_stats: bool = True, include_quality: bool = True) -> dict:
         """Get comprehensive overview of all sections.
 
         Args:
@@ -765,9 +724,7 @@ class Document:
             include_quality=include_quality,
         )
 
-    def get_sections_with_confidence(
-        self, min_confidence: float = 0.5, min_length: int = 50
-    ) -> list[tuple[str, str]]:
+    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> list[tuple[str, str]]:
         """Get sections that meet minimum quality criteria.
 
         Args:
@@ -807,9 +764,7 @@ class Document:
 
         try:
             vector_index_path_str = (
-                str(self.vector_index.persist_path.resolve())
-                if self.vector_index and self.vector_index.persist_path
-                else None
+                str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
             )
 
             # Convert metadata to dict, handling Path objects and None values
@@ -864,13 +819,9 @@ class Document:
             from datetime import datetime
 
             if metadata_dict.get("created_at"):
-                metadata_dict["created_at"] = datetime.fromisoformat(
-                    metadata_dict["created_at"]
-                )
+                metadata_dict["created_at"] = datetime.fromisoformat(metadata_dict["created_at"])
             if metadata_dict.get("modified_at"):
-                metadata_dict["modified_at"] = datetime.fromisoformat(
-                    metadata_dict["modified_at"]
-                )
+                metadata_dict["modified_at"] = datetime.fromisoformat(metadata_dict["modified_at"])
 
             metadata = DocumentMetadata(**metadata_dict)
 
@@ -896,9 +847,7 @@ class Document:
                 persist_path = Path(vector_index_path_str)
                 if persist_path.exists():
                     collection_name = persist_path.stem
-                    doc.vector_index = VectorIndex(
-                        collection_name=collection_name, persist_path=persist_path
-                    )
+                    doc.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
                     logger.info("Vector index re-linked successfully")
                 else:
                     logger.warning(f"Vector index path does not exist: {persist_path}")

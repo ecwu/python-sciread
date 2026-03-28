@@ -72,9 +72,7 @@ class DocumentBuilder:
         from .document import Document  # Import here to avoid circular imports
 
         path = Path(file_path)
-        self.logger.debug(
-            f"Creating document from file: {path} (to_markdown={to_markdown})"
-        )
+        self.logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
 
         # Initialize default loader if none provided
         if self.loader is None:
@@ -95,18 +93,14 @@ class DocumentBuilder:
 
         # Update processing state
         doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note(
-            f"Document loaded using {self.loader.loader_name}"
-        )
+        doc.processing_state.add_note(f"Document loaded using {self.loader.loader_name}")
 
         # Add any warnings to processing state
         for warning in load_result.warnings:
             doc.processing_state.add_note(f"Warning: {warning}")
             self.logger.warning(f"Document loading warning: {warning}")
 
-        self.logger.debug(
-            f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters"
-        )
+        self.logger.debug(f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters")
 
         # Auto-split if requested
         if auto_split:
@@ -223,9 +217,7 @@ class DocumentBuilder:
 
             raise ValueError(f"Unsupported file format: {suffix}")
 
-    def _split_document(
-        self, doc: "Document", splitter: BaseSplitter | None = None, **split_kwargs
-    ) -> None:
+    def _split_document(self, doc: "Document", splitter: BaseSplitter | None = None, **split_kwargs) -> None:
         """
         Split document into chunks.
 
@@ -246,13 +238,9 @@ class DocumentBuilder:
         chunks = active_splitter.split(doc.text)
         self._enrich_chunks(doc, chunks)
         doc._set_chunks(chunks)
-        doc.processing_state.add_note(
-            f"Document split using {active_splitter.splitter_name}"
-        )
+        doc.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
-        self.logger.info(
-            f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}"
-        )
+        self.logger.info(f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}")
 
     def _enrich_chunks(self, doc: "Document", chunks: list) -> None:
         """Enrich chunks with normalized retrieval metadata and derived texts."""
@@ -263,11 +251,7 @@ class DocumentBuilder:
             chunk.para_index = i
             chunk.position = i
 
-            if (
-                not chunk.section_path
-                and chunk.chunk_name
-                and chunk.chunk_name != "unknown"
-            ):
+            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
                 chunk.section_path = [chunk.chunk_name]
 
             if not chunk.content_plain or chunk.content_plain == chunk.content:
@@ -276,14 +260,8 @@ class DocumentBuilder:
             if not chunk.display_text:
                 chunk.display_text = chunk.content
 
-            if (
-                not chunk.retrieval_text
-                or chunk.retrieval_text == chunk.content
-                or chunk.retrieval_text == chunk.content_plain
-            ):
-                chunk.retrieval_text = self._build_retrieval_text(
-                    chunk.section_path, chunk.content_plain
-                )
+            if not chunk.retrieval_text or chunk.retrieval_text == chunk.content or chunk.retrieval_text == chunk.content_plain:
+                chunk.retrieval_text = self._build_retrieval_text(chunk.section_path, chunk.content_plain)
 
             if chunk.token_count is None:
                 chunk.token_count = len(chunk.content_plain.split())
@@ -302,23 +280,15 @@ class DocumentBuilder:
             if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
                 chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
 
-            chunk.metadata["section_label"] = (
-                " > ".join(chunk.section_path) if chunk.section_path else ""
-            )
+            chunk.metadata["section_label"] = " > ".join(chunk.section_path) if chunk.section_path else ""
 
         for i, chunk in enumerate(chunks):
             chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
-            chunk.next_chunk_id = (
-                chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
-            )
+            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
 
     def _build_doc_id(self, doc: "Document") -> str:
         """Build a stable document ID used by chunk metadata."""
-        return doc.metadata.file_hash or (
-            Path(doc.metadata.source_path).stem
-            if doc.metadata.source_path
-            else "unnamed_document"
-        )
+        return doc.metadata.file_hash or (Path(doc.metadata.source_path).stem if doc.metadata.source_path else "unnamed_document")
 
     def _build_retrieval_text(self, section_path: list[str], content_plain: str) -> str:
         """Compose retrieval text used by embeddings/rerank flows."""

@@ -37,12 +37,8 @@ This is the methods content."""
         assert len(chunks) >= 2  # At least abstract and methods content
         chunk_names = [chunk.chunk_name for chunk in chunks]
         # Check for actual section names (capitalized) or abstract in metadata
-        has_abstract = any(
-            "abstract" in name.lower() or "Abstract" in name for name in chunk_names
-        )
-        has_abstract_metadata = any(
-            chunk.metadata.get("splitter") == "abstract" for chunk in chunks
-        )
+        has_abstract = any("abstract" in name.lower() or "Abstract" in name for name in chunk_names)
+        has_abstract_metadata = any(chunk.metadata.get("splitter") == "abstract" for chunk in chunks)
         assert has_abstract or has_abstract_metadata
         # Introduction might be grouped with abstract or methods depending on size
 
@@ -68,10 +64,7 @@ This is section 2."""
         # Check section detection (subsection might not always be separate)
         chunk_types = [chunk.metadata.get("splitter") for chunk in chunks]
         # Enhanced classifier now classifies numbered sections by their content
-        assert any(
-            section_type in chunk_types
-            for section_type in ["introduction", "related_work", "section"]
-        )
+        assert any(section_type in chunk_types for section_type in ["introduction", "related_work", "section"])
 
     def test_confidence_scoring(self):
         """Test confidence scoring for different patterns."""
@@ -91,20 +84,12 @@ This describes the figure."""
         chunks = splitter.split(text)
 
         # Abstract should have reasonable confidence (may be reduced due to small chunk size without merge)
-        abstract_chunks = [
-            c for c in chunks if c.metadata.get("splitter") == "abstract"
-        ]
+        abstract_chunks = [c for c in chunks if c.metadata.get("splitter") == "abstract"]
         if abstract_chunks:
-            assert (
-                abstract_chunks[0].confidence >= 0.4
-            )  # Lowered from 0.9 due to small chunk penalty
+            assert abstract_chunks[0].confidence >= 0.4  # Lowered from 0.9 due to small chunk penalty
 
         # Introduction/section should have medium confidence (without merging, may be lower)
-        intro_chunks = [
-            c
-            for c in chunks
-            if c.metadata.get("splitter") in ["introduction", "section"]
-        ]
+        intro_chunks = [c for c in chunks if c.metadata.get("splitter") in ["introduction", "section"]]
         if intro_chunks:
             assert 0.3 <= intro_chunks[0].confidence <= 0.8
 
@@ -160,14 +145,9 @@ This introduction section provides substantial background information and contex
             assert chunk.confidence >= 0.7
 
         # Should include abstract and introduction (high confidence patterns)
-        chunk_splitter_types = [
-            chunk.metadata.get("splitter") for chunk in high_quality_chunks
-        ]
+        chunk_splitter_types = [chunk.metadata.get("splitter") for chunk in high_quality_chunks]
         if len(high_quality_chunks) > 0:
-            assert any(
-                ct in ["abstract", "introduction", "section"]
-                for ct in chunk_splitter_types
-            )
+            assert any(ct in ["abstract", "introduction", "section"] for ct in chunk_splitter_types)
 
     def test_custom_patterns(self):
         """Test adding custom patterns."""
@@ -191,9 +171,7 @@ This is more content."""
 
         # Check that the splitter name reflects the added pattern
         name = splitter.splitter_name
-        assert (
-            int(name.split("patterns=")[1].split(",")[0]) >= 15
-        )  # Default patterns + 1 custom
+        assert int(name.split("patterns=")[1].split(",")[0]) >= 15  # Default patterns + 1 custom
 
     def test_remove_pattern(self):
         """Test removing patterns."""
@@ -320,9 +298,7 @@ This is abstract in title case."""
         chunks = splitter.split(text)
 
         # Should detect at least abstract pattern (may be grouped into one chunk)
-        abstract_chunks = [
-            c for c in chunks if c.metadata.get("splitter") == "abstract"
-        ]
+        abstract_chunks = [c for c in chunks if c.metadata.get("splitter") == "abstract"]
         assert len(abstract_chunks) >= 1
 
     def test_multiple_figure_table_references(self):

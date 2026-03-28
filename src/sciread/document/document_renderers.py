@@ -143,33 +143,21 @@ def format_for_human(
         }
         reset = "\033[0m"
     else:
-        colors = dict.fromkeys(
-            ["header", "title", "section", "confidence", "content", "metadata"], ""
-        )
+        colors = dict.fromkeys(["header", "title", "section", "confidence", "content", "metadata"], "")
         reset = ""
 
-    sections = collect_sections(
-        document, section_names=section_names, max_sections=max_sections
-    )
+    sections = collect_sections(document, section_names=section_names, max_sections=max_sections)
     lines: list[str] = []
 
     if show_metadata:
         lines.append(f"{colors['header']}{'=' * 80}{reset}")
-        lines.append(
-            f"{colors['title']}Document: {document.metadata.title or 'Untitled'}{reset}"
-        )
+        lines.append(f"{colors['title']}Document: {document.metadata.title or 'Untitled'}{reset}")
         if document.metadata.author:
-            lines.append(
-                f"{colors['metadata']}Author: {document.metadata.author}{reset}"
-            )
+            lines.append(f"{colors['metadata']}Author: {document.metadata.author}{reset}")
         if document.metadata.source_path:
-            lines.append(
-                f"{colors['metadata']}Source: {document.metadata.source_path}{reset}"
-            )
+            lines.append(f"{colors['metadata']}Source: {document.metadata.source_path}{reset}")
         if document.metadata.page_count:
-            lines.append(
-                f"{colors['metadata']}Pages: {document.metadata.page_count}{reset}"
-            )
+            lines.append(f"{colors['metadata']}Pages: {document.metadata.page_count}{reset}")
         lines.append(f"{colors['header']}{'=' * 80}{reset}")
         lines.append("")
 
@@ -179,9 +167,7 @@ def format_for_human(
         confidence = section["average_confidence"]
         lines.append(f"{colors['section']}Section {i}: {section_name}{reset}")
         if show_confidence:
-            lines.append(
-                f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}"
-            )
+            lines.append(f"{colors['confidence']}Confidence: {confidence:.2f} | Length: {len(content)} chars{reset}")
         lines.append(f"{colors['header']}{'-' * 60}{reset}")
         lines.append(f"{colors['content']}{content}{reset}")
         lines.append("")
@@ -229,12 +215,8 @@ def format_for_llm(
             if token_limit and total_chars + len(section_text) > token_limit:
                 remaining = token_limit - total_chars - 50
                 if remaining > 200:
-                    partial_content = (
-                        content[:remaining] + "...[truncated due to token limit]"
-                    )
-                    section_text = (
-                        f"=== {section_name.upper()} ===\n{partial_content}\n"
-                    )
+                    partial_content = content[:remaining] + "...[truncated due to token limit]"
+                    section_text = f"=== {section_name.upper()} ===\n{partial_content}\n"
                     content_parts.append(section_text)
                 break
 
@@ -247,9 +229,7 @@ def format_for_llm(
         return f"Error retrieving content: {e}"
 
 
-def get_section_overview(
-    document: Document, include_stats: bool = True, include_quality: bool = True
-) -> dict:
+def get_section_overview(document: Document, include_stats: bool = True, include_quality: bool = True) -> dict:
     """Get overview of all sections."""
     try:
         overview = {
@@ -279,14 +259,8 @@ def get_section_overview(
                 section_info.update(
                     {
                         "average_confidence": avg_confidence,
-                        "high_quality_chunks": sum(
-                            1
-                            for chunk in section_chunks
-                            if (chunk.confidence or 0.0) >= 0.7
-                        ),
-                        "processed_chunks": sum(
-                            1 for chunk in section_chunks if chunk.processed
-                        ),
+                        "high_quality_chunks": sum(1 for chunk in section_chunks if (chunk.confidence or 0.0) >= 0.7),
+                        "processed_chunks": sum(1 for chunk in section_chunks if chunk.processed),
                     }
                 )
 
@@ -296,11 +270,7 @@ def get_section_overview(
                     {
                         "min_chunk_size": min(chunk_lengths) if chunk_lengths else 0,
                         "max_chunk_size": max(chunk_lengths) if chunk_lengths else 0,
-                        "avg_chunk_size": (
-                            (sum(chunk_lengths) / len(chunk_lengths))
-                            if chunk_lengths
-                            else 0
-                        ),
+                        "avg_chunk_size": ((sum(chunk_lengths) / len(chunk_lengths)) if chunk_lengths else 0),
                     }
                 )
 
@@ -323,10 +293,7 @@ def get_sections_with_confidence(
         sections = collect_sections(document)
 
         for section in sections:
-            if (
-                section["average_confidence"] >= min_confidence
-                and section["length"] >= min_length
-            ):
+            if section["average_confidence"] >= min_confidence and section["length"] >= min_length:
                 qualifying_sections.append((section["name"], section["content"]))
 
         return qualifying_sections

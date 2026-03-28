@@ -1,5 +1,0 @@
-pip>=25
-setuptools>=80
-setuptools_scm>=8
-tox>=4
-virtualenv>=20.34

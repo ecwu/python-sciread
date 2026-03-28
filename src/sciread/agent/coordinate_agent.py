@@ -599,7 +599,7 @@ class CoordinateAgent:
 
             return result.output
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.error(f"Analysis planning timed out after {self.timeout} seconds")
             # Log controller agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
@@ -755,7 +755,7 @@ class CoordinateAgent:
         completed_tasks = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Process results
-        for (agent_name, _), result in zip(tasks, completed_tasks):
+        for (agent_name, _), result in zip(tasks, completed_tasks, strict=True):
             if isinstance(result, Exception):
                 self.logger.error(f"Agent {agent_name} failed: {result}")
                 results[agent_name] = {"error": str(result), "success": False}
@@ -861,7 +861,7 @@ class CoordinateAgent:
             self.logger.debug(f"[synthesis_agent] Output ({len(str(result.output))} chars): {output_preview}")
             return result.output
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             self.logger.error(f"Report synthesis timed out after {self.timeout} seconds")
             # Log synthesis agent timeout
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt

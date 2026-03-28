@@ -3,21 +3,21 @@
 ## Build, Lint, and Test Commands
 
 ```bash
-# Install: pip install -e ".[test]"
+# Install: uv sync
+# Install with test deps: uv sync --group test
+# Install with all dev deps: uv sync --group test --group dev
 
-# Lint (fails on errors): ruff check src/ tests/
-- Format: ruff format src/ tests/
+# Lint (fails on errors): uv run ruff check src/ tests/
+# Format: uv run ruff format src/ tests/
 
-# Run all tests: tox
+# Run all tests: uv run pytest tests/
 
-# Run single test file: pytest tests/test_core.py
-- Run specific test: pytest tests/test_core.py::test_compute
-- Run with coverage: pytest --cov src/ tests/test_core.py
+# Run single test file: uv run pytest tests/test_core.py
+# Run specific test: uv run pytest tests/test_core.py::test_compute
+# Run with coverage: uv run pytest --cov src/ tests/test_core.py
 
-# Run tests by module: pytest tests/test_document/
-- Run tests with verbose: pytest -v tests/test_document/test_document.py
-
-# Docs: tox -e docs && open dist/docs/index.html
+# Run tests by module: uv run pytest tests/test_document/
+# Run tests with verbose: uv run pytest -v tests/test_document/test_document.py
 ```
 
 ## Code Style Guidelines
@@ -39,7 +39,7 @@ from ..document import Document
 - **Quotes**: Double quotes for strings
 - **Indentation**: 4 spaces
 - **Trailing whitespace**: Never
-- **Run**: `ruff format src/ tests/` before committing
+- **Run**: `uv run ruff format src/ tests/` before committing
 
 ### Type Hints
 Use modern syntax consistently:
@@ -133,7 +133,7 @@ self.logger.info("Milestone completed")
 self.logger.warning("Recoverable issue detected")
 self.logger.error(f"Failure: {exception}")
 ```
-**Debug mode**: `LOG_LEVEL=DEBUG python -msciread coordinate paper.pdf`
+**Debug mode**: `LOG_LEVEL=DEBUG uv run sciread coordinate paper.pdf`
 
 ### Async/Await Patterns
 ```python
@@ -254,10 +254,10 @@ def test_api_call(mock_post):
 
 ### Running Tests
 ```bash
-# Single test: pytest tests/test_document/test_document.py::test_method
-# Module tests: pytest tests/test_document/
-# With coverage: pytest --cov src/ tests/
-# Verbose: pytest -v tests/
+# Single test: uv run pytest tests/test_document/test_document.py::test_method
+# Module tests: uv run pytest tests/test_document/
+# With coverage: uv run pytest --cov src/ tests/
+# Verbose: uv run pytest -v tests/
 ```
 
 ## Architectural Principles
@@ -295,7 +295,7 @@ elif args.command == "new_command":
 - **Never**: Edit `tests/` unless adding tests
 - **Never**: Commit without user request
 - **Never**: Suppress type errors with `as any`, `@ts-ignore`
-- **Always**: Run `ruff check` before committing
+- **Always**: Run `uv run ruff check` before committing
 - **Always**: Add tests for new features
 - **Always**: Follow existing async/await patterns
 - **Always**: Use `get_logger(__name__)` for logging

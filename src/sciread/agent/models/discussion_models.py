@@ -1,7 +1,7 @@
 """Data models for multi-agent discussion system."""
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel
@@ -9,7 +9,7 @@ from pydantic import ConfigDict
 from pydantic import Field
 
 
-class AgentPersonality(str, Enum):
+class AgentPersonality(StrEnum):
     """Different personality types for discussion agents."""
 
     CRITICAL_EVALUATOR = "critical_evaluator"
@@ -18,7 +18,7 @@ class AgentPersonality(str, Enum):
     THEORETICAL_INTEGRATOR = "theoretical_integrator"
 
 
-class DiscussionPhase(str, Enum):
+class DiscussionPhase(StrEnum):
     """Phases of the discussion process."""
 
     INITIAL_ANALYSIS = "initial_analysis"

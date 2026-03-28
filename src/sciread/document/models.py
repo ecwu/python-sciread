@@ -3,8 +3,8 @@
 import uuid
 from dataclasses import dataclass
 from dataclasses import field
+from datetime import UTC
 from datetime import datetime
-from datetime import timezone
 from pathlib import Path
 from typing import Any
 
@@ -136,7 +136,7 @@ class DocumentMetadata:
 
     def __post_init__(self):
         """Initialize timestamps if not provided."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if self.created_at is None:
             self.created_at = now
         if self.modified_at is None:
@@ -155,11 +155,11 @@ class ProcessingState:
 
     def add_note(self, note: str) -> None:
         """Add a processing note."""
-        self.notes.append(f"{datetime.now(timezone.utc).isoformat()}: {note}")
+        self.notes.append(f"{datetime.now(UTC).isoformat()}: {note}")
 
     def update_timestamp(self, operation: str) -> None:
         """Update the appropriate timestamp for an operation."""
-        timestamp = datetime.now(timezone.utc)
+        timestamp = datetime.now(UTC)
         if operation == "loaded":
             self.loaded_at = timestamp
         elif operation == "split":

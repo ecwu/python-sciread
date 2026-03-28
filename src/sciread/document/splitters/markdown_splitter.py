@@ -53,9 +53,7 @@ class MarkdownSplitter(BaseSplitter):
             "h6": re.compile(r"^(#{6})\s+(.+)$", re.MULTILINE),
             # Code blocks (high confidence)
             "fenced_code": re.compile(r"^```[\w]*\n.*?\n```", re.MULTILINE | re.DOTALL),
-            "indented_code": re.compile(
-                r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE
-            ),
+            "indented_code": re.compile(r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE),
             "inline_code": re.compile(r"`[^`]+`"),
             # Lists (medium confidence)
             "unordered_list": re.compile(r"^[*+-]\s+.+$", re.MULTILINE),
@@ -136,9 +134,7 @@ class MarkdownSplitter(BaseSplitter):
         # Return "untitled" if empty after cleaning
         return cleaned if cleaned else "untitled"
 
-    def _find_markdown_split_points(
-        self, text: str
-    ) -> list[tuple[int, str, float, str]]:
+    def _find_markdown_split_points(self, text: str) -> list[tuple[int, str, float, str]]:
         """Find split points based on markdown structure.
 
         Returns:
@@ -156,9 +152,7 @@ class MarkdownSplitter(BaseSplitter):
                     # Extract the header title and clean it for section name
                     raw_title = match.group(2).strip()
                     section_name = self._clean_section_name(raw_title)
-                    split_points.append(
-                        (match.start(), f"h{level}", confidence, section_name)
-                    )
+                    split_points.append((match.start(), f"h{level}", confidence, section_name))
 
         # Sort split points by position
         split_points.sort(key=lambda x: x[0])
@@ -173,9 +167,7 @@ class MarkdownSplitter(BaseSplitter):
 
         return filtered_points
 
-    def _create_markdown_chunks(
-        self, text: str, split_points: list[tuple[int, str, float, str]]
-    ) -> list[Chunk]:
+    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float, str]]) -> list[Chunk]:
         """Create chunks based on markdown split points."""
         if not split_points:
             # No markdown structure found, treat as single chunk
@@ -184,9 +176,7 @@ class MarkdownSplitter(BaseSplitter):
         chunks = []
         prev_pos = 0
 
-        for _i, (pos, element_type, confidence, _section_name) in enumerate(
-            split_points
-        ):
+        for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
@@ -212,9 +202,7 @@ class MarkdownSplitter(BaseSplitter):
             if chunk_text:
                 # Use section_name from the last split point if available
                 last_section_name = split_points[-1][3] if split_points else None
-                chunk = self._create_chunk_from_content(
-                    chunk_text, prev_pos, len(text), "final", 0.5, last_section_name
-                )
+                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5, last_section_name)
                 chunks.append(chunk)
 
         return chunks
@@ -230,9 +218,7 @@ class MarkdownSplitter(BaseSplitter):
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
-        chunk_type, confidence = self._analyze_chunk_content(
-            content, default_confidence
-        )
+        chunk_type, confidence = self._analyze_chunk_content(content, default_confidence)
 
         # If content starts with a header, extract section info
         if section_name is None:
@@ -267,7 +253,7 @@ class MarkdownSplitter(BaseSplitter):
 
     def _extract_section_from_content(self, content: str) -> str | None:
         """Extract section name from content if it starts with a header."""
-        first_line = content.split("\n")[0].strip()
+        first_line = content.split("\n", maxsplit=1)[0].strip()
 
         # Check if first line is a markdown header
         header_match = re.match(r"^(#{1,6})\s+(.+)$", first_line)
@@ -277,16 +263,12 @@ class MarkdownSplitter(BaseSplitter):
 
         return None
 
-    def _analyze_chunk_content(
-        self, content: str, default_confidence: float
-    ) -> tuple[str, float]:
+    def _analyze_chunk_content(self, content: str, default_confidence: float) -> tuple[str, float]:
         """Analyze chunk content to determine type and confidence."""
         content_lower = content.lower()
 
         # Check for code content first (highest priority)
-        if self.patterns["fenced_code"].search(content) or self.patterns[
-            "indented_code"
-        ].search(content):
+        if self.patterns["fenced_code"].search(content) or self.patterns["indented_code"].search(content):
             return "code", self.confidence_scores["fenced_code"]
 
         # Check for tables
@@ -294,9 +276,7 @@ class MarkdownSplitter(BaseSplitter):
             return "table", self.confidence_scores["table"]
 
         # Check for lists
-        if self.patterns["unordered_list"].search(content) or self.patterns[
-            "ordered_list"
-        ].search(content):
+        if self.patterns["unordered_list"].search(content) or self.patterns["ordered_list"].search(content):
             return "list", self.confidence_scores["unordered_list"]
 
         # Check for blockquotes
@@ -319,12 +299,10 @@ class MarkdownSplitter(BaseSplitter):
                 return section_type, 0.8
 
         # Check for headers only if content starts with a header
-        first_line = content.split("\n")[0].strip()
+        first_line = content.split("\n", maxsplit=1)[0].strip()
         for element_type, pattern in self.patterns.items():
             if element_type.startswith("h") and pattern.match(first_line):
-                confidence = self.confidence_scores.get(
-                    element_type, default_confidence
-                )
+                confidence = self.confidence_scores.get(element_type, default_confidence)
                 return element_type, confidence
 
         # Default classification
@@ -362,11 +340,11 @@ class MarkdownSplitter(BaseSplitter):
             metadata={"splitter": chunk_type},
         )
 
-    def _restore_code_blocks(
-        self, chunks: list[Chunk], code_blocks: list[dict]
-    ) -> list[Chunk]:
+    def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:
         """Restore extracted code blocks to their original positions."""
         return super()._restore_code_blocks(chunks, code_blocks)
+
+    def add_pattern(self, name: str, pattern: str, confidence: float) -> None:
         """Add a custom markdown pattern."""
         try:
             compiled_pattern = re.compile(pattern, re.MULTILINE)

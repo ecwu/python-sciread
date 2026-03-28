@@ -178,9 +178,7 @@ class RegexSectionSplitter(BaseSplitter):
 
         return final_points
 
-    def _create_raw_chunks(
-        self, text: str, split_points: list[tuple[int, str, float]]
-    ) -> list[dict]:
+    def _create_raw_chunks(self, text: str, split_points: list[tuple[int, str, float]]) -> list[dict]:
         """Create raw chunks based on split points."""
         if not split_points:
             return [
@@ -201,9 +199,7 @@ class RegexSectionSplitter(BaseSplitter):
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
                     # Find the best pattern for this chunk by checking what it contains
-                    best_pattern, best_confidence = self._find_pattern_for_chunk(
-                        chunk_text
-                    )
+                    best_pattern, best_confidence = self._find_pattern_for_chunk(chunk_text)
                     chunks.append(
                         {
                             "text": chunk_text,
@@ -251,9 +247,7 @@ class RegexSectionSplitter(BaseSplitter):
                     section_title = match.group(2) if len(match.groups()) >= 2 else ""
                     if section_title:
                         # Classify the section by title for better accuracy
-                        classified_type = self._classify_section_by_title(
-                            section_title.strip()
-                        )
+                        classified_type = self._classify_section_by_title(section_title.strip())
                         if classified_type != "unknown":
                             best_pattern = classified_type
                             best_confidence = confidence
@@ -273,9 +267,7 @@ class RegexSectionSplitter(BaseSplitter):
         for i, raw_chunk in enumerate(raw_chunks):
             content = raw_chunk["text"]
             if len(content) < self.min_chunk_size:
-                confidence = (
-                    raw_chunk["confidence"] * 0.5
-                )  # Reduce confidence for small chunks
+                confidence = raw_chunk["confidence"] * 0.5  # Reduce confidence for small chunks
             else:
                 confidence = raw_chunk["confidence"]
 
@@ -454,11 +446,7 @@ class RegexSectionSplitter(BaseSplitter):
         for pattern in section_patterns:
             match = re.match(pattern, first_line, re.IGNORECASE)
             if match:
-                return (
-                    match.group(1).strip()
-                    if match.group(1).strip()
-                    else match.group(0).strip()
-                )
+                return match.group(1).strip() if match.group(1).strip() else match.group(0).strip()
 
         # If it's a single word section header
         single_word_patterns = [

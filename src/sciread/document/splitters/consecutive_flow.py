@@ -40,9 +40,7 @@ class ConsecutiveFlowSplitter(SentenceFlowSplitter):
 
         return chunks
 
-    def _create_chunks_using_consecutive_similarity(
-        self, sentences: list[dict[str, Any]], embeddings: list[list[float]]
-    ) -> list[Chunk]:
+    def _create_chunks_using_consecutive_similarity(self, sentences: list[dict[str, Any]], embeddings: list[list[float]]) -> list[Chunk]:
         """Create chunks using consecutive similarity between adjacent sentences."""
         if len(sentences) != len(embeddings):
             return self._fallback_split(" ".join(s["text"] for s in sentences))
@@ -58,19 +56,14 @@ class ConsecutiveFlowSplitter(SentenceFlowSplitter):
             prev_embedding = embeddings[i - 1]
 
             # Calculate consecutive similarity
-            similarity_score = self.ollama_client.cosine_similarity(
-                prev_embedding, next_embedding
-            )
+            similarity_score = self.ollama_client.cosine_similarity(prev_embedding, next_embedding)
 
             # Check if adding this sentence would exceed budget
-            would_exceed_budget = (
-                current_segment_chars + sentence["length"] > self.max_segment_chars
-            )
+            would_exceed_budget = current_segment_chars + sentence["length"] > self.max_segment_chars
 
             # Check if we have enough content to make a split decision
             ready_for_split = (
-                len(current_segment_sentences) >= self.min_segment_sentences
-                and current_segment_chars >= self.min_segment_chars
+                len(current_segment_sentences) >= self.min_segment_sentences and current_segment_chars >= self.min_segment_chars
             )
 
             # Decision logic

@@ -1,6 +1,5 @@
 """Base interface for text splitters."""
 
-import re
 from abc import ABC
 from abc import abstractmethod
 
@@ -34,9 +33,7 @@ class BaseSplitter(ABC):
 
         return text
 
-    def _calculate_char_range(
-        self, start_char: int, chunk_text: str
-    ) -> tuple[int, int]:
+    def _calculate_char_range(self, start_char: int, chunk_text: str) -> tuple[int, int]:
         """Calculate character range for a chunk."""
         end_char = start_char + len(chunk_text)
         return (start_char, end_char)
@@ -83,15 +80,11 @@ class BaseSplitter(ABC):
                         "end": match.end(),
                     }
                 )
-                text = text.replace(
-                    block_text, placeholder_pattern.format(offset + i), 1
-                )
+                text = text.replace(block_text, placeholder_pattern.format(offset + i), 1)
 
         return text, code_blocks
 
-    def _restore_code_blocks(
-        self, chunks: list[Chunk], code_blocks: list[dict]
-    ) -> list[Chunk]:
+    def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:
         """Restore extracted code blocks to their original positions.
 
         Args:
@@ -104,7 +97,5 @@ class BaseSplitter(ABC):
         for chunk in chunks:
             for code_block in code_blocks:
                 if code_block["placeholder"] in chunk.content:
-                    chunk.content = chunk.content.replace(
-                        code_block["placeholder"], code_block["content"]
-                    )
+                    chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
         return chunks

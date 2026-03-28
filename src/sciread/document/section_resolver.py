@@ -11,9 +11,7 @@ if TYPE_CHECKING:
     from .document import Document
 
 
-def match_section_pattern(
-    search_name: str, normalized_names: list[str], original_names: list[str]
-) -> str | None:
+def match_section_pattern(search_name: str, normalized_names: list[str], original_names: list[str]) -> str | None:
     """Match section using common academic paper patterns."""
     section_patterns = {
         "introduction": [
@@ -156,9 +154,7 @@ def get_closest_section_name(
         if search_name in normalized_names:
             return available_names[normalized_names.index(search_name)]
 
-        pattern_match = match_section_pattern(
-            search_name, normalized_names, available_names
-        )
+        pattern_match = match_section_pattern(search_name, normalized_names, available_names)
         if pattern_match:
             return pattern_match
 
@@ -169,9 +165,7 @@ def get_closest_section_name(
                     for i, name in enumerate(normalized_names):
                         name_embedding = document._embedding_client.get_embedding(name)
                         if name_embedding:
-                            similarity = cosine_similarity(
-                                target_embedding, name_embedding
-                            )
+                            similarity = cosine_similarity(target_embedding, name_embedding)
                             if similarity > best_score and similarity >= threshold:
                                 best_score = similarity
                                 best_match = available_names[i]
@@ -191,7 +185,5 @@ def get_closest_section_name(
         return best_match
 
     except Exception as e:
-        document.logger.error(
-            f"Failed to find closest section name for '{target_name}': {e}"
-        )
+        document.logger.error(f"Failed to find closest section name for '{target_name}': {e}")
         return None

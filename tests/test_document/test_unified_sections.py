@@ -72,9 +72,7 @@ class TestUnifiedSectionHandling:
         assert "Section 2: introduction" in rendered
         assert "Confidence:" in rendered
 
-    def test_print_for_human_with_specific_sections(
-        self, sample_document_with_sections
-    ):
+    def test_print_for_human_with_specific_sections(self, sample_document_with_sections):
         """Test print_for_human with specific sections."""
         doc = sample_document_with_sections
 
@@ -92,10 +90,7 @@ class TestUnifiedSectionHandling:
 
         assert "=== ABSTRACT ===" in content
         assert "=== INTRODUCTION ===" in content
-        assert (
-            "This is the abstract of the paper with enough content to meet minimum length requirements."
-            in content
-        )
+        assert "This is the abstract of the paper with enough content to meet minimum length requirements." in content
         assert "DOCUMENT METADATA:" in content
         assert "Sample Paper" in content
 
@@ -107,8 +102,7 @@ class TestUnifiedSectionHandling:
         assert len(intro_chunks) == 1
         assert intro_chunks[0].chunk_name == "introduction"
         assert (
-            "This is the introduction section that is also sufficiently long to pass the minimum length check."
-            in intro_chunks[0].content
+            "This is the introduction section that is also sufficiently long to pass the minimum length check." in intro_chunks[0].content
         )
 
     def test_get_sections_content_helper(self, sample_document_with_sections):
@@ -141,9 +135,7 @@ class TestUnifiedSectionHandling:
         match = doc.get_closest_section_name("nonexistent", threshold=0.9)
         assert match is None
 
-    def test_get_closest_section_name_with_patterns(
-        self, sample_document_with_sections
-    ):
+    def test_get_closest_section_name_with_patterns(self, sample_document_with_sections):
         """Test pattern-based section matching."""
         doc = sample_document_with_sections
 
@@ -192,9 +184,7 @@ class TestUnifiedSectionHandling:
 
         # Create chunk with cleaning artifacts
         dirty_content = "This  has    extra  spaces\n\n\nand newlines."
-        chunk = Chunk(
-            content=dirty_content, chunk_name="test_section", position=0, confidence=0.9
-        )
+        chunk = Chunk(content=dirty_content, chunk_name="test_section", position=0, confidence=0.9)
         doc._set_chunks([chunk])
 
         content = doc.get_for_llm(clean_text=True)

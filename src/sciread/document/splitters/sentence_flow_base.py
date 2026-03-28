@@ -88,9 +88,7 @@ class SentenceFlowSplitter(BaseSplitter):
         self.min_segment_chars = min_segment_chars
         self.max_segment_chars = max_segment_chars
         self.embedding_batch_size = embedding_batch_size
-        self.sentence_pattern = regex.compile(
-            self.SENTENCE_REGEX_PATTERN, regex.VERBOSE
-        )
+        self.sentence_pattern = regex.compile(self.SENTENCE_REGEX_PATTERN, regex.VERBOSE)
 
     def _extract_sentences_with_metadata(self, text: str) -> list[dict[str, Any]]:
         """Extract sentences with char_span and metadata."""

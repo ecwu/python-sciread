@@ -1,57 +1,37 @@
 name: build
 on: [push, pull_request, workflow_dispatch]
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: ruff check
+        run: uv run ruff check src/ tests/
+      - name: ruff format
+        run: uv run ruff format --check src/ tests/
+
   test:
-    name: ${{ matrix.name }}
-    runs-on: ${{ matrix.os }}
+    name: "py${{ matrix.python }} (ubuntu)"
+    runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - name: "check"
-            python: "3.13"
-            tox_env: "check"
-            os: "ubuntu-latest"
-          - name: "docs"
-            python: "3.13"
-            tox_env: "docs"
-            os: "ubuntu-latest"
-          - name: "py311 (ubuntu)"
-            python: "3.11"
-            python_arch: "x64"
-            tox_env: "py311"
-            os: "ubuntu-latest"
-          - name: "py312 (ubuntu)"
-            python: "3.12"
-            python_arch: "x64"
-            tox_env: "py312"
-            os: "ubuntu-latest"
-          - name: "py313 (ubuntu)"
-            python: "3.13"
-            python_arch: "x64"
-            tox_env: "py313"
-            os: "ubuntu-latest"
+        python: ["3.12", "3.13"]
     steps:
       - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-          architecture: ${{ matrix.python_arch }}
       - name: install dependencies
-        run: |
-          python -mpip install --progress-bar=off -r ci/requirements.txt
-          virtualenv --version
-          pip --version
-          tox --version
-          pip list --format=freeze
+        run: uv sync --group test
       - name: test
-        run: >
-          tox -e ${{ matrix.tox_env }} -v
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml -vv tests/
+
   finish:
-    needs: test
+    needs: [lint, test]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:

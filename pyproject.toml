@@ -1,15 +1,11 @@
 [build-system]
-requires = [
-    "setuptools>=80",
-]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
-dynamic = [
-    "readme",
-]
 name = "sciread"
 version = "0.0.0"
+readme = "README.rst"
 license = "MIT"
 license-files = ["LICENSE"]
 description = "Understand paper with LLM-driven agents."
@@ -26,23 +22,14 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: Implementation :: PyPy",
-    # uncomment if you test on these interpreters:
-    # "Programming Language :: Python :: Implementation :: IronPython",
-    # "Programming Language :: Python :: Implementation :: Jython",
-    # "Programming Language :: Python :: Implementation :: Stackless",
     "Topic :: Utilities",
 ]
-keywords = [
-    # eg: "keyword1", "keyword2", "keyword3",
-]
-requires-python = ">=3.9"
+keywords = []
+requires-python = ">=3.12"
 dependencies = [
     "pydantic-ai>=0.0.13",
     "pydantic>=2.0.0",
@@ -56,46 +43,50 @@ dependencies = [
     "chromadb>=0.5.0",
 ]
 
-[project.optional-dependencies]
-# rst = ["docutils>=0.11"]
-
 [dependency-groups]
 test = [
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
+]
+dev = [
+    "ruff",
+    "pre-commit",
 ]
 
 [project.scripts]
 sciread = "sciread.cli:run"
 
 [project.urls]
-"Sources" = "https://https://gitea.ecwu.xyz/ecwu/python-sciread"
+"Sources" = "https://gitea.ecwu.xyz/ecwu/python-sciread"
 "Documentation" = "https://python-sciread.readthedocs.io/"
 "Changelog" = "https://python-sciread.readthedocs.io/en/latest/changelog.html"
-"Issue Tracker" = "https://https://gitea.ecwu.xyz/ecwu/python-sciread/issues"
+"Issue Tracker" = "https://gitea.ecwu.xyz/ecwu/python-sciread/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sciread"]
 
 [tool.ruff]
 extend-exclude = ["static", "ci/templates"]
 line-length = 140
 src = ["src", "tests"]
-target-version = "py39"
+target-version = "py312"
 
 [tool.ruff.lint.per-file-ignores]
 "ci/*" = ["S"]
 
 [tool.ruff.lint]
 ignore = [
-    "RUF001",  # ruff-specific rules ambiguous-unicode-character-string
-    "RUF006",  # store a reference to the return value of asyncio.create_task
-    "S101",    # flake8-bandit assert
-    "S110",    # try-except-pass detected
-    "S308",    # flake8-bandit suspicious-mark-safe-usage
-    "S603",    # flake8-bandit subprocess-without-shell-equals-true
-    "S607",    # flake8-bandit start-process-with-partial-path
-    "S608",    # possible SQL injection vector through string-based query construction
-    "E501",    # pycodestyle line-too-long
+    "RUF001", # ruff-specific rules ambiguous-unicode-character-string
+    "RUF006", # store a reference to the return value of asyncio.create_task
+    "S101",   # flake8-bandit assert
+    "S110",   # try-except-pass detected
+    "S308",   # flake8-bandit suspicious-mark-safe-usage
+    "S603",   # flake8-bandit subprocess-without-shell-equals-true
+    "S607",   # flake8-bandit start-process-with-partial-path
+    "S608",   # possible SQL injection vector through string-based query construction
+    "E501",   # pycodestyle line-too-long
     "PLC0415", # import should be at the top of the file
-
 ]
 select = [
     "B",   # flake8-bugbear
@@ -128,3 +119,24 @@ force-single-line = true
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.pytest.ini_options]
+norecursedirs = ["migrations"]
+python_files = ["test_*.py", "*_test.py", "tests.py"]
+addopts = "-ra --strict-markers --tb=short"
+markers = ["asyncio: marks tests as async"]
+testpaths = ["tests"]
+filterwarnings = ["error"]
+
+[tool.coverage.paths]
+source = ["src", "*/site-packages"]
+
+[tool.coverage.run]
+branch = true
+source = ["sciread", "tests"]
+parallel = true
+
+[tool.coverage.report]
+show_missing = true
+precision = 2
+omit = ["*migrations*"]
