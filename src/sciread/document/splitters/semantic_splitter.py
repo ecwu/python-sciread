@@ -55,7 +55,9 @@ class SemanticSplitter(BaseSplitter):
         if self.enable_academic_patterns:
             academic_patterns = {
                 # High confidence academic sections
-                "abstract": re.compile(r"^(?:abstract|summary)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE),
+                "abstract": re.compile(
+                    r"^(?:abstract|summary)\s*[:\-]?\s*$", re.IGNORECASE | re.MULTILINE
+                ),
                 "introduction": re.compile(
                     r"^(?:introduction|overview|background)\s*[:\-]?\s*$",
                     re.IGNORECASE | re.MULTILINE,
@@ -95,7 +97,9 @@ class SemanticSplitter(BaseSplitter):
                 # Medium confidence academic patterns
                 "section": re.compile(r"^(\d+)\.?\s+([^\n]+)$", re.MULTILINE),
                 "subsection": re.compile(r"^(\d+\.\d+)\.?\s+([^\n]+)$", re.MULTILINE),
-                "subsection2": re.compile(r"^(\d+\.\d+\.\d+)\.?\s+([^\n]+)$", re.MULTILINE),
+                "subsection2": re.compile(
+                    r"^(\d+\.\d+\.\d+)\.?\s+([^\n]+)$", re.MULTILINE
+                ),
             }
             self.patterns.update(academic_patterns)
 
@@ -110,15 +114,21 @@ class SemanticSplitter(BaseSplitter):
                 "h5": re.compile(r"^(#{5})\s+(.+)$", re.MULTILINE),
                 "h6": re.compile(r"^(#{6})\s+(.+)$", re.MULTILINE),
                 # Code blocks (high confidence)
-                "fenced_code": re.compile(r"^```[\w]*\n.*?\n```", re.MULTILINE | re.DOTALL),
-                "indented_code": re.compile(r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE),
+                "fenced_code": re.compile(
+                    r"^```[\w]*\n.*?\n```", re.MULTILINE | re.DOTALL
+                ),
+                "indented_code": re.compile(
+                    r"^(?:\t| {4}).+(?:\n(?:\t| {4}).+)*", re.MULTILINE
+                ),
                 "inline_code": re.compile(r"`[^`]+`"),
                 # Lists (medium confidence)
                 "unordered_list": re.compile(r"^[*+-]\s+.+$", re.MULTILINE),
                 "ordered_list": re.compile(r"^\d+\.\s+.+$", re.MULTILINE),
                 # Structural elements (medium confidence)
                 "blockquote": re.compile(r"^>\s+.+$", re.MULTILINE),
-                "horizontal_rule": re.compile(r"^-{3,}$|^\*{3,}$|^_{3,}$", re.MULTILINE),
+                "horizontal_rule": re.compile(
+                    r"^-{3,}$|^\*{3,}$|^_{3,}$", re.MULTILINE
+                ),
                 # Tables (medium confidence)
                 "table": re.compile(r"^\|.*\|$", re.MULTILINE),
                 # Links and emphasis (low confidence)
@@ -171,7 +181,7 @@ class SemanticSplitter(BaseSplitter):
         # Extract and preserve code blocks if requested
         code_blocks = []
         if self.preserve_code_blocks and self.enable_markdown_patterns:
-            text, code_blocks = self._extract_code_blocks(text)
+            text, code_blocks = self._extract_code_blocks(text, self.patterns)
 
         # Find all split points based on semantic structure
         split_points = self._find_semantic_split_points(text)
@@ -189,46 +199,6 @@ class SemanticSplitter(BaseSplitter):
 
         return chunks
 
-    def _extract_code_blocks(self, text: str) -> tuple[str, list[dict]]:
-        """Extract code blocks and replace them with placeholders."""
-        if not self.enable_markdown_patterns:
-            return text, []
-
-        code_blocks = []
-        placeholder_pattern = "__CODE_BLOCK_{}__"
-
-        # Extract fenced code blocks
-        for i, match in enumerate(self.patterns["fenced_code"].finditer(text)):
-            block_text = match.group(0)
-            code_blocks.append(
-                {
-                    "placeholder": placeholder_pattern.format(i),
-                    "content": block_text,
-                    "type": "fenced_code",
-                    "start": match.start(),
-                    "end": match.end(),
-                }
-            )
-            text = text.replace(block_text, placeholder_pattern.format(i), 1)
-
-        # Extract indented code blocks
-        if "indented_code" in self.patterns:
-            offset = len(code_blocks)
-            for i, match in enumerate(self.patterns["indented_code"].finditer(text)):
-                block_text = match.group(0)
-                code_blocks.append(
-                    {
-                        "placeholder": placeholder_pattern.format(offset + i),
-                        "content": block_text,
-                        "type": "indented_code",
-                        "start": match.start(),
-                        "end": match.end(),
-                    }
-                )
-                text = text.replace(block_text, placeholder_pattern.format(offset + i), 1)
-
-        return text, code_blocks
-
     def _clean_section_name(self, title: str) -> str:
         """Clean section name: lowercase, remove symbols, trim spaces."""
         # Convert to lowercase
@@ -244,7 +214,9 @@ class SemanticSplitter(BaseSplitter):
         # Return "untitled" if empty after cleaning
         return cleaned if cleaned else "untitled"
 
-    def _find_semantic_split_points(self, text: str) -> list[tuple[int, str, float, str]]:
+    def _find_semantic_split_points(
+        self, text: str
+    ) -> list[tuple[int, str, float, str]]:
         """Find split points based on semantic structure."""
         split_points = []
 
@@ -267,7 +239,9 @@ class SemanticSplitter(BaseSplitter):
                         confidence = self.confidence_scores.get(pattern_name, 0.8)
                         for match in pattern.finditer(text):
                             section_name = pattern_name
-                            split_points.append((match.start(), pattern_name, confidence, section_name))
+                            split_points.append(
+                                (match.start(), pattern_name, confidence, section_name)
+                            )
 
             # Find markdown headers
             if self.enable_markdown_patterns:
@@ -280,7 +254,9 @@ class SemanticSplitter(BaseSplitter):
                             # Extract the header title and clean it for section name
                             raw_title = match.group(2).strip()
                             section_name = self._clean_section_name(raw_title)
-                            split_points.append((match.start(), pattern_name, confidence, section_name))
+                            split_points.append(
+                                (match.start(), pattern_name, confidence, section_name)
+                            )
 
             # Find numbered academic sections
             if self.enable_academic_patterns:
@@ -292,7 +268,9 @@ class SemanticSplitter(BaseSplitter):
                             # Extract section number and title
                             section_title = match.group(2).strip()
                             section_name = self._clean_section_name(section_title)
-                            split_points.append((match.start(), pattern_name, confidence, section_name))
+                            split_points.append(
+                                (match.start(), pattern_name, confidence, section_name)
+                            )
 
         # Sort split points by position
         split_points.sort(key=lambda x: x[0])
@@ -307,7 +285,9 @@ class SemanticSplitter(BaseSplitter):
 
         return filtered_points
 
-    def _create_semantic_chunks(self, text: str, split_points: list[tuple[int, str, float, str]]) -> list[Chunk]:
+    def _create_semantic_chunks(
+        self, text: str, split_points: list[tuple[int, str, float, str]]
+    ) -> list[Chunk]:
         """Create chunks based on semantic split points."""
         if not split_points:
             # No semantic structure found, treat as single chunk
@@ -316,7 +296,9 @@ class SemanticSplitter(BaseSplitter):
         chunks = []
         prev_pos = 0
 
-        for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
+        for _i, (pos, element_type, confidence, _section_name) in enumerate(
+            split_points
+        ):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
@@ -341,7 +323,9 @@ class SemanticSplitter(BaseSplitter):
             if chunk_text:
                 # Use section_name from the last split point if available
                 last_section_name = split_points[-1][3] if split_points else None
-                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5, last_section_name)
+                chunk = self._create_chunk_from_content(
+                    chunk_text, prev_pos, len(text), "final", 0.5, last_section_name
+                )
                 chunks.append(chunk)
 
         return chunks
@@ -357,7 +341,9 @@ class SemanticSplitter(BaseSplitter):
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
-        chunk_type, confidence = self._analyze_chunk_content(content, default_confidence)
+        chunk_type, confidence = self._analyze_chunk_content(
+            content, default_confidence
+        )
 
         # If content starts with a header, extract section info
         if section_name is None:
@@ -406,23 +392,35 @@ class SemanticSplitter(BaseSplitter):
 
         return None
 
-    def _analyze_chunk_content(self, content: str, default_confidence: float) -> tuple[str, float]:
+    def _analyze_chunk_content(
+        self, content: str, default_confidence: float
+    ) -> tuple[str, float]:
         """Analyze chunk content to determine type and confidence."""
         content_lower = content.lower()
 
         # Check for code content first (highest priority)
         if self.enable_markdown_patterns:
-            if "fenced_code" in self.patterns and self.patterns["fenced_code"].search(content):
+            if "fenced_code" in self.patterns and self.patterns["fenced_code"].search(
+                content
+            ):
                 return "code", self.confidence_scores["fenced_code"]
-            if "indented_code" in self.patterns and self.patterns["indented_code"].search(content):
+            if "indented_code" in self.patterns and self.patterns[
+                "indented_code"
+            ].search(content):
                 return "code", self.confidence_scores["indented_code"]
             if "table" in self.patterns and self.patterns["table"].search(content):
                 return "table", self.confidence_scores["table"]
-            if "unordered_list" in self.patterns and self.patterns["unordered_list"].search(content):
+            if "unordered_list" in self.patterns and self.patterns[
+                "unordered_list"
+            ].search(content):
                 return "list", self.confidence_scores["unordered_list"]
-            if "ordered_list" in self.patterns and self.patterns["ordered_list"].search(content):
+            if "ordered_list" in self.patterns and self.patterns["ordered_list"].search(
+                content
+            ):
                 return "list", self.confidence_scores["ordered_list"]
-            if "blockquote" in self.patterns and self.patterns["blockquote"].search(content):
+            if "blockquote" in self.patterns and self.patterns["blockquote"].search(
+                content
+            ):
                 return "blockquote", self.confidence_scores["blockquote"]
 
         # Check for academic paper sections by content analysis
@@ -445,7 +443,9 @@ class SemanticSplitter(BaseSplitter):
         first_line = content.split("\n")[0].strip()
         for element_type, pattern in self.patterns.items():
             if element_type.startswith("h") and pattern.match(first_line):
-                confidence = self.confidence_scores.get(element_type, default_confidence)
+                confidence = self.confidence_scores.get(
+                    element_type, default_confidence
+                )
                 return element_type, confidence
 
         # Default classification
@@ -469,13 +469,11 @@ class SemanticSplitter(BaseSplitter):
             metadata={"splitter": chunk_type},
         )
 
-    def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:
+    def _restore_code_blocks(
+        self, chunks: list[Chunk], code_blocks: list[dict]
+    ) -> list[Chunk]:
         """Restore extracted code blocks to their original positions."""
-        for chunk in chunks:
-            for code_block in code_blocks:
-                if code_block["placeholder"] in chunk.content:
-                    chunk.content = chunk.content.replace(code_block["placeholder"], code_block["content"])
-        return chunks
+        return super()._restore_code_blocks(chunks, code_blocks)
 
     def add_custom_pattern(self, name: str, pattern: str, confidence: float = 0.5):
         """Add a custom pattern."""
