@@ -10,7 +10,6 @@ from pydantic_ai import Agent
 from ...document import Document
 from ...llm_provider import get_model
 from ...logging_config import get_logger
-from ..task_queue import TaskQueueManager
 from .models import AgentPersonality
 from .models import DiscussionPhase
 from .models import DiscussionResult
@@ -19,6 +18,7 @@ from .task_models import TaskPriority
 from .task_models import TaskQueue
 from .task_models import TaskStatus
 from .task_models import TaskType
+from .task_queue import TaskQueueManager
 
 logger = get_logger(__name__)
 

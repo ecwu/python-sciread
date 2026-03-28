@@ -89,7 +89,7 @@ from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
 from .simple_agent import SimpleAgent
-from .task_queue import TaskQueueManager
+from .discussion import TaskQueueManager
 from .text_utils import remove_references
 
 __all__ = [

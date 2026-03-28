@@ -8,14 +8,14 @@ from datetime import datetime
 from datetime import timedelta
 from typing import Any
 
-from ..logging_config import get_logger
-from .discussion.models import AgentPersonality
-from .discussion.task_models import Task
-from .discussion.task_models import TaskPriority
-from .discussion.task_models import TaskQueue
-from .discussion.task_models import TaskResult
-from .discussion.task_models import TaskStatus
-from .discussion.task_models import TaskType
+from ...logging_config import get_logger
+from .models import AgentPersonality
+from .task_models import Task
+from .task_models import TaskPriority
+from .task_models import TaskQueue
+from .task_models import TaskResult
+from .task_models import TaskStatus
+from .task_models import TaskType
 
 logger = get_logger(__name__)
 

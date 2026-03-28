@@ -23,6 +23,7 @@ from .task_models import TaskQueue
 from .task_models import TaskResult
 from .task_models import TaskStatus
 from .task_models import TaskType
+from .task_queue import TaskQueueManager
 
 __all__ = [
     "AgentInsight",
@@ -40,6 +41,7 @@ __all__ = [
     "Task",
     "TaskPriority",
     "TaskQueue",
+    "TaskQueueManager",
     "TaskResult",
     "TaskStatus",
     "TaskType",
