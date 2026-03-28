@@ -238,6 +238,9 @@ class TestDocument:
         assert doc.chunks[0].citation_key == "unnamed_document:0"
         assert doc.chunks[1].citation_key == "unnamed_document:1"
         assert doc.chunks[2].citation_key == "unnamed_document:2"
+        assert doc.chunks[0].display_text == "Chunk one"
+        assert doc.chunks[0].content_plain == "Chunk one"
+        assert doc.chunks[0].retrieval_text == "[Section] intro\n\nChunk one"
 
     def test_chunk_enrichment_preserves_custom_citation_key(self):
         """Test custom citation keys are preserved during enrichment."""
@@ -249,3 +252,19 @@ class TestDocument:
         doc._set_chunks([chunk])
 
         assert doc.chunks[0].citation_key == "custom:cite"
+
+    def test_chunk_enrichment_builds_plain_text_for_markdown(self):
+        """Test markdown text is normalized into plain text and retrieval text."""
+        doc = Document.from_text("placeholder")
+        chunk = Chunk(
+            content="# Intro\n\nThis is **bold** and [linked](https://example.com).",
+            chunk_name="intro",
+        )
+
+        doc._set_chunks([chunk])
+
+        assert doc.chunks[0].display_text.startswith("# Intro")
+        assert "#" not in doc.chunks[0].content_plain
+        assert "**" not in doc.chunks[0].content_plain
+        assert "[linked](https://example.com)" not in doc.chunks[0].content_plain
+        assert doc.chunks[0].retrieval_text.startswith("[Section] intro\n\n")

@@ -41,11 +41,13 @@ class VectorIndex:
             return
 
         if len(chunks) != len(embeddings):
-            raise ValueError(f"Number of chunks ({len(chunks)}) must match number of embeddings ({len(embeddings)})")
+            raise ValueError(
+                f"Number of chunks ({len(chunks)}) must match number of embeddings ({len(embeddings)})"
+            )
 
         self._collection.add(
             embeddings=embeddings,
-            documents=[chunk.content for chunk in chunks],
+            documents=[chunk.retrieval_text or chunk.content for chunk in chunks],
             metadatas=[
                 {
                     "source": chunk.chunk_name,
@@ -58,7 +60,9 @@ class VectorIndex:
             ids=[chunk.id for chunk in chunks],
         )
 
-    def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:
+    def search(
+        self, query_embedding: list[float], top_k: int = 5
+    ) -> list[dict[str, Any]]:
         """Performs a semantic search and returns the top_k results.
 
         Args:
@@ -70,7 +74,9 @@ class VectorIndex:
             Similarity scores are in range [0, 1] where 1 is most similar
         """
         try:
-            results = self._collection.query(query_embeddings=[query_embedding], n_results=top_k)
+            results = self._collection.query(
+                query_embeddings=[query_embedding], n_results=top_k
+            )
         except Exception as e:
             raise RuntimeError(f"Failed to query vector index: {e}") from e
 

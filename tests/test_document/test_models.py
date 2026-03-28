@@ -85,6 +85,8 @@ class TestChunk:
         assert chunk.chunk_id
         assert chunk.id == chunk.chunk_id
         assert chunk.content_plain == chunk.content
+        assert chunk.retrieval_text == chunk.content_plain
+        assert chunk.display_text == chunk.content
         assert chunk.doc_id == ""
         assert chunk.section_path == ["introduction"]
         assert chunk.page_start == 1

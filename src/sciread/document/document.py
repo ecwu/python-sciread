@@ -438,8 +438,20 @@ class Document:
             chunk.para_index = i
             chunk.position = i
 
-            if not chunk.content_plain:
-                chunk.content_plain = chunk.content
+            if not chunk.content_plain or chunk.content_plain == chunk.content:
+                chunk.content_plain = self._to_plain_text(chunk.content)
+
+            if not chunk.display_text:
+                chunk.display_text = chunk.content
+
+            if (
+                not chunk.retrieval_text
+                or chunk.retrieval_text == chunk.content
+                or chunk.retrieval_text == chunk.content_plain
+            ):
+                chunk.retrieval_text = self._build_retrieval_text(
+                    chunk.section_path, chunk.content_plain
+                )
 
             if chunk.token_count is None:
                 chunk.token_count = len(chunk.content_plain.split())
@@ -465,11 +477,41 @@ class Document:
             if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
                 chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
 
+            chunk.metadata["section_label"] = (
+                " > ".join(chunk.section_path) if chunk.section_path else ""
+            )
+
         for i, chunk in enumerate(chunks):
             chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
             chunk.next_chunk_id = (
                 chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
             )
+
+    def _build_retrieval_text(self, section_path: list[str], content_plain: str) -> str:
+        """Compose retrieval text used by embeddings/rerank flows."""
+        if section_path:
+            section_label = " > ".join(section_path)
+            return f"[Section] {section_label}\n\n{content_plain}"
+        return content_plain
+
+    def _to_plain_text(self, text: str) -> str:
+        """Convert markdown-ish text into plain text for lexical retrieval."""
+        plain = text
+        plain = re.sub(r"```.*?```", " ", plain, flags=re.DOTALL)
+        plain = re.sub(r"`([^`]+)`", r"\1", plain)
+        plain = re.sub(r"^#{1,6}\s+", "", plain, flags=re.MULTILINE)
+        plain = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", plain)
+        plain = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", plain)
+        plain = re.sub(r"\*\*([^*]+)\*\*", r"\1", plain)
+        plain = re.sub(r"__([^_]+)__", r"\1", plain)
+        plain = re.sub(r"\*([^*]+)\*", r"\1", plain)
+        plain = re.sub(r"_([^_]+)_", r"\1", plain)
+        plain = re.sub(r"^\s{0,3}>\s?", "", plain, flags=re.MULTILINE)
+        plain = re.sub(r"^\s*[-*+]\s+", "", plain, flags=re.MULTILINE)
+        plain = re.sub(r"^\s*\d+\.\s+", "", plain, flags=re.MULTILINE)
+        plain = re.sub(r"<[^>]+>", " ", plain)
+        plain = re.sub(r"\s+", " ", plain).strip()
+        return plain
 
     def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
@@ -513,7 +555,8 @@ class Document:
                 batch_size = embedding_client.embedding_batch_size
 
             embeddings = embedding_client.get_embeddings(
-                [c.content for c in self._chunks], batch_size=batch_size
+                [c.retrieval_text or c.content for c in self._chunks],
+                batch_size=batch_size,
             )
 
             persist_path = None

@@ -17,6 +17,8 @@ class Chunk:
     chunk_id: str = field(default_factory=lambda: str(uuid.uuid4()))
     doc_id: str = ""
     content_plain: str = ""
+    retrieval_text: str = ""
+    display_text: str = ""
     section_path: list[str] = field(default_factory=list)
     page_start: int | None = None
     page_end: int | None = None
@@ -42,8 +44,14 @@ class Chunk:
 
     def __post_init__(self):
         """Validate and initialize derived fields."""
+        if not self.display_text:
+            self.display_text = self.content
+
         if not self.content_plain:
             self.content_plain = self.content
+
+        if not self.retrieval_text:
+            self.retrieval_text = self.content_plain
 
         if self.word_count == 0:
             self.word_count = len(self.content.split())
