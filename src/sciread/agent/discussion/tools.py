@@ -5,12 +5,12 @@ from datetime import datetime
 from typing import Any
 
 from ...logging_config import get_logger
-from ..models.discussion_models import AgentPersonality
-from ..models.task_models import Task
-from ..models.task_models import TaskResult
-from ..models.task_models import TaskType
-from ..personality_agents import PersonalityAgent
-from ..personality_agents import create_personality_agent
+from .models import AgentPersonality
+from .personalities import PersonalityAgent
+from .personalities import create_personality_agent
+from .task_models import Task
+from .task_models import TaskResult
+from .task_models import TaskType
 
 logger = get_logger(__name__)
 

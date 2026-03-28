@@ -9,13 +9,13 @@ from datetime import timedelta
 from typing import Any
 
 from ..logging_config import get_logger
-from .models.discussion_models import AgentPersonality
-from .models.task_models import Task
-from .models.task_models import TaskPriority
-from .models.task_models import TaskQueue
-from .models.task_models import TaskResult
-from .models.task_models import TaskStatus
-from .models.task_models import TaskType
+from .discussion.models import AgentPersonality
+from .discussion.task_models import Task
+from .discussion.task_models import TaskPriority
+from .discussion.task_models import TaskQueue
+from .discussion.task_models import TaskResult
+from .discussion.task_models import TaskStatus
+from .discussion.task_models import TaskType
 
 logger = get_logger(__name__)
 

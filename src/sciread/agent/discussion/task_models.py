@@ -10,10 +10,10 @@ from pydantic import BaseModel
 from pydantic import ConfigDict
 from pydantic import Field
 
-from .discussion_models import AgentInsight
-from .discussion_models import AgentPersonality
-from .discussion_models import Question
-from .discussion_models import Response
+from .models import AgentInsight
+from .models import AgentPersonality
+from .models import Question
+from .models import Response
 
 
 class TaskType(StrEnum):

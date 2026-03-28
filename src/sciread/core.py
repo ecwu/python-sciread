@@ -298,7 +298,7 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
         raise ValueError("Failed to load document: no text content extracted")
 
     # Display information about the discussion agents
-    from .agent.models.discussion_models import AgentPersonality
+    from .agent import AgentPersonality
 
     print("Discussion Agents:")
     for personality in AgentPersonality:

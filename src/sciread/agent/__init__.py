@@ -42,11 +42,27 @@ Example Usage:
 """
 
 # Agent classes
-from .consensus_builder import ConsensusBuilder
-from .coordinate_agent import CoordinateAgent
-
 # Discussion system imports
-from .discussion_agent import DiscussionAgent
+from .discussion import AgentInsight
+from .discussion import AgentPersonality
+from .discussion import ConsensusBuilder
+from .discussion import ConsensusPoint
+from .discussion import DiscussionAgent
+from .discussion import DiscussionResult
+from .discussion import DiscussionState
+from .discussion import DivergentView
+from .discussion import PersonalityAgent
+from .discussion import Question
+from .discussion import Response
+from .discussion import Task
+from .discussion import TaskPriority
+from .discussion import TaskQueue
+from .discussion import TaskResult
+from .discussion import TaskStatus
+from .discussion import TaskType
+from .discussion import create_personality_agent
+
+from .coordinate_agent import CoordinateAgent
 
 # CoordinateAgent models - now imported from models folder
 from .models.coordinate_models import AnalysisPlan
@@ -57,14 +73,6 @@ from .models.coordinate_models import MetadataExtractionResult
 from .models.coordinate_models import MethodologyResult
 from .models.coordinate_models import PreviousMethodsResult
 from .models.coordinate_models import ResearchQuestionsResult
-from .models.discussion_models import AgentInsight
-from .models.discussion_models import AgentPersonality
-from .models.discussion_models import ConsensusPoint
-from .models.discussion_models import DiscussionResult
-from .models.discussion_models import DiscussionState
-from .models.discussion_models import DivergentView
-from .models.discussion_models import Question
-from .models.discussion_models import Response
 
 # ReActAgent models - now imported from models folder
 from .models.react_models import ReActAgentInput
@@ -72,14 +80,7 @@ from .models.react_models import ReActAgentOutput
 
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
-from .models.task_models import Task
-from .models.task_models import TaskPriority
-from .models.task_models import TaskQueue
-from .models.task_models import TaskResult
-from .models.task_models import TaskStatus
-from .models.task_models import TaskType
-from .personality_agents import PersonalityAgent
-from .personality_agents import create_personality_agent
+
 
 # ReActAgent and utility functions
 from .react_agent import ReActAgent

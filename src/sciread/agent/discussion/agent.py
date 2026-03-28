@@ -7,18 +7,18 @@ from datetime import timedelta
 
 from pydantic_ai import Agent
 
-from ..document import Document
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .models.discussion_models import AgentPersonality
-from .models.discussion_models import DiscussionPhase
-from .models.discussion_models import DiscussionResult
-from .models.discussion_models import DiscussionState
-from .models.task_models import TaskPriority
-from .models.task_models import TaskQueue
-from .models.task_models import TaskStatus
-from .models.task_models import TaskType
-from .task_queue import TaskQueueManager
+from ...document import Document
+from ...llm_provider import get_model
+from ...logging_config import get_logger
+from ..task_queue import TaskQueueManager
+from .models import AgentPersonality
+from .models import DiscussionPhase
+from .models import DiscussionResult
+from .models import DiscussionState
+from .task_models import TaskPriority
+from .task_models import TaskQueue
+from .task_models import TaskStatus
+from .task_models import TaskType
 
 logger = get_logger(__name__)
 
@@ -61,10 +61,10 @@ class DiscussionAgent:
 
     def _register_task_tools(self):
         """Register all task tools with the task manager."""
-        from .tools.task_tools import answer_question_tool
-        from .tools.task_tools import ask_question_tool
-        from .tools.task_tools import evaluate_convergence_tool
-        from .tools.task_tools import generate_insights_tool
+        from .tools import answer_question_tool
+        from .tools import ask_question_tool
+        from .tools import evaluate_convergence_tool
+        from .tools import generate_insights_tool
 
         self.task_manager.register_task_callback(TaskType.GENERATE_INSIGHTS, generate_insights_tool)
         self.task_manager.register_task_callback(TaskType.ASK_QUESTION, ask_question_tool)
@@ -346,7 +346,7 @@ class DiscussionAgent:
         logger.info("Starting consensus phase")
 
         # Import here to avoid circular imports
-        from .consensus_builder import ConsensusBuilder
+        from .consensus import ConsensusBuilder
 
         ConsensusBuilder(self.model_name)
         self.discussion_state.current_phase = DiscussionPhase.COMPLETED
@@ -480,7 +480,7 @@ class DiscussionAgent:
     async def _build_final_result(self, document: Document) -> DiscussionResult:
         """Build final discussion result."""
         # Import here to avoid circular imports
-        from .consensus_builder import ConsensusBuilder
+        from .consensus import ConsensusBuilder
 
         consensus_builder = ConsensusBuilder(self.model_name)
         return await consensus_builder.build_consensus_result(
@@ -508,14 +508,14 @@ class DiscussionAgent:
 
     def clear_agent_cache(self):
         """Clear all cached agent instances to free memory or reset discussion."""
-        from .tools.task_tools import clear_agent_cache
+        from .tools import clear_agent_cache
 
         clear_agent_cache()
         logger.info("DiscussionAgent: Cleared all cached agent instances")
 
     def get_agent_cache_status(self) -> dict:
         """Get current agent cache status for debugging."""
-        from .tools.task_tools import get_agent_cache_status
+        from .tools import get_agent_cache_status
 
         status = get_agent_cache_status()
         logger.info(f"DiscussionAgent: Cache status - {status}")

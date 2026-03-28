@@ -8,17 +8,17 @@ from typing import Any
 
 from pydantic_ai import Agent
 
-from ..document import Document
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .models.discussion_models import AgentInsight
-from .models.discussion_models import AgentPersonality
-from .models.discussion_models import ConsensusPoint
-from .models.discussion_models import DiscussionResult
-from .models.discussion_models import DiscussionState
-from .models.discussion_models import DivergentView
-from .models.discussion_models import Question
-from .models.discussion_models import Response
+from ...document import Document
+from ...llm_provider import get_model
+from ...logging_config import get_logger
+from .models import AgentInsight
+from .models import AgentPersonality
+from .models import ConsensusPoint
+from .models import DiscussionResult
+from .models import DiscussionState
+from .models import DivergentView
+from .models import Question
+from .models import Response
 
 logger = get_logger(__name__)
 

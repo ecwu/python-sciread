@@ -7,14 +7,14 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 
-from ..document import Document
-from ..document.document_renderers import get_sections_content
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .models.discussion_models import AgentInsight
-from .models.discussion_models import AgentPersonality
-from .models.discussion_models import Question
-from .models.discussion_models import Response
+from ...document import Document
+from ...document.document_renderers import get_sections_content
+from ...llm_provider import get_model
+from ...logging_config import get_logger
+from .models import AgentInsight
+from .models import AgentPersonality
+from .models import Question
+from .models import Response
 from .prompts.personalities import build_insight_generation_prompt
 from .prompts.personalities import get_personality_system_prompt
 

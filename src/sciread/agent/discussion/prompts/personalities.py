@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from ..models.discussion_models import AgentPersonality
+from ..models import AgentPersonality
 
 CRITICAL_EVALUATOR_SYSTEM_PROMPT = """You are a Critical Evaluator, an expert in identifying limitations, methodological flaws, and potential weaknesses in academic research.
 
