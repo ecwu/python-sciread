@@ -273,7 +273,7 @@ Select sections that will help you provide the most valuable insights from your 
     ) -> Any | None:
         """Ask a question about another agent's insight."""
         try:
-            self.logger.info(f"{self.personality.value} asking question to {target_agent.value}")
+            # Removed early info log to avoid redundancy with later print/log
 
             insight_author = getattr(target_insight, "agent_id", target_agent)
             author_value = getattr(insight_author, "value", insight_author)
@@ -333,13 +333,14 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
                 return None
 
             if parsed.get("decision") == "skip":
-                self.logger.info(
-                    f"{self.personality.value} chose to skip questioning {target_agent.value}: {parsed.get('reason', 'no reason provided')}"
-                )
+                self.logger.info(f"{self.personality.value} skipped asking question to {target_agent.value}")
                 return parsed
 
             question_obj = parsed.get("question")
             if question_obj:
+                from_name = str(self.personality.value).replace("_", " ").title()
+                to_name = str(target_agent.value).replace("_", " ").title()
+                print(f"{from_name} asked a question to {to_name}: {question_obj.content}")
                 self.logger.debug(f"Generated question from {self.personality.value} to {target_agent.value}")
             return question_obj
 
