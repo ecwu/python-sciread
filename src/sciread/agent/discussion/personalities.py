@@ -51,7 +51,7 @@ class PersonalityAgent:
     async def generate_insights(self, document: Document, discussion_context: dict[str, Any]) -> list[AgentInsight]:
         """Generate insights based on document and personality."""
         try:
-            self.logger.info(f"Generating insights for {self.personality.value}")
+            self.logger.debug(f"Generating insights for {self.personality.value}")
 
             # Get abstract from document
             abstract_chunks = document.get_sections_by_name(["abstract"])
@@ -61,7 +61,7 @@ class PersonalityAgent:
             section_names = document.get_section_names()
             selected_sections = await self._select_sections_to_read(document.metadata.title or "Untitled", abstract_text, section_names)
 
-            self.logger.info(f"{self.personality.value} selected {len(selected_sections)} sections to read: {selected_sections}")
+            self.logger.debug(f"{self.personality.value} selected sections: {selected_sections}")
 
             # Step 2: Get content of selected sections
             selected_content = self._get_section_content(document, selected_sections)
@@ -87,7 +87,7 @@ class PersonalityAgent:
                 if not getattr(insight, "insight_id", None):
                     insight.insight_id = f"INS-{self.abbrev}-{i + 1:02d}"
 
-            self.logger.info(f"Generated {len(insights)} insights for {self.personality.value}")
+            self.logger.debug(f"Generated {len(insights)} insights for {self.personality.value}")
             return insights
 
         except Exception as e:
@@ -103,7 +103,7 @@ class PersonalityAgent:
         # Safety limit to avoid context window issues
         target_insights = target_insights[:12]
         try:
-            self.logger.info(f"{self.personality.value} reviewing {len(target_insights)} insights for questioning")
+            self.logger.debug(f"{self.personality.value} reviewing {len(target_insights)} insights for questioning")
 
             insights_text = ""
             for insight in target_insights:
@@ -147,7 +147,7 @@ Provide a block for EVERY insight listed above.
             result = await self._run_with_history(prompt)
             questions = self._parse_batch_questions_response(result.output, target_insights)
 
-            self.logger.info(f"{self.personality.value} generated {len(questions)} questions in batch")
+            self.logger.debug(f"{self.personality.value} generated {len(questions)} questions in batch")
             return questions
 
         except Exception as e:
@@ -162,7 +162,7 @@ Provide a block for EVERY insight listed above.
     ) -> list[Response]:
         """Answer multiple questions directed at this agent in one call."""
         try:
-            self.logger.info(f"{self.personality.value} answering {len(questions)} questions in batch")
+            self.logger.debug(f"{self.personality.value} answering {len(questions)} questions in batch")
 
             questions_text = ""
             for q in questions:
@@ -204,7 +204,7 @@ Provide a block for EVERY question listed above.
             result = await self._run_with_history(prompt)
             responses = self._parse_batch_responses_response(result.output, questions)
 
-            self.logger.info(f"{self.personality.value} generated {len(responses)} responses in batch")
+            self.logger.debug(f"{self.personality.value} generated {len(responses)} responses in batch")
             return responses
 
         except Exception as e:
@@ -533,14 +533,11 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
                 return None
 
             if parsed.get("decision") == "skip":
-                self.logger.info(f"{self.personality.value} skipped asking question to {target_agent.value}")
+                self.logger.debug(f"{self.personality.value} skipped asking question to {target_agent.value}")
                 return parsed
 
             question_obj = parsed.get("question")
             if question_obj:
-                from_name = str(self.personality.value).replace("_", " ").title()
-                to_name = str(target_agent.value).replace("_", " ").title()
-                print(f"{from_name} asked a question to {to_name}: {question_obj.content}")
                 self.logger.debug(f"Generated question from {self.personality.value} to {target_agent.value}")
             return question_obj
 
@@ -559,7 +556,7 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
             # Handle from_agent which might be string or enum
             from_agent_str = question.from_agent if isinstance(question.from_agent, str) else question.from_agent.value
 
-            self.logger.info(f"{self.personality.value} answering question from {from_agent_str}")
+            self.logger.debug(f"{self.personality.value} answering question from {from_agent_str}")
 
             relevant_insights = self._find_relevant_insights_for_question(my_insights, question)
 
@@ -651,7 +648,7 @@ Recommendations: [Any suggestions for next steps]
             result = await self._run_with_history(prompt)
             evaluation = self._parse_convergence_evaluation(result.output)
 
-            self.logger.info(f"{self.personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}")
+            self.logger.debug(f"{self.personality.value} convergence evaluation: {evaluation.get('convergence_score', 0.0)}")
             return evaluation
 
         except Exception as e:

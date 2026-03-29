@@ -75,7 +75,7 @@ class DiscussionAgent:
 
     async def analyze_document(self, document: Document) -> DiscussionResult:
         """Main entry point for document analysis."""
-        logger.info(f"Starting multi-agent discussion analysis for document: {document.metadata.title}")
+        logger.info(f"Starting multi-agent discussion analysis for document: {document.metadata.title or 'Untitled'}")
 
         try:
             # Initialize discussion
@@ -422,6 +422,7 @@ class DiscussionAgent:
 
                     # Also add to discussion state
                     self.discussion_state.insights.extend(task.result.insights)
+                    self._log_insight_batch(personality_enum, task.result.insights)
 
     async def _collect_responses_from_tasks(self, task_ids: list[str]):
         """Collect responses from specified tasks only."""
@@ -435,6 +436,12 @@ class DiscussionAgent:
 
                 # Also add to discussion state
                 self.discussion_state.responses.extend(task.result.responses)
+
+                personality = task.assigned_to
+                if isinstance(personality, str):
+                    personality = AgentPersonality(personality)
+                if personality:
+                    self._log_response_batch(personality, task.result.responses)
 
     def _build_role_qa_context(self, personality: AgentPersonality) -> str:
         """Build per-agent Q&A summary for context."""
@@ -465,6 +472,81 @@ class DiscussionAgent:
 
         return "\n".join(lines) if lines else "No prior Q&A involving you."
 
+    def _format_agent_name(self, personality: AgentPersonality | str | None) -> str:
+        """Format agent personality names for logs."""
+        if personality is None:
+            return "Unknown Agent"
+
+        agent_value = personality.value if isinstance(personality, AgentPersonality) else str(personality)
+        return agent_value.replace("_", " ").title()
+
+    def _truncate_for_log(self, text: str | None, limit: int = 160) -> str:
+        """Normalize and trim log text to a readable summary."""
+        if not text:
+            return ""
+
+        normalized = " ".join(text.split())
+        if len(normalized) <= limit:
+            return normalized
+        return f"{normalized[: limit - 3]}..."
+
+    def _format_insight_log_entry(self, insight) -> str:
+        """Format a single insight log line."""
+        insight_id = getattr(insight, "insight_id", "INS-??")
+        importance = getattr(insight, "importance_score", 0.0)
+        confidence = getattr(insight, "confidence", 0.0)
+        content = self._truncate_for_log(getattr(insight, "content", ""))
+        return f"  - {insight_id} [importance={importance:.2f}, confidence={confidence:.2f}] {content}"
+
+    def _log_insight_batch(self, personality: AgentPersonality, insights: list) -> None:
+        """Log a batch of generated insights."""
+        if not insights:
+            return
+
+        print(f"{self._format_agent_name(personality)} insights:")
+        for insight in insights:
+            print(self._format_insight_log_entry(insight))
+
+    def _format_question_log_entry(self, question) -> str:
+        """Format a single question log line."""
+        from_name = self._format_agent_name(question.from_agent)
+        to_name = self._format_agent_name(question.to_agent)
+        content = self._truncate_for_log(question.content)
+        return f"  - {question.question_id} [{question.question_type}, p={question.priority:.2f}] {from_name} -> {to_name}: {content}"
+
+    def _log_question_batch(self, personality: AgentPersonality, questions: list) -> None:
+        """Log a batch of generated questions."""
+        if not questions:
+            print(f"{self._format_agent_name(personality)} asked no follow-up questions.")
+            return
+
+        print(f"{self._format_agent_name(personality)} questions:")
+        for question in questions:
+            print(self._format_question_log_entry(question))
+
+    def _format_response_log_entry(self, response, question=None) -> str:
+        """Format a single response log line."""
+        from_name = self._format_agent_name(response.from_agent)
+        to_name = self._format_agent_name(question.from_agent) if question else "Unknown Agent"
+        question_text = self._truncate_for_log(question.content) if question else ""
+        answer_text = self._truncate_for_log(response.content)
+        base = f"  - {response.question_id} [{response.stance}, c={response.confidence:.2f}] {from_name} -> {to_name}"
+
+        if question_text:
+            return f"{base} | Q: {question_text} | A: {answer_text}"
+        return f"{base} | A: {answer_text}"
+
+    def _log_response_batch(self, personality: AgentPersonality, responses: list) -> None:
+        """Log a batch of generated responses."""
+        if not responses:
+            print(f"{self._format_agent_name(personality)} had no responses to provide.")
+            return
+
+        question_map = {question.question_id: question for question in self.all_questions}
+        print(f"{self._format_agent_name(personality)} responses:")
+        for response in responses:
+            print(self._format_response_log_entry(response, question_map.get(response.question_id)))
+
     async def _collect_questions_from_tasks(self, task_ids: list[str]):
         """Collect questions and assign short IDs."""
         if not self.discussion_queue:
@@ -482,6 +564,8 @@ class DiscussionAgent:
                     q.question_id = self.question_id_gen.next_id(from_agent)
                     self.all_questions.append(q)
                     self.discussion_state.questions.append(q)
+
+                self._log_question_batch(from_agent, task.result.questions)
 
     async def _calculate_overall_convergence(self, task_ids: list[str]) -> float:
         """Calculate overall convergence score from given convergence tasks."""

@@ -73,7 +73,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
 
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
-        logger.info(f"Generated {len(insights)} insights for {personality.value}")
+        logger.debug(f"Generated {len(insights)} insights for {personality.value}")
 
         return TaskResult(
             task_id=task.task_id,
@@ -133,7 +133,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
 
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
-        logger.info(f"Generated {len(questions)} questions from {from_agent.value}")
+        logger.debug(f"Generated {len(questions)} questions from {from_agent.value}")
 
         return TaskResult(
             task_id=task.task_id,
@@ -196,7 +196,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
 
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
-        logger.info(f"Generated {len(responses)} responses from {personality.value}")
+        logger.debug(f"Generated {len(responses)} responses from {personality.value}")
 
         return TaskResult(
             task_id=task.task_id,

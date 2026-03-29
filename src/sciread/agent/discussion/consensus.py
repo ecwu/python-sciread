@@ -26,6 +26,71 @@ logger = get_logger(__name__)
 class ConsensusBuilder:
     """Builds consensus from multi-agent discussion results."""
 
+    CONTRIBUTION_ACTION_KEYWORDS = (
+        "introduces",
+        "proposes",
+        "presents",
+        "develops",
+        "provides",
+        "demonstrates",
+        "establishes",
+        "offers",
+        "enables",
+        "achieves",
+    )
+
+    CONTRIBUTION_TOPIC_KEYWORDS = (
+        "contribution",
+        "contributions",
+        "novel",
+        "innovation",
+        "innovative",
+        "framework",
+        "method",
+        "methodology",
+        "approach",
+        "technique",
+        "algorithm",
+        "model",
+        "system",
+        "architecture",
+        "benchmark",
+        "dataset",
+        "finding",
+        "findings",
+        "result",
+        "results",
+    )
+
+    NON_CONTRIBUTION_KEYWORDS = (
+        "limitation",
+        "limitations",
+        "weakness",
+        "weaknesses",
+        "drawback",
+        "drawbacks",
+        "concern",
+        "concerns",
+        "problem",
+        "problems",
+        "issue",
+        "issues",
+        "risk",
+        "risks",
+        "lacks",
+        "lack of",
+        "lacking",
+        "omitted",
+        "omission",
+        "failed",
+        "failure",
+        "unclear",
+        "questionable",
+        "critic",
+        "critique",
+        "relies heavily",
+    )
+
     def __init__(self, model_name: str = "deepseek-chat"):
         """Initialize the consensus builder."""
         self.model_name = model_name
@@ -303,39 +368,115 @@ SIGNIFICANCE:
     ) -> list[str]:
         """Extract key contributions identified in the analysis."""
         try:
-            contributions = set()
+            scored_candidates: list[tuple[int, int, str]] = []
 
-            # From insights
             for insight in top_insights:
-                # Look for contribution-related keywords
-                content_lower = insight.content.lower()
-                if any(
-                    keyword in content_lower
-                    for keyword in [
-                        "contribution",
-                        "novel",
-                        "innovation",
-                        "advancement",
-                        "breakthrough",
-                    ]
-                ):
-                    contributions.add(insight.content[:200] + "..." if len(insight.content) > 200 else insight.content)
+                candidate = self._normalize_contribution_candidate(insight.content)
+                score = self._score_contribution_candidate(candidate)
+                if score > 0:
+                    scored_candidates.append((score, int(insight.importance_score * 100), candidate))
 
-            # From consensus points
             for point in consensus_points:
-                if any(keyword in point.content.lower() for keyword in ["contribution", "novel", "innovation"]):
-                    contributions.add(point.content[:200] + "..." if len(point.content) > 200 else point.content)
+                candidate = self._normalize_contribution_candidate(point.content)
+                score = self._score_contribution_candidate(candidate)
+                if score > 0:
+                    scored_candidates.append((score + 1, int(point.strength * 100), candidate))
 
-            # If no clear contributions, use top insights
-            if not contributions and top_insights:
-                for insight in top_insights[:5]:
-                    contributions.add(insight.content[:200] + "..." if len(insight.content) > 200 else insight.content)
+            if not scored_candidates:
+                for insight in top_insights:
+                    candidate = self._normalize_contribution_candidate(insight.content)
+                    if self._is_viable_fallback_contribution(candidate):
+                        scored_candidates.append((1, int(insight.importance_score * 100), candidate))
 
-            return list(contributions)
+            ranked_candidates = sorted(scored_candidates, key=lambda item: (item[0], item[1], len(item[2])), reverse=True)
+
+            contributions: list[str] = []
+            seen_normalized: set[str] = set()
+            for _score, _importance, candidate in ranked_candidates:
+                normalized = self._dedupe_contribution_candidate(candidate)
+                if normalized in seen_normalized:
+                    continue
+                contributions.append(candidate)
+                seen_normalized.add(normalized)
+                if len(contributions) == 5:
+                    break
+
+            return contributions
 
         except Exception as e:
             self.logger.error(f"Error extracting key contributions: {e}")
             return []
+
+    def _normalize_contribution_candidate(self, content: str) -> str:
+        """Normalize contribution text for display and deduplication."""
+        candidate = re.sub(r"\s+", " ", content).strip()
+        candidate = re.sub(r"^\d+\.\s*", "", candidate)
+
+        return candidate
+
+    def _score_contribution_candidate(self, candidate: str) -> int:
+        """Score whether a statement is likely to be a real paper contribution."""
+        if not candidate:
+            return 0
+
+        candidate_lower = candidate.lower()
+
+        if any(
+            phrase in candidate_lower
+            for phrase in [
+                "analysis of ",
+                "evaluation of ",
+                "key contributions is omitted",
+                "key contribution is omitted",
+                "main contribution is omitted",
+            ]
+        ):
+            return 0
+
+        action_hits = sum(keyword in candidate_lower for keyword in self.CONTRIBUTION_ACTION_KEYWORDS)
+        topic_hits = sum(keyword in candidate_lower for keyword in self.CONTRIBUTION_TOPIC_KEYWORDS)
+        negative_hits = sum(keyword in candidate_lower for keyword in self.NON_CONTRIBUTION_KEYWORDS)
+
+        if action_hits == 0 and topic_hits == 0:
+            return 0
+
+        if negative_hits >= action_hits + topic_hits and action_hits < 2:
+            return 0
+
+        if negative_hits > 0 and any(
+            phrase in candidate_lower
+            for phrase in [
+                "raises significant concerns",
+                "lacks public validation",
+                "relies heavily on",
+            ]
+        ):
+            return 0
+
+        score = (action_hits * 3) + topic_hits - (negative_hits * 2)
+
+        if any(candidate_lower.startswith(keyword) for keyword in self.CONTRIBUTION_ACTION_KEYWORDS):
+            score += 2
+
+        return max(score, 0)
+
+    def _is_viable_fallback_contribution(self, candidate: str) -> bool:
+        """Use only affirmative, non-critical insight text as fallback contributions."""
+        candidate_lower = candidate.lower()
+        if any(keyword in candidate_lower for keyword in self.NON_CONTRIBUTION_KEYWORDS):
+            return False
+        return bool(
+            any(keyword in candidate_lower for keyword in self.CONTRIBUTION_ACTION_KEYWORDS)
+            or any(keyword in candidate_lower for keyword in ("framework", "method", "approach", "system", "model"))
+        )
+
+    def _dedupe_contribution_candidate(self, candidate: str) -> str:
+        """Create a normalized key so near-identical contribution strings collapse."""
+        normalized = candidate.lower()
+        normalized = normalized.replace("...", "")
+        normalized = re.sub(r"[^a-z0-9\s]", "", normalized)
+        normalized = re.sub(r"\s+", " ", normalized).strip()
+        return normalized
 
     def _calculate_overall_confidence(self, top_insights: list[AgentInsight], consensus_points: list[ConsensusPoint]) -> float:
         """Calculate overall confidence in the analysis results."""
