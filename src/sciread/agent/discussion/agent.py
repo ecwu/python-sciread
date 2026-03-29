@@ -14,6 +14,7 @@ from .models import AgentPersonality
 from .models import DiscussionPhase
 from .models import DiscussionResult
 from .models import DiscussionState
+from .models import QuestionIdGenerator
 from .task_models import TaskPriority
 from .task_models import TaskQueue
 from .task_models import TaskStatus
@@ -55,6 +56,7 @@ class DiscussionAgent:
         self.agent_insights: dict[AgentPersonality, list] = {}
         self.all_questions: list = []
         self.all_responses: list = []
+        self.question_id_gen = QuestionIdGenerator()
 
         # Register task tools
         self._register_task_tools()
@@ -123,6 +125,7 @@ class DiscussionAgent:
         self.agent_insights = {personality: [] for personality in AgentPersonality}
         self.all_questions = []
         self.all_responses = []
+        self.question_id_gen = QuestionIdGenerator()
 
         logger.info("Discussion initialized")
 
@@ -197,102 +200,108 @@ class DiscussionAgent:
         logger.info(f"Initial analysis phase completed. Total insights: {sum(len(insights) for insights in self.agent_insights.values())}")
 
     async def _run_questioning_phase(self):
-        """Run questioning phase where agents ask questions about each other's insights."""
-        logger.info("Starting questioning phase")
+        """Run questioning phase (batch mode)."""
+        logger.info("Starting questioning phase (batch)")
 
         question_tasks = []
 
-        for target_personality, insights in self.agent_insights.items():
-            if not insights:
+        # All insights from all other agents
+        all_other_insights = []
+        for insights in self.agent_insights.values():
+            # Sort and take top 3 insights per agent for questioning
+            top_insights = sorted(insights, key=lambda i: i.importance_score, reverse=True)[:3]
+            all_other_insights.extend(top_insights)
+
+        for from_personality in AgentPersonality:
+            # Insights NOT from this agent
+            target_insights = [i for i in all_other_insights if i.agent_id != from_personality]
+
+            if not target_insights:
                 continue
 
-            top_insights = sorted(insights, key=lambda i: i.importance_score, reverse=True)[:2]
-
-            for insight in top_insights:
-                prior_qa_for_insight = self._get_prior_qa_for_insight(insight)
-
-                for from_personality in AgentPersonality:
-                    if from_personality == target_personality:
-                        continue
-
-                    my_prior_questions = [qa for qa in prior_qa_for_insight if qa["from_agent"] == from_personality.value]
-
-                    task_id = self.task_manager.create_task(
-                        queue_name="main_discussion",
-                        task_type=TaskType.ASK_QUESTION,
-                        parameters={
-                            "from_agent": from_personality,
-                            "to_agent": target_personality,
-                            "target_insight": insight,
-                            "discussion_context": {
-                                "phase": "questioning",
-                                "iteration": self.discussion_state.iteration_count,
-                                "total_questions": len(self.all_questions),
-                                "prior_qa_for_insight": prior_qa_for_insight,
-                                "my_prior_questions": my_prior_questions,
-                            },
-                        },
-                        priority=TaskPriority.MEDIUM,
-                        assigned_to=from_personality,
-                        timeout_seconds=120,
-                        context={"model_name": self.model_name},
-                    )
-                    question_tasks.append(task_id)
+            task_id = self.task_manager.create_task(
+                queue_name="main_discussion",
+                task_type=TaskType.ASK_QUESTION,
+                parameters={
+                    "from_agent": from_personality,
+                    "target_insights": target_insights,
+                    "discussion_context": {
+                        "phase": "questioning",
+                        "iteration": self.discussion_state.iteration_count,
+                        "role_qa_summary": self._build_role_qa_context(from_personality),
+                    },
+                },
+                priority=TaskPriority.MEDIUM,
+                assigned_to=from_personality,
+                timeout_seconds=240,  # Batch questioning takes longer
+                context={"model_name": self.model_name},
+            )
+            question_tasks.append(task_id)
 
         # Wait for question generation to complete
-        await self._wait_for_tasks_completion(question_tasks, timeout_minutes=3)
+        await self._wait_for_tasks_completion(question_tasks, timeout_minutes=5)
 
-        # Collect questions from these specific tasks only
+        # Collect questions and assign short IDs
         await self._collect_questions_from_tasks(question_tasks)
 
         # Update phase
         if self.all_questions:
             self.discussion_state.current_phase = DiscussionPhase.RESPONDING
         else:
-            # No questions generated, skip to convergence
             self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
         logger.info(f"Questioning phase completed. Questions generated: {len(self.all_questions)}")
 
     async def _run_responding_phase(self):
-        """Run responding phase where agents answer questions."""
-        logger.info("Starting responding phase")
+        """Run responding phase (batch mode)."""
+        logger.info("Starting responding phase (batch)")
 
         response_tasks = []
 
-        # Create response tasks for unanswered questions
+        # Group unanswered questions by to_agent
+        questions_by_agent: dict[AgentPersonality, list] = {p: [] for p in AgentPersonality}
+
         for question in self.all_questions:
             # Check if this question has been answered
             if not any(resp.question_id == question.question_id for resp in self.all_responses):
-                task_id = self.task_manager.create_task(
-                    queue_name="main_discussion",
-                    task_type=TaskType.ANSWER_QUESTION,
-                    parameters={
-                        "question": question,
-                        "my_insights": self.agent_insights.get(question.to_agent, []),
-                        "discussion_context": {
-                            "phase": "responding",
-                            "iteration": self.discussion_state.iteration_count,
-                            "total_responses": len(self.all_responses),
-                        },
+                to_agent = question.to_agent
+                if isinstance(to_agent, str):
+                    to_agent = AgentPersonality(to_agent)
+                questions_by_agent[to_agent].append(question)
+
+        for agent, questions in questions_by_agent.items():
+            if not questions:
+                continue
+
+            task_id = self.task_manager.create_task(
+                queue_name="main_discussion",
+                task_type=TaskType.ANSWER_QUESTION,
+                parameters={
+                    "questions": questions,
+                    "my_insights": self.agent_insights.get(agent, []),
+                    "discussion_context": {
+                        "phase": "responding",
+                        "iteration": self.discussion_state.iteration_count,
+                        "role_qa_summary": self._build_role_qa_context(agent),
                     },
-                    priority=TaskPriority.HIGH,
-                    assigned_to=question.to_agent,
-                    timeout_seconds=180,  # 3 minutes
-                    context={"model_name": self.model_name},
-                )
-                response_tasks.append(task_id)
+                },
+                priority=TaskPriority.HIGH,
+                assigned_to=agent,
+                timeout_seconds=300,  # Batch answering takes longer
+                context={"model_name": self.model_name},
+            )
+            response_tasks.append(task_id)
 
         # Wait for response generation to complete
-        await self._wait_for_tasks_completion(response_tasks, timeout_minutes=5)
+        await self._wait_for_tasks_completion(response_tasks, timeout_minutes=7)
 
-        # Collect responses from these specific tasks only
+        # Collect responses
         await self._collect_responses_from_tasks(response_tasks)
 
         # Update phase
         self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
-        logger.info(f"Responding phase completed. Responses generated: {len(self.all_responses)}")
+        logger.info(f"Responding phase completed. Total responses: {len(self.all_responses)}")
 
     async def _run_convergence_phase(self):
         """Run convergence evaluation phase."""
@@ -362,7 +371,6 @@ class DiscussionAgent:
             return True
 
         # Only terminate if phase is COMPLETED
-        # max_iterations check is now handled in _run_convergence_phase
         if self.discussion_state.current_phase == DiscussionPhase.COMPLETED:
             return True
 
@@ -415,19 +423,6 @@ class DiscussionAgent:
                     # Also add to discussion state
                     self.discussion_state.insights.extend(task.result.insights)
 
-    async def _collect_questions_from_tasks(self, task_ids: list[str]):
-        """Collect questions from specified tasks only."""
-        if not self.discussion_queue:
-            return
-
-        for task_id in task_ids:
-            task = self.discussion_queue.get_task(task_id)
-            if task and task.task_type == TaskType.ASK_QUESTION and task.result:
-                self.all_questions.extend(task.result.questions)
-
-                # Also add to discussion state
-                self.discussion_state.questions.extend(task.result.questions)
-
     async def _collect_responses_from_tasks(self, task_ids: list[str]):
         """Collect responses from specified tasks only."""
         if not self.discussion_queue:
@@ -440,6 +435,53 @@ class DiscussionAgent:
 
                 # Also add to discussion state
                 self.discussion_state.responses.extend(task.result.responses)
+
+    def _build_role_qa_context(self, personality: AgentPersonality) -> str:
+        """Build per-agent Q&A summary for context."""
+        pers_value = personality.value if hasattr(personality, "value") else str(personality)
+
+        # Questions asked BY this agent
+        asked_by_me = [q for q in self.all_questions if q.from_agent == pers_value]
+        # Questions directed TO this agent
+        directed_to_me = [q for q in self.all_questions if q.to_agent == pers_value]
+
+        lines = []
+
+        if asked_by_me:
+            lines.append("Questions you asked:")
+            for q in asked_by_me:
+                resp = next((r for r in self.all_responses if r.question_id == q.question_id), None)
+                to_name = str(q.to_agent).replace("_", " ").title()
+                status = f"Answered (stance: {resp.stance})" if resp else "Pending"
+                lines.append(f"  [{q.question_id}] \u2192 {to_name}: \"{q.content[:100]}...\" ({status})")
+
+        if directed_to_me:
+            lines.append("\nQuestions directed at you:")
+            for q in directed_to_me:
+                resp = next((r for r in self.all_responses if r.question_id == q.question_id), None)
+                from_name = str(q.from_agent).replace("_", " ").title()
+                status = "Answered" if resp else "Pending - please answer"
+                lines.append(f"  [{q.question_id}] From {from_name}: \"{q.content[:100]}...\" ({status})")
+
+        return "\n".join(lines) if lines else "No prior Q&A involving you."
+
+    async def _collect_questions_from_tasks(self, task_ids: list[str]):
+        """Collect questions and assign short IDs."""
+        if not self.discussion_queue:
+            return
+
+        for task_id in task_ids:
+            task = self.discussion_queue.get_task(task_id)
+            if task and task.task_type == TaskType.ASK_QUESTION and task.result:
+                from_agent = task.assigned_to
+                if isinstance(from_agent, str):
+                    from_agent = AgentPersonality(from_agent)
+
+                for q in task.result.questions:
+                    # Assign short ID
+                    q.question_id = self.question_id_gen.next_id(from_agent)
+                    self.all_questions.append(q)
+                    self.discussion_state.questions.append(q)
 
     async def _calculate_overall_convergence(self, task_ids: list[str]) -> float:
         """Calculate overall convergence score from given convergence tasks."""

@@ -11,6 +11,7 @@ from ...document import Document
 from ...document.document_renderers import get_sections_content
 from ...llm_provider import get_model
 from ...logging_config import get_logger
+from .models import AGENT_ABBREVIATIONS
 from .models import AgentInsight
 from .models import AgentPersonality
 from .models import Question
@@ -32,6 +33,7 @@ class PersonalityAgent:
         self.agent = Agent(self.model, system_prompt=get_personality_system_prompt(personality))
         self.logger = get_logger(f"{__name__}.{personality.value}")
         self.message_history: list[ModelMessage] = []
+        self.abbrev = AGENT_ABBREVIATIONS.get(personality, "XX")
 
     async def _run_with_history(self, prompt: str):
         """Run agent with message history persistence."""
@@ -80,12 +82,210 @@ class PersonalityAgent:
             # Parse the response to extract insights
             insights = self._parse_insights_response(result.output, document)
 
+            # Assign short IDs if not present
+            for i, insight in enumerate(insights):
+                if not getattr(insight, "insight_id", None):
+                    insight.insight_id = f"INS-{self.abbrev}-{i + 1:02d}"
+
             self.logger.info(f"Generated {len(insights)} insights for {self.personality.value}")
             return insights
 
         except Exception as e:
             self.logger.error(f"Error generating insights for {self.personality.value}: {e}")
             return []
+
+    async def ask_questions_batch(
+        self,
+        target_insights: list[AgentInsight],
+        discussion_context: dict[str, Any],
+    ) -> list[Question]:
+        """Ask multiple questions about other agents' insights in one call."""
+        # Safety limit to avoid context window issues
+        target_insights = target_insights[:12]
+        try:
+            self.logger.info(f"{self.personality.value} reviewing {len(target_insights)} insights for questioning")
+
+            insights_text = ""
+            for insight in target_insights:
+                author_name = str(insight.agent_id).replace("_", " ").title()
+                insights_text += f"\n[{insight.insight_id}] From {author_name} (importance: {insight.importance_score}):\n"
+                insights_text += f"  \"{insight.content}\"\n"
+                if insight.supporting_evidence:
+                    insights_text += f"  Evidence: \"{insight.supporting_evidence[0][:200]}...\"\n"
+
+            qa_summary = self._format_role_qa_summary(discussion_context)
+
+            prompt = f"""
+As a {self.personality.value.replace("_", " ").title()}, review the following insights from other agents and decide which to question.
+
+**Insights to review:**
+{insights_text}
+
+{qa_summary}
+
+**Discussion Context:**
+Current Phase: {discussion_context.get("phase", "questioning")}
+Iteration: {discussion_context.get("iteration", 1)}
+
+**Your Task:**
+For each insight you want to question, provide a specific, critical, or clarifying question.
+Only ask a question if it will meaningfully advance the discussion. If an insight already satisfies your concerns OR your previous questions addressed the topic, choose to skip.
+
+For each insight you evaluate, use this format:
+---
+Question about [INS-XX-01]:
+Decision: [ask|skip]
+Reason: [brief justification]
+Question: [your specific question or "None" if skipping]
+Priority: [0.0-1.0 score, 0.0 for skip]
+Type: [clarification/challenge/extension/none]
+---
+
+Provide a block for EVERY insight listed above.
+"""
+
+            result = await self._run_with_history(prompt)
+            questions = self._parse_batch_questions_response(result.output, target_insights)
+
+            self.logger.info(f"{self.personality.value} generated {len(questions)} questions in batch")
+            return questions
+
+        except Exception as e:
+            self.logger.error(f"Error in batch questioning for {self.personality.value}: {e}")
+            return []
+
+    async def answer_questions_batch(
+        self,
+        questions: list[Question],
+        my_insights: list[AgentInsight],
+        discussion_context: dict[str, Any],
+    ) -> list[Response]:
+        """Answer multiple questions directed at this agent in one call."""
+        try:
+            self.logger.info(f"{self.personality.value} answering {len(questions)} questions in batch")
+
+            questions_text = ""
+            for q in questions:
+                from_name = str(q.from_agent).replace("_", " ").title()
+                questions_text += f"\n[{q.question_id}] From {from_name} about insight \"{q.target_insight}\":\n"
+                questions_text += f"  \"{q.content}\"\n"
+
+            insights_text = "\n".join([f"- [{i.insight_id}] {i.content}" for i in my_insights])
+            qa_summary = self._format_role_qa_summary(discussion_context)
+
+            prompt = f"""
+You have the following questions to answer:
+{questions_text}
+
+**Your Relevant Insights:**
+{insights_text}
+
+{qa_summary}
+
+**Discussion Context:**
+Current Phase: {discussion_context.get("phase", "responding")}
+Iteration: {discussion_context.get("iteration", 1)}
+
+**Your Task:**
+For each question, provide your answer. Maintain your personality's perspective, provide clear reasoning, and suggest revisions to your insights if appropriate.
+
+For each question, provide your answer using this exact format:
+---
+Answer to [Q-XX-01]:
+Response: [Your detailed response]
+Stance: [agree/disagree/clarify/modify]
+Revised Insight: [If modifying, provide revised insight text, otherwise "None"]
+Confidence: [0.0-1.0]
+---
+
+Provide a block for EVERY question listed above.
+"""
+
+            result = await self._run_with_history(prompt)
+            responses = self._parse_batch_responses_response(result.output, questions)
+
+            self.logger.info(f"{self.personality.value} generated {len(responses)} responses in batch")
+            return responses
+
+        except Exception as e:
+            self.logger.error(f"Error in batch answering for {self.personality.value}: {e}")
+            return []
+
+    def _format_role_qa_summary(self, discussion_context: dict[str, Any]) -> str:
+        """Format a summary of Q&A involving this agent's role."""
+        qa_summary = discussion_context.get("role_qa_summary", "")
+        if qa_summary:
+            return f"**Q&A involving you ({self.personality.value.replace('_', ' ').title()}):**\n{qa_summary}"
+        return ""
+
+    def _parse_batch_questions_response(self, response: str, target_insights: list[AgentInsight]) -> list[Question]:
+        """Parse multiple question blocks from LLM response."""
+        questions = []
+        blocks = re.split(r"---", response)
+
+        # Map insight_id to insight object for easy lookup
+        insight_map = {i.insight_id: i for i in target_insights}
+
+        for block in blocks:
+            if "Question about [" not in block:
+                continue
+
+            try:
+                insight_id_match = re.search(r"Question about \[(INS-[A-Z]+-\d+)\]", block)
+                if not insight_id_match:
+                    continue
+
+                insight_id = insight_id_match.group(1)
+                target_insight = insight_map.get(insight_id)
+
+                if not target_insight:
+                    continue
+
+                # Use existing single parser logic but adapted for the block
+                parsed = self._parse_question_response(block, target_insight, target_insight.agent_id)
+                if parsed and parsed.get("decision") == "ask":
+                    q = parsed["question"]
+                    # Short ID will be assigned by orchestrator/generator,
+                    # but we can set a temporary one if needed.
+                    # Actually, the orchestrator should use QuestionIdGenerator.
+                    questions.append(q)
+
+            except Exception as e:
+                self.logger.warning(f"Failed to parse question block: {e}")
+
+        return questions
+
+    def _parse_batch_responses_response(self, response: str, questions: list[Question]) -> list[Response]:
+        """Parse multiple answer blocks from LLM response."""
+        responses = []
+        blocks = re.split(r"---", response)
+
+        # Map question_id to question object
+        question_map = {q.question_id: q for q in questions}
+
+        for block in blocks:
+            if "Answer to [" not in block:
+                continue
+
+            try:
+                question_id_match = re.search(r"Answer to \[(Q-[A-Z]+-\d+)\]", block)
+                if not question_id_match:
+                    continue
+
+                question_id = question_id_match.group(1)
+                question = question_map.get(question_id)
+
+                if not question:
+                    continue
+
+                parsed = self._parse_answer_response(block, question)
+                if parsed:
+                    responses.append(parsed)
+
+            except Exception as e:
+                self.logger.warning(f"Failed to parse answer block: {e}")
+
+        return responses
 
     async def _select_sections_to_read(self, title: str, abstract: str, available_sections: list[str]) -> list[str]:
         """Select which sections to read based on personality and paper overview."""
@@ -710,11 +910,11 @@ Recommendations: [Any suggestions for next steps]
                 return None
 
             question_obj = Question(
-                question_id=str(uuid.uuid4()),
+                question_id="PENDING",  # Will be assigned a short ID by orchestrator
                 from_agent=self.personality,
                 to_agent=target_agent,
                 content=question_text,
-                target_insight=target_insight.content[:50],  # Use first 50 chars as ID
+                target_insight=getattr(target_insight, "insight_id", None) or target_insight.content[:50],
                 question_type=question_type if question_type else "clarification",
                 priority=min(max(priority, 0.0), 1.0) or 0.5,
                 requires_response=True,
@@ -871,22 +1071,42 @@ Recommendations: [Any suggestions for next steps]
     def _parse_answer_response(self, response: str, question: Question) -> Response | None:
         """Parse response to create a Response object."""
         try:
-            response_match = re.search(r"Response:\s*(.+)", response, re.IGNORECASE | re.DOTALL)
-            stance_match = re.search(r"Stance:\s*(\w+)", response, re.IGNORECASE)
-            revised_match = re.search(r"Revised Insight:\s*(.+)", response, re.IGNORECASE)
-            confidence_match = re.search(r"Confidence:\s*([0-9.]+)", response, re.IGNORECASE)
+            fields: dict[str, str] = {}
+            current_key: str | None = None
 
-            if response_match:
+            for raw_line in response.splitlines():
+                line = raw_line.strip()
+                if not line:
+                    continue
+                if ":" in line:
+                    key, value = line.split(":", 1)
+                    current_key = key.strip().lower().replace(" ", "_")
+                    fields[current_key] = value.strip()
+                elif current_key:
+                    fields[current_key] = f"{fields[current_key]} {line}"
+
+            content = fields.get("response", "").strip() or fields.get("answer", "").strip()
+
+            if content:
+                stance = fields.get("stance", "clarify").lower()
+                revised = fields.get("revised_insight", "None")
+                if not revised or revised.lower() == "none":
+                    revised = None
+
+                priority_raw = fields.get("confidence", "0.5")
+                try:
+                    confidence = float(re.search(r"(\d+\.?\d*)", priority_raw).group(1)) if re.search(r"(\d+\.?\d*)", priority_raw) else 0.5
+                except (ValueError, AttributeError):
+                    confidence = 0.5
+
                 return Response(
                     response_id=str(uuid.uuid4()),
                     question_id=question.question_id,
                     from_agent=self.personality,
-                    content=response_match.group(1).strip(),
-                    stance=stance_match.group(1).strip() if stance_match else "clarify",
-                    revised_insight=(
-                        revised_match.group(1).strip() if revised_match and revised_match.group(1).strip().lower() != "none" else None
-                    ),
-                    confidence=(float(confidence_match.group(1)) if confidence_match else 0.5),
+                    content=content,
+                    stance=stance,
+                    revised_insight=revised,
+                    confidence=min(max(confidence, 0.0), 1.0),
                 )
         except Exception as e:
             self.logger.error(f"Error parsing answer response: {e}")

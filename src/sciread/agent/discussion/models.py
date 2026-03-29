@@ -18,6 +18,14 @@ class AgentPersonality(StrEnum):
     THEORETICAL_INTEGRATOR = "theoretical_integrator"
 
 
+AGENT_ABBREVIATIONS = {
+    AgentPersonality.CRITICAL_EVALUATOR: "CE",
+    AgentPersonality.INNOVATIVE_INSIGHTER: "II",
+    AgentPersonality.PRACTICAL_APPLICATOR: "PA",
+    AgentPersonality.THEORETICAL_INTEGRATOR: "TI",
+}
+
+
 class DiscussionPhase(StrEnum):
     """Phases of the discussion process."""
 
@@ -32,6 +40,7 @@ class DiscussionPhase(StrEnum):
 class AgentInsight(BaseModel):
     """Represents an insight or finding from an agent."""
 
+    insight_id: str | None = Field(default=None, description="Short human-readable ID (e.g., INS-CE-01)")
     agent_id: AgentPersonality = Field(..., description="The agent personality type")
     content: str = Field(..., description="The insight content")
     importance_score: float = Field(..., ge=0.0, le=1.0, description="Importance score from 0 to 1")
@@ -47,7 +56,7 @@ class AgentInsight(BaseModel):
 class Question(BaseModel):
     """Represents a question from one agent to another."""
 
-    question_id: str = Field(..., description="Unique identifier for the question")
+    question_id: str = Field(..., description="Short human-readable ID (e.g., Q-CE-01)")
     from_agent: AgentPersonality = Field(..., description="Agent asking the question")
     to_agent: AgentPersonality = Field(..., description="Agent being questioned")
     content: str = Field(..., description="The question content")
@@ -73,6 +82,34 @@ class Response(BaseModel):
     timestamp: datetime = Field(default_factory=datetime.now, description="When the response was given")
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class IdGenerator:
+    """Helper for generating short human-readable IDs."""
+
+    def __init__(self, prefix: str):
+        self.prefix = prefix
+        self.counters: dict[str, int] = {}
+
+    def next_id(self, agent_personality: AgentPersonality) -> str:
+        """Generate next ID for the given agent."""
+        abbrev = AGENT_ABBREVIATIONS.get(agent_personality, "XX")
+        self.counters[abbrev] = self.counters.get(abbrev, 0) + 1
+        return f"{self.prefix}-{abbrev}-{self.counters[abbrev]:02d}"
+
+
+class InsightIdGenerator(IdGenerator):
+    """Generator for insight IDs (INS-XX-01)."""
+
+    def __init__(self):
+        super().__init__("INS")
+
+
+class QuestionIdGenerator(IdGenerator):
+    """Generator for question IDs (Q-XX-01)."""
+
+    def __init__(self):
+        super().__init__("Q")
 
 
 class DiscussionState(BaseModel):

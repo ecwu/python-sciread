@@ -104,78 +104,48 @@ async def generate_insights_tool(task: Task) -> TaskResult:
 
 
 async def ask_question_tool(task: Task) -> TaskResult:
-    """Tool for asking questions between agents."""
+    """Tool for asking questions between agents (batch-aware)."""
     start_time = datetime.now(UTC)
 
     try:
         # Extract parameters
         from_agent = task.parameters.get("from_agent")
-        to_agent = task.parameters.get("to_agent")
-        target_insight = task.parameters.get("target_insight")
+        target_insights = task.parameters.get("target_insights", [])
         discussion_context = task.parameters.get("discussion_context", {})
 
-        if not all([from_agent, to_agent, target_insight]):
-            raise ValueError("Missing required parameters: from_agent, to_agent, target_insight")
+        if not from_agent or not target_insights:
+            # Fallback for old single-question tasks if they exist
+            target_insight = task.parameters.get("target_insight")
+            if target_insight:
+                target_insights = [target_insight]
+            else:
+                raise ValueError("Missing required parameters: from_agent and target_insights")
 
         # Convert to proper types
         if isinstance(from_agent, str):
             from_agent = AgentPersonality(from_agent)
-        if isinstance(to_agent, str):
-            to_agent = AgentPersonality(to_agent)
 
         # Create agent
         agent = get_cached_agent(from_agent, task.context.get("model_name", "deepseek-chat"))
 
-        # Ask question (may return a question object or a skip decision)
-        question_decision = await agent.ask_question(target_insight, to_agent, discussion_context)
+        # Ask questions in batch
+        questions = await agent.ask_questions_batch(target_insights, discussion_context)
 
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
-        if isinstance(question_decision, dict) and question_decision.get("decision") == "skip":
-            logger.debug(
-                f"{from_agent.value} skipped questioning {to_agent.value}: {question_decision.get('reason', 'no reason provided')}"
-            )
-            return TaskResult(
-                task_id=task.task_id,
-                success=True,
-                execution_time=execution_time,
-                questions=[],
-                confidence=0.0,
-                metadata={
-                    "from_agent": from_agent.value,
-                    "to_agent": to_agent.value,
-                    "decision": "skip",
-                    "reason": question_decision.get("reason"),
-                },
-                notes=["No question needed for this insight."],
-            )
+        logger.info(f"Generated {len(questions)} questions from {from_agent.value}")
 
-        question = question_decision
-
-        if question:
-            logger.debug(f"Generated question from {from_agent.value} to {to_agent.value}")
-            return TaskResult(
-                task_id=task.task_id,
-                success=True,
-                execution_time=execution_time,
-                questions=[question],
-                confidence=question.priority,
-                metadata={
-                    "from_agent": from_agent.value,
-                    "to_agent": to_agent.value,
-                    "question_type": question.question_type,
-                    "priority": question.priority,
-                },
-            )
-        else:
-            return TaskResult(
-                task_id=task.task_id,
-                success=False,
-                execution_time=execution_time,
-                error_message="Failed to generate question",
-                confidence=0.0,
-                metadata={"from_agent": from_agent.value, "to_agent": to_agent.value},
-            )
+        return TaskResult(
+            task_id=task.task_id,
+            success=True,
+            execution_time=execution_time,
+            questions=questions,
+            confidence=(sum(q.priority for q in questions) / len(questions) if questions else 0.0),
+            metadata={
+                "from_agent": from_agent.value,
+                "questions_count": len(questions),
+            },
+        )
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
@@ -193,55 +163,52 @@ async def ask_question_tool(task: Task) -> TaskResult:
 
 
 async def answer_question_tool(task: Task) -> TaskResult:
-    """Tool for answering questions from other agents."""
+    """Tool for answering questions from other agents (batch-aware)."""
     start_time = datetime.now(UTC)
 
     try:
         # Extract parameters
-        question = task.parameters.get("question")
+        questions = task.parameters.get("questions", [])
         my_insights = task.parameters.get("my_insights", [])
         discussion_context = task.parameters.get("discussion_context", {})
+        assigned_to = task.assigned_to
 
-        if not question:
-            raise ValueError("Missing required parameter: question")
+        if not questions:
+            # Fallback for old single-answer tasks
+            question = task.parameters.get("question")
+            if question:
+                questions = [question]
+            else:
+                raise ValueError("Missing required parameter: questions")
 
-        # Extract personality from question's to_agent
-        # Note: question.to_agent might be a string due to use_enum_values=True
-        personality = question.to_agent
-        if isinstance(personality, str):
-            personality = AgentPersonality(personality)
+        if not assigned_to:
+            # Extract personality from first question's to_agent if not assigned
+            personality_str = questions[0].to_agent
+            personality = AgentPersonality(personality_str) if isinstance(personality_str, str) else personality_str
+        else:
+            personality = AgentPersonality(assigned_to) if isinstance(assigned_to, str) else assigned_to
 
         # Create agent
         agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
 
-        # Answer question
-        response = await agent.answer_question(question, my_insights, discussion_context)
+        # Answer questions in batch
+        responses = await agent.answer_questions_batch(questions, my_insights, discussion_context)
 
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
 
-        if response:
-            logger.debug(f"Generated response from {personality.value}")
-            return TaskResult(
-                task_id=task.task_id,
-                success=True,
-                execution_time=execution_time,
-                responses=[response],
-                confidence=response.confidence,
-                metadata={
-                    "personality": personality.value,
-                    "stance": response.stance,
-                    "has_revised_insight": response.revised_insight is not None,
-                },
-            )
-        else:
-            return TaskResult(
-                task_id=task.task_id,
-                success=False,
-                execution_time=execution_time,
-                error_message="Failed to generate response",
-                confidence=0.0,
-                metadata={"personality": personality.value},
-            )
+        logger.info(f"Generated {len(responses)} responses from {personality.value}")
+
+        return TaskResult(
+            task_id=task.task_id,
+            success=True,
+            execution_time=execution_time,
+            responses=responses,
+            confidence=(sum(r.confidence for r in responses) / len(responses) if responses else 0.0),
+            metadata={
+                "personality": personality.value,
+                "responses_count": len(responses),
+            },
+        )
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
@@ -254,7 +221,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
             execution_time=execution_time,
             error_message=error_msg,
             confidence=0.0,
-            metadata={"personality": str(personality) if personality else "unknown"},
+            metadata={"personality": str(personality) if "personality" in locals() else "unknown"},
         )
 
 
