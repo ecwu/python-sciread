@@ -191,19 +191,27 @@ MODELS:
         )
 
         try:
-            result = run_react_analysis(
-                args.document_file,
-                args.task,
-                model=args.model,
-                max_loops=args.max_loops,
-                show_progress=not args.no_progress,
+            result = asyncio.run(
+                run_react_analysis(
+                    args.document_file,
+                    args.task,
+                    model=args.model,
+                    max_loops=args.max_loops,
+                    show_progress=not args.no_progress,
+                )
             )
             # The final report is already printed if show_progress=True
             if args.no_progress:
                 print("=" * 60)
                 print("REACT ANALYSIS RESULT:")
                 print("=" * 60)
-                print(result)
+                print(result.final_report)
+                print()
+                print("SUMMARY:")
+                print(result.summary)
+                print()
+                print("SECTIONS COVERED:")
+                print(", ".join(result.sections_covered) if result.sections_covered else "None")
                 print("=" * 60)
             return 0
         except Exception as e:

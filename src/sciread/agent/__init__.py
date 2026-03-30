@@ -71,10 +71,7 @@ from .models.coordinate_models import MetadataExtractionResult
 from .models.coordinate_models import MethodologyResult
 from .models.coordinate_models import PreviousMethodsResult
 from .models.coordinate_models import ResearchQuestionsResult
-
-# ReActAgent models - now imported from models folder
-from .models.react_models import ReActAgentInput
-from .models.react_models import ReActAgentOutput
+from .models.react_models import AnalysisReport
 
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
@@ -82,6 +79,7 @@ from .models.simple_models import SimpleAnalysisResult
 # ReActAgent and utility functions
 from .react_agent import ReActAgent
 from .react_agent import analyze_document_with_react
+from .react_agent import analyze_document_with_react_sync
 from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
@@ -90,15 +88,13 @@ from .text_utils import remove_references
 
 __all__ = [
     "AgentInsight",
-    # Discussion models
     "AgentPersonality",
-    # Existing agents
     "AnalysisPlan",
+    "AnalysisReport",
     "ComprehensiveAnalysisResult",
     "ConsensusBuilder",
     "ConsensusPoint",
     "CoordinateAgent",
-    # New discussion system
     "DiscussionAgent",
     "DiscussionResult",
     "DiscussionState",
@@ -111,13 +107,10 @@ __all__ = [
     "PreviousMethodsResult",
     "Question",
     "ReActAgent",
-    "ReActAgentInput",
-    "ReActAgentOutput",
     "ResearchQuestionsResult",
     "Response",
     "SimpleAgent",
     "SimpleAnalysisResult",
-    # Task models
     "Task",
     "TaskPriority",
     "TaskQueue",
@@ -125,8 +118,8 @@ __all__ = [
     "TaskResult",
     "TaskStatus",
     "TaskType",
-    # Utility functions
     "analyze_document_with_react",
+    "analyze_document_with_react_sync",
     "create_personality_agent",
     "format_status_summary",
     "get_initial_sections",

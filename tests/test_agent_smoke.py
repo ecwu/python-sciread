@@ -1,6 +1,5 @@
 import re
 from pathlib import Path
-from threading import Thread
 from typing import Any
 
 import pytest
@@ -9,6 +8,7 @@ from pydantic import BaseModel
 from sciread.agent.coordinate_agent import CoordinateAgent
 from sciread.agent.discussion.agent import DiscussionAgent
 from sciread.agent.discussion.tools import clear_agent_cache
+from sciread.agent.models.react_models import AnalysisReport
 from sciread.agent.react_agent import ReActAgent
 from sciread.agent.simple_agent import SimpleAgent
 from sciread.document import Document
@@ -30,6 +30,7 @@ class _DummyRunContext:
 
     def __init__(self, deps: Any):
         self.deps = deps
+        self.metadata: dict[str, Any] | None = None
 
 
 class DummyAgent:
@@ -65,13 +66,16 @@ class DummyAgent:
         prompt: str,
         deps: Any | None = None,
         message_history: list[dict[str, str]] | None = None,
+        model: Any | None = None,
+        metadata: dict[str, Any] | None = None,
+        **_: Any,
     ):
-        output = await self._build_output(prompt, deps)
+        output = await self._build_output(prompt, deps, metadata)
         history = list(message_history or [])
         history.append({"role": "assistant", "content": str(output)})
         return DummyRunResult(output=output, history=history)
 
-    async def _build_output(self, prompt: str, deps: Any | None) -> Any:
+    async def _build_output(self, prompt: str, deps: Any | None, metadata: dict[str, Any] | None = None) -> Any:
         prompt_lower = prompt.lower()
 
         # ReAct smoke path: exercise registered tools and dependency state updates.
@@ -79,20 +83,31 @@ class DummyAgent:
             deps is not None
             and "start analysis. use tools to read sections" in prompt_lower
             and "read_section" in self._tools
-            and "append_to_report" in self._tools
+            and "update_report" in self._tools
         ):
             ctx = _DummyRunContext(deps)
+            ctx.metadata = metadata
             read_section = self._tools["read_section"]
-            append_to_report = self._tools["append_to_report"]
+            update_report = self._tools["update_report"]
+            state = metadata["react_state"]
 
-            read_result = await read_section(ctx, deps.current_sections or None)
-            await append_to_report(ctx, f"Dummy ReAct report fragment\n{read_result[:400]}")
+            read_result = await read_section(ctx, state.current_sections or None)
+            await update_report(ctx, f"Dummy ReAct report revision\n{read_result[:400]}")
 
-            if deps.loop_count < deps.max_loops:
+            if state.loop_count < deps.max_loops:
                 extra_read_result = await read_section(ctx, None)
-                await append_to_report(ctx, f"Dummy ReAct extra fragment\n{extra_read_result[:240]}")
+                await update_report(ctx, f"Dummy ReAct report revision\n{read_result[:220]}\n\nDummy ReAct extra revision\n{extra_read_result[:240]}")
 
-            return deps.current_report or "Dummy ReAct report: pipeline is alive."
+            return AnalysisReport(
+                summary="Dummy ReAct summary.",
+                research_questions=["What does the paper study?"],
+                methodology="Dummy methodology description.",
+                key_findings=["Dummy key finding."],
+                contributions=["Dummy contribution."],
+                limitations="Dummy limitation.",
+                sections_covered=list(state.processed_sections),
+                final_report=state.current_report or "Dummy ReAct report: pipeline is alive.",
+            )
 
         output_type = self.output_type
         if isinstance(output_type, type) and issubclass(output_type, BaseModel):
@@ -101,6 +116,18 @@ class DummyAgent:
 
 
 def _build_dummy_model_output(model_type: type[BaseModel]) -> BaseModel:
+    if model_type.__name__ == "AnalysisReport":
+        return model_type(
+            summary="Dummy ReAct summary.",
+            research_questions=["What does the paper study?"],
+            methodology="Dummy methodology description.",
+            key_findings=["Dummy key finding."],
+            contributions=["Dummy contribution."],
+            limitations="Dummy limitation.",
+            sections_covered=["abstract", "introduction"],
+            final_report="Dummy ReAct report: pipeline is alive.",
+        )
+
     if model_type.__name__ == "AnalysisPlan":
         return model_type(
             analyze_metadata=True,
@@ -258,6 +285,16 @@ def dummy_llm(monkeypatch: pytest.MonkeyPatch):
         monkeypatch.setattr(module, "Agent", DummyAgent)
         monkeypatch.setattr(module, "get_model", _dummy_get_model)
 
+    dummy_react_agent = DummyAgent(
+        model=None,
+        deps_type=react_agent_module.ReActDeps,
+        output_type=AnalysisReport,
+    )
+    dummy_react_agent.system_prompt(react_agent_module.react_system_prompt)
+    dummy_react_agent.tool(react_agent_module.read_section)
+    dummy_react_agent.tool(react_agent_module.update_report)
+    monkeypatch.setattr(react_agent_module, "react_agent", dummy_react_agent)
+
     clear_agent_cache()
     yield
     clear_agent_cache()
@@ -273,27 +310,20 @@ async def test_simple_agent_pipeline_smoke(dummy_llm):
     assert "Dummy" in result
 
 
-def test_react_agent_pipeline_smoke(dummy_llm):
+@pytest.mark.asyncio
+async def test_react_agent_pipeline_smoke(dummy_llm):
     document = _build_smoke_document()
     agent = ReActAgent(model="dummy", max_loops=2)
+    result = await agent.analyze_document(
+        document,
+        task="Summarize methodology and results.",
+        show_progress=False,
+    )
 
-    outcome: dict[str, Any] = {}
-
-    def _target() -> None:
-        outcome["result"] = agent.analyze_document(
-            document,
-            task="Summarize methodology and results.",
-            show_progress=False,
-        )
-
-    thread = Thread(target=_target, daemon=True)
-    thread.start()
-    thread.join()
-
-    result = outcome["result"]
-
-    assert "Dummy ReAct report fragment" in result
-    assert "READ_RESULT" in result
+    assert result.summary == "Dummy ReAct summary."
+    assert "Dummy ReAct extra revision" in result.final_report
+    assert "READ_RESULT" in result.final_report
+    assert result.sections_covered
 
 
 @pytest.mark.asyncio

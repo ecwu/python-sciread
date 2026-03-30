@@ -1,30 +1,17 @@
-"""ReActAgent input and output models for structured data.
-
-This module contains Pydantic models used by the ReActAgent for
-structured input/output during the iterative analysis process.
-"""
+"""ReActAgent result models for structured outputs."""
 
 from pydantic import BaseModel
 from pydantic import Field
 
 
-class ReActAgentInput(BaseModel):
-    """Input model for ReAct agent iterations."""
+class AnalysisReport(BaseModel):
+    """Structured final output for ReAct-based document analysis."""
 
-    task_prompt: str = Field(description="The original analysis task or question about the document")
-    available_sections: list[str] = Field(description="List of all available section names in the document")
-    status_summary: str = Field(
-        description="Summary of current stage, loop count, and remaining loops (e.g., 'Initial analysis (loop 1 of 8)')"
-    )
-    section_content: str = Field(description="Content of the sections to analyze in this iteration (empty for initial step)")
-    current_report: str = Field(description="The cumulative report built so far from previous iterations")
-    processed_sections: list[str] = Field(description="List of sections that have already been processed")
-
-
-class ReActAgentOutput(BaseModel):
-    """Output model for ReAct agent iterations."""
-
-    should_stop: bool = Field(description="Whether to stop the analysis process (True) or continue (False)")
-    report_section: str = Field(description="New content generated for the current section content")
-    next_sections: list[str] = Field(description="List of section names to analyze in the next iteration (empty if should_stop is True)")
-    reasoning: str = Field(description="Explanation of why the agent made these choices (stop decision and section selection)")
+    summary: str = Field(description="High-level summary of the paper and its main purpose")
+    research_questions: list[str] = Field(default_factory=list, description="Primary research questions or objectives")
+    methodology: str = Field(description="Summary of the methodology and technical approach")
+    key_findings: list[str] = Field(default_factory=list, description="Main findings and empirical or theoretical results")
+    contributions: list[str] = Field(default_factory=list, description="Main contributions and significance of the work")
+    limitations: str | None = Field(default=None, description="Key limitations, caveats, or unresolved issues")
+    sections_covered: list[str] = Field(default_factory=list, description="Document sections incorporated into the analysis")
+    final_report: str = Field(description="Complete human-readable report synthesizing all known information")
