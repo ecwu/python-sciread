@@ -1,6 +1,7 @@
 """ReAct agent for intelligent document analysis."""
 
 import asyncio
+import json
 import traceback
 from dataclasses import dataclass
 from dataclasses import field
@@ -50,7 +51,9 @@ def _get_state(ctx: RunContext[ReActDeps]) -> ReActState:
 # ReAct agent implementation
 
 
-def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
+def load_and_process_document(
+    file_path: str | Path, to_markdown: bool = True
+) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -66,7 +69,9 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
+    logger.info(
+        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
+    )
     logger.info(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -163,9 +168,43 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
+    logger.debug(
+        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
+    )
 
     return combined_content
+
+
+def normalize_section_names(section_names: list[str] | str | None) -> list[str] | None:
+    """Normalize tool input to a list of section names.
+
+    Some models send a JSON-encoded list as a string. This parser keeps the
+    tool callable instead of failing at schema validation time.
+    """
+    if section_names is None:
+        return None
+
+    if isinstance(section_names, list):
+        return [
+            name for name in section_names if isinstance(name, str) and name.strip()
+        ]
+
+    if isinstance(section_names, str):
+        raw = section_names.strip()
+        if not raw:
+            return None
+
+        try:
+            parsed = json.loads(raw)
+            if isinstance(parsed, list):
+                return [
+                    name for name in parsed if isinstance(name, str) and name.strip()
+                ]
+        except json.JSONDecodeError:
+            # Fallback: treat as a single section name.
+            return [raw]
+
+    return None
 
 
 async def analyze_document_with_react(
@@ -195,7 +234,9 @@ async def analyze_document_with_react(
     """
     logger.info(f"Starting ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
+    logger.info(
+        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
+    )
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -245,7 +286,9 @@ async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
     deps = ctx.deps
     state = _get_state(ctx)
     current_report = state.current_report or "[No report yet]"
-    processed_sections = ", ".join(state.processed_sections) if state.processed_sections else "None"
+    processed_sections = (
+        ", ".join(state.processed_sections) if state.processed_sections else "None"
+    )
 
     return (
         "You are an expert academic research analyst using a native ReAct tool-calling workflow.\n\n"
@@ -260,6 +303,9 @@ async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
         "- If information is not incorporated into the report in the current turn, it will be lost in later turns.\n\n"
         "You MUST use tools to analyze the paper:\n"
         "1) Call read_section(section_names) to fetch one or more sections.\n"
+        "   - section_names should be a JSON array of strings.\n"
+        '   - Preferred: {"section_names": ["1 introduction", "2 method"]}\n'
+        '   - Also tolerated: {"section_names": "[\\"1 introduction\\", \\"2 method\\"]"}\n'
         "2) Immediately after each read, call update_report(updated_full_report) with the full revised report containing all known information.\n"
         "3) Repeat until the report clearly covers research questions, methodology, results, and contributions.\n"
         "4) Then return the final structured analysis.\n\n"
@@ -274,8 +320,14 @@ async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
 
 
 @react_agent.tool
-async def read_section(ctx: RunContext[ReActDeps], section_names: list[str] | None = None) -> str:
-    """Read one or more document sections and update progress state."""
+async def read_section(
+    ctx: RunContext[ReActDeps], section_names: list[str] | str | None = None
+) -> str:
+    """Read one or more document sections and update progress state.
+
+    section_names is expected as a list, but stringified JSON lists are
+    accepted for model compatibility.
+    """
     deps = ctx.deps
     state = _get_state(ctx)
 
@@ -283,8 +335,13 @@ async def read_section(ctx: RunContext[ReActDeps], section_names: list[str] | No
         return "READ_LIMIT_REACHED: You have reached max read attempts. Finish using existing evidence and return final report."
 
     available_sections = deps.document.get_section_names()
-    unprocessed_sections = [s for s in available_sections if s not in state.processed_sections]
-    requested_sections = section_names or state.current_sections or unprocessed_sections[:1]
+    unprocessed_sections = [
+        s for s in available_sections if s not in state.processed_sections
+    ]
+    normalized_section_names = normalize_section_names(section_names)
+    requested_sections = (
+        normalized_section_names or state.current_sections or unprocessed_sections[:1]
+    )
 
     resolved_sections: list[str] = []
     for section in requested_sections:
@@ -372,9 +429,13 @@ class ReActAgent:
         self.model_identifier = model
         self.agent = react_agent
 
-        self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
+        self.logger.info(
+            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
+        )
 
-    async def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> AnalysisReport:
+    async def analyze_document(
+        self, document: Document, task: str, show_progress: bool = True
+    ) -> AnalysisReport:
         """Main analysis method using a single native tool-calling run.
 
         Args:
@@ -403,7 +464,9 @@ class ReActAgent:
                 model=self.model,
                 metadata={"react_state": state},
             )
-            report = result.output if isinstance(result.output, AnalysisReport) else None
+            report = (
+                result.output if isinstance(result.output, AnalysisReport) else None
+            )
         except Exception as e:
             self.logger.error(f"Agent execution failed: {e}")
             self.logger.error(f"Exception type: {type(e)}")
@@ -426,7 +489,9 @@ class ReActAgent:
             if not report.sections_covered:
                 report.sections_covered = list(state.processed_sections)
 
-        self.logger.info(f"ReAct analysis completed after {state.loop_count} read loops")
+        self.logger.info(
+            f"ReAct analysis completed after {state.loop_count} read loops"
+        )
 
         # Log and print the final report
         if report.final_report:
@@ -444,9 +509,15 @@ class ReActAgent:
 
         return report
 
-    def analyze_document_sync(self, document: Document, task: str, show_progress: bool = True) -> AnalysisReport:
+    def analyze_document_sync(
+        self, document: Document, task: str, show_progress: bool = True
+    ) -> AnalysisReport:
         """Synchronous wrapper for top-level sync callers such as the CLI."""
-        return asyncio.run(self.analyze_document(document=document, task=task, show_progress=show_progress))
+        return asyncio.run(
+            self.analyze_document(
+                document=document, task=task, show_progress=show_progress
+            )
+        )
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""
