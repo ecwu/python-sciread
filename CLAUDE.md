@@ -12,7 +12,7 @@ Quick orientation for working in this repo.
 - `src/sciread/cli.py` – argparse CLI wrapper exposing `simple`, `coordinate`, `react`, `rag_react`, `discussion`.
 - Agents: `src/sciread/agent/` (`simple_agent.py`, `react_agent.py`, `rag_react_agent.py`, `coordinate_agent.py`, `discussion_agent.py`, `consensus_builder.py`, `task_queue.py`, `personality_agents.py`, prompts/ and tools/ helpers).
 - Documents: `src/sciread/document/` (`document.py`, `document_builder.py`, `vector_index.py`, `splitters/`, `loaders/`, `external_clients.py`, `factory.py`, `mineru_cache.py`, `models.py`).
-- Providers: `src/sciread/llm_provider/` (deepseek, zhipu, ollama + `factory.py`); `src/sciread/embedding_provider/` (siliconflow, ollama + `factory.py`).
+- Providers: `src/sciread/llm_provider/` (deepseek, volcengine, ollama + `factory.py`); `src/sciread/embedding_provider/` (siliconflow, ollama + `factory.py`).
 - Config and docs: `config/sciread.toml`, `README.rst`, `docs/`.
 - Tests mirror `src/` under `tests/`.
 

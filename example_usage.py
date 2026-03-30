@@ -32,8 +32,8 @@ def main():
     examples = [
         "deepseek/deepseek-chat",
         "deepseek/deepseek-reasoner",
-        "zhipu/glm-4.6",
-        "zhipu/glm-4.5",
+        "volcengine/doubao-seed-2.0-code",
+        "volcengine/glm-4.7",
         "ollama/qwen3:4b",
         "deepseek-chat",  # Auto-detect provider
     ]
@@ -55,11 +55,12 @@ def main():
     print("\nConfiguration:")
     print("  Set these environment variables for API keys:")
     print("    - DEEPSEEK_API_KEY")
-    print("    - ZHIPU_API_KEY")
+    print("    - VOLCES_API")
     print("  - Ollama doesn't require an API key (local)")
 
     print("\nUsage in your code:")
-    print("""
+    print(
+        """
 from sciread.llm_provider import get_model
 
 # Get a model instance
@@ -71,7 +72,8 @@ agent = Agent(model)
 
 # Or use directly
 result = await model.run("Hello, world!")
-""")
+"""
+    )
 
 
 if __name__ == "__main__":

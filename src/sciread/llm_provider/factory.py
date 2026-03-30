@@ -3,13 +3,12 @@
 from typing import Any
 from typing import ClassVar
 
-from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
 from ..config import get_config
 from .deepseek import DeepSeekProvider
 from .ollama import OllamaProvider
-from .zhipu import ZhipuProvider
+from .volcengine import VolcengineProvider
 
 
 class UnsupportedModelError(Exception):
@@ -25,7 +24,7 @@ class ModelFactory:
 
     PROVIDERS: ClassVar[dict[str, type]] = {
         "deepseek": DeepSeekProvider,
-        "zhipu": ZhipuProvider,
+        "volcengine": VolcengineProvider,
         "ollama": OllamaProvider,
     }
 
@@ -82,11 +81,13 @@ class ModelFactory:
         """
         if provider_name not in cls.PROVIDERS:
             supported = ", ".join(cls.PROVIDERS.keys())
-            raise UnsupportedModelError(f"Unsupported provider: {provider_name}. Supported providers: {supported}")
+            raise UnsupportedModelError(
+                f"Unsupported provider: {provider_name}. Supported providers: {supported}"
+            )
         return cls.PROVIDERS[provider_name]
 
     @classmethod
-    def create_model(cls, model_identifier: str, **kwargs: Any) -> OpenAIChatModel | AnthropicModel:
+    def create_model(cls, model_identifier: str, **kwargs: Any) -> OpenAIChatModel:
         """Create a model instance from a model identifier.
 
         Args:
@@ -139,7 +140,7 @@ class ModelFactory:
         return models
 
 
-def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel | AnthropicModel:
+def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel:
     """Get a model instance.
 
     This is the main public interface for creating LLM model instances.
@@ -154,7 +155,7 @@ def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel | Anthrop
 
     Examples:
         >>> model = get_model("deepseek/deepseek-chat")
-        >>> model = get_model("zhipu/glm-4.6")
+        >>> model = get_model("volcengine/doubao-seed-2.0-code")
         >>> model = get_model("ollama/qwen3:4b")
         >>> # Use default provider for known models
         >>> model = get_model("deepseek-chat")

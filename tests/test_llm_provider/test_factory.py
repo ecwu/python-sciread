@@ -11,7 +11,7 @@ from sciread.llm_provider.factory import ModelFactory
 from sciread.llm_provider.factory import UnsupportedModelError
 from sciread.llm_provider.factory import get_model
 from sciread.llm_provider.ollama import OllamaProvider
-from sciread.llm_provider.zhipu import ZhipuProvider
+from sciread.llm_provider.volcengine import VolcengineProvider
 
 
 class TestModelFactory:
@@ -65,7 +65,9 @@ class TestModelFactory:
     @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_deepseek(self, mock_config):
         """Test creating DeepSeek model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = "https://api.deepseek.com"
+        mock_config.return_value.get_provider_config.return_value.base_url = (
+            "https://api.deepseek.com"
+        )
         mock_config.return_value.get_api_key.return_value = "test-key"
 
         with patch.object(DeepSeekProvider, "create_model") as mock_create:
@@ -78,24 +80,28 @@ class TestModelFactory:
             assert result == mock_model
 
     @patch("sciread.llm_provider.factory.get_config")
-    def test_create_model_zhipu(self, mock_config):
-        """Test creating Zhipu model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = "https://open.bigmodel.cn/api/anthropic"
+    def test_create_model_volcengine(self, mock_config):
+        """Test creating Volcengine model."""
+        mock_config.return_value.get_provider_config.return_value.base_url = (
+            "https://ark.cn-beijing.volces.com/api/coding/v3"
+        )
         mock_config.return_value.get_api_key.return_value = "test-key"
 
-        with patch.object(ZhipuProvider, "create_model") as mock_create:
+        with patch.object(VolcengineProvider, "create_model") as mock_create:
             mock_model = MagicMock()
             mock_create.return_value = mock_model
 
-            result = ModelFactory.create_model("zhipu/glm-4.6")
+            result = ModelFactory.create_model("volcengine/glm-4.7")
 
-            mock_create.assert_called_once_with("glm-4.6")
+            mock_create.assert_called_once_with("glm-4.7")
             assert result == mock_model
 
     @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_ollama(self, mock_config):
         """Test creating Ollama model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
+        mock_config.return_value.get_provider_config.return_value.base_url = (
+            "http://localhost:11434/v1"
+        )
 
         with patch.object(OllamaProvider, "create_model") as mock_create:
             mock_model = MagicMock()
@@ -114,7 +120,9 @@ class TestModelFactory:
     def test_create_model_unsupported_model(self):
         """Test creating model with unsupported model."""
         with patch("sciread.llm_provider.factory.get_config"):
-            with patch.object(DeepSeekProvider, "is_model_supported", return_value=False):
+            with patch.object(
+                DeepSeekProvider, "is_model_supported", return_value=False
+            ):
                 with pytest.raises(UnsupportedModelError):
                     ModelFactory.create_model("deepseek/unsupported-model")
 
@@ -122,16 +130,16 @@ class TestModelFactory:
         """Test getting supported providers."""
         providers = ModelFactory.get_supported_providers()
         assert "deepseek" in providers
-        assert "zhipu" in providers
+        assert "volcengine" in providers
         assert "ollama" in providers
         assert "deepseek-chat" in providers["deepseek"]
-        assert "glm-4.6" in providers["zhipu"]
+        assert "glm-4.7" in providers["volcengine"]
 
     def test_list_all_supported_models(self):
         """Test listing all supported models."""
         models = ModelFactory.list_all_supported_models()
         assert "deepseek/deepseek-chat" in models
-        assert "zhipu/glm-4.6" in models
+        assert "volcengine/glm-4.7" in models
         assert "ollama/qwen3:4b" in models
 
 

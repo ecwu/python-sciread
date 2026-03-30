@@ -6,10 +6,10 @@ api_key = "${DEEPSEEK_API_KEY}"
 default_model = "deepseek-chat"
 base_url = "https://api.deepseek.com"
 
-[llm_providers.zhipu]
-api_key = "${ZHIPU_API_KEY}"
-default_model = "glm-4.6"
-base_url = "https://open.bigmodel.cn/api/anthropic"
+[llm_providers.volcengine]
+api_key = "${VOLCES_API}"
+default_model = "doubao-seed-2.0-code"
+base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
 
 [llm_providers.ollama]
 base_url = "http://localhost:11434/v1"

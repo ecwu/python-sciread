@@ -20,7 +20,7 @@ class TestScireadConfig:
         assert config.default.provider == "deepseek"
         assert config.default.model == "deepseek-chat"
         assert "deepseek" in config.llm_providers
-        assert "zhipu" in config.llm_providers
+        assert "volcengine" in config.llm_providers
         assert "ollama" in config.llm_providers
 
     def test_load_from_file(self, tmp_path):
