@@ -1,10 +1,17 @@
+from unittest.mock import Mock
+from unittest.mock import patch
+
 from sciread.agent.discussion.agent import DiscussionAgent
 from sciread.agent.discussion.models import AgentPersonality
 from sciread.agent.discussion.models import Question
 from sciread.agent.discussion.models import Response
 
 
-def test_format_question_log_entry_includes_content():
+@patch("sciread.agent.discussion.agent.Agent")
+@patch("sciread.agent.discussion.agent.get_model")
+def test_format_question_log_entry_includes_content(mock_get_model, mock_agent):
+    mock_get_model.return_value = Mock()
+    mock_agent.return_value = Mock()
     agent = DiscussionAgent()
     question = Question(
         question_id="Q-CE-01",
@@ -21,10 +28,18 @@ def test_format_question_log_entry_includes_content():
     assert "Q-CE-01" in entry
     assert "Critical Evaluator -> Innovative Insighter" in entry
     assert "challenge" in entry
-    assert "What evidence shows the agent swarm result is not just prompt tuning?" in entry
+    assert (
+        "What evidence shows the agent swarm result is not just prompt tuning?" in entry
+    )
 
 
-def test_format_response_log_entry_includes_stance_and_question_content():
+@patch("sciread.agent.discussion.agent.Agent")
+@patch("sciread.agent.discussion.agent.get_model")
+def test_format_response_log_entry_includes_stance_and_question_content(
+    mock_get_model, mock_agent
+):
+    mock_get_model.return_value = Mock()
+    mock_agent.return_value = Mock()
     agent = DiscussionAgent()
     question = Question(
         question_id="Q-II-02",

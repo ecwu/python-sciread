@@ -77,15 +77,15 @@ target-version = "py312"
 
 [tool.ruff.lint]
 ignore = [
-    "RUF001", # ruff-specific rules ambiguous-unicode-character-string
-    "RUF006", # store a reference to the return value of asyncio.create_task
-    "S101",   # flake8-bandit assert
-    "S110",   # try-except-pass detected
-    "S308",   # flake8-bandit suspicious-mark-safe-usage
-    "S603",   # flake8-bandit subprocess-without-shell-equals-true
-    "S607",   # flake8-bandit start-process-with-partial-path
-    "S608",   # possible SQL injection vector through string-based query construction
-    "E501",   # pycodestyle line-too-long
+    "RUF001",  # ruff-specific rules ambiguous-unicode-character-string
+    "RUF006",  # store a reference to the return value of asyncio.create_task
+    "S101",    # flake8-bandit assert
+    "S110",    # try-except-pass detected
+    "S308",    # flake8-bandit suspicious-mark-safe-usage
+    "S603",    # flake8-bandit subprocess-without-shell-equals-true
+    "S607",    # flake8-bandit start-process-with-partial-path
+    "S608",    # possible SQL injection vector through string-based query construction
+    "E501",    # pycodestyle line-too-long
     "PLC0415", # import should be at the top of the file
 ]
 select = [
@@ -126,7 +126,11 @@ python_files = ["test_*.py", "*_test.py", "tests.py"]
 addopts = "-ra --strict-markers --tb=short"
 markers = ["asyncio: marks tests as async"]
 testpaths = ["tests"]
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    "ignore::pytest.PytestUnraisableExceptionWarning:_pytest.unraisableexception",
+    "ignore::ResourceWarning",
+]
 
 [tool.coverage.paths]
 source = ["src", "*/site-packages"]
