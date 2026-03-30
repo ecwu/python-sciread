@@ -109,9 +109,9 @@ class PersonalityAgent:
             for insight in target_insights:
                 author_name = str(insight.agent_id).replace("_", " ").title()
                 insights_text += f"\n[{insight.insight_id}] From {author_name} (importance: {insight.importance_score}):\n"
-                insights_text += f"  \"{insight.content}\"\n"
+                insights_text += f'  "{insight.content}"\n'
                 if insight.supporting_evidence:
-                    insights_text += f"  Evidence: \"{insight.supporting_evidence[0][:200]}...\"\n"
+                    insights_text += f'  Evidence: "{insight.supporting_evidence[0][:200]}..."\n'
 
             qa_summary = self._format_role_qa_summary(discussion_context)
 
@@ -167,8 +167,8 @@ Provide a block for EVERY insight listed above.
             questions_text = ""
             for q in questions:
                 from_name = str(q.from_agent).replace("_", " ").title()
-                questions_text += f"\n[{q.question_id}] From {from_name} about insight \"{q.target_insight}\":\n"
-                questions_text += f"  \"{q.content}\"\n"
+                questions_text += f'\n[{q.question_id}] From {from_name} about insight "{q.target_insight}":\n'
+                questions_text += f'  "{q.content}"\n'
 
             insights_text = "\n".join([f"- [{i.insight_id}] {i.content}" for i in my_insights])
             qa_summary = self._format_role_qa_summary(discussion_context)

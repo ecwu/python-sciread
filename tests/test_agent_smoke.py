@@ -86,15 +86,11 @@ class DummyAgent:
             append_to_report = self._tools["append_to_report"]
 
             read_result = await read_section(ctx, deps.current_sections or None)
-            await append_to_report(
-                ctx, f"Dummy ReAct report fragment\n{read_result[:400]}"
-            )
+            await append_to_report(ctx, f"Dummy ReAct report fragment\n{read_result[:400]}")
 
             if deps.loop_count < deps.max_loops:
                 extra_read_result = await read_section(ctx, None)
-                await append_to_report(
-                    ctx, f"Dummy ReAct extra fragment\n{extra_read_result[:240]}"
-                )
+                await append_to_report(ctx, f"Dummy ReAct extra fragment\n{extra_read_result[:240]}")
 
             return deps.current_report or "Dummy ReAct report: pipeline is alive."
 
@@ -133,16 +129,8 @@ def _build_dummy_text_output(prompt: str) -> str:
     if "start analysis. use tools to read sections" in prompt_lower:
         return "Dummy ReAct report: pipeline is alive."
 
-    if (
-        "provide your evaluation in this format" in prompt_lower
-        and "convergence score" in prompt_lower
-    ):
-        return (
-            "Convergence Score: 0.86\n"
-            "Continue Discussion: no\n"
-            "Key Issues Remaining: None\n"
-            "Recommendations: Proceed to final consensus."
-        )
+    if "provide your evaluation in this format" in prompt_lower and "convergence score" in prompt_lower:
+        return "Convergence Score: 0.86\nContinue Discussion: no\nKey Issues Remaining: None\nRecommendations: Proceed to final consensus."
 
     if "for each question, provide your answer using this exact format" in prompt_lower:
         question_ids = re.findall(r"\[(Q-[A-Z]+-\d+)\]", prompt)
@@ -174,11 +162,7 @@ def _build_dummy_text_output(prompt: str) -> str:
         blocks = []
         for index, insight_id in enumerate(insight_ids):
             decision = "ask" if index == 0 else "skip"
-            question_text = (
-                "What direct evidence supports this point?"
-                if decision == "ask"
-                else "None"
-            )
+            question_text = "What direct evidence supports this point?" if decision == "ask" else "None"
             priority = "0.80" if decision == "ask" else "0.0"
             question_type = "clarification" if decision == "ask" else "none"
             blocks.append(
@@ -200,11 +184,7 @@ def _build_dummy_text_output(prompt: str) -> str:
     if "select which sections of a paper to read" in prompt_lower:
         return "abstract\nintroduction\nmethodology\nexperiments"
 
-    if (
-        "format your response as:" in prompt_lower
-        and "summary:" in prompt_lower
-        and "significance:" in prompt_lower
-    ):
+    if "format your response as:" in prompt_lower and "summary:" in prompt_lower and "significance:" in prompt_lower:
         return "SUMMARY:\nDummy summary for smoke testing.\n\nSIGNIFICANCE:\nDummy significance assessment."
 
     if "your task is:" in prompt_lower and "insight" in prompt_lower:
@@ -288,9 +268,7 @@ async def test_simple_agent_pipeline_smoke(dummy_llm):
     document = _build_smoke_document()
     agent = SimpleAgent(model=object())
 
-    result = await agent.analyze(
-        document=document, task_prompt="Summarize this document."
-    )
+    result = await agent.analyze(document=document, task_prompt="Summarize this document.")
 
     assert "Dummy" in result
 
@@ -332,9 +310,7 @@ async def test_coordinate_agent_pipeline_smoke(dummy_llm):
 @pytest.mark.asyncio
 async def test_discussion_agent_pipeline_smoke(dummy_llm):
     document = _build_smoke_document()
-    agent = DiscussionAgent(
-        model_name="dummy", max_iterations=1, max_discussion_time_minutes=2
-    )
+    agent = DiscussionAgent(model_name="dummy", max_iterations=1, max_discussion_time_minutes=2)
 
     result = await agent.analyze_document(document)
 

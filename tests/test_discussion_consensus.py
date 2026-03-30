@@ -40,7 +40,7 @@ def test_extract_key_contributions_filters_critical_and_meta_statements():
     consensus_points = [
         ConsensusPoint(
             topic="Methodology",
-            content='The paper presents a modular orchestration architecture for coordinating specialized subagents with explicit role separation.',
+            content="The paper presents a modular orchestration architecture for coordinating specialized subagents with explicit role separation.",
             supporting_agents=[
                 AgentPersonality.INNOVATIVE_INSIGHTER,
                 AgentPersonality.PRACTICAL_APPLICATOR,
@@ -50,7 +50,9 @@ def test_extract_key_contributions_filters_critical_and_meta_statements():
         )
     ]
 
-    contributions = asyncio.run(builder._extract_key_contributions(document=None, top_insights=top_insights, consensus_points=consensus_points))
+    contributions = asyncio.run(
+        builder._extract_key_contributions(document=None, top_insights=top_insights, consensus_points=consensus_points)
+    )
 
     assert len(contributions) == 2
     assert any("introduces a novel theoretical model" in contribution for contribution in contributions)

@@ -457,18 +457,24 @@ class DiscussionAgent:
         if asked_by_me:
             lines.append("Questions you asked:")
             for q in asked_by_me:
-                resp = next((r for r in self.all_responses if r.question_id == q.question_id), None)
+                resp = next(
+                    (r for r in self.all_responses if r.question_id == q.question_id),
+                    None,
+                )
                 to_name = str(q.to_agent).replace("_", " ").title()
                 status = f"Answered (stance: {resp.stance})" if resp else "Pending"
-                lines.append(f"  [{q.question_id}] \u2192 {to_name}: \"{q.content[:100]}...\" ({status})")
+                lines.append(f'  [{q.question_id}] \u2192 {to_name}: "{q.content[:100]}..." ({status})')
 
         if directed_to_me:
             lines.append("\nQuestions directed at you:")
             for q in directed_to_me:
-                resp = next((r for r in self.all_responses if r.question_id == q.question_id), None)
+                resp = next(
+                    (r for r in self.all_responses if r.question_id == q.question_id),
+                    None,
+                )
                 from_name = str(q.from_agent).replace("_", " ").title()
                 status = "Answered" if resp else "Pending - please answer"
-                lines.append(f"  [{q.question_id}] From {from_name}: \"{q.content[:100]}...\" ({status})")
+                lines.append(f'  [{q.question_id}] From {from_name}: "{q.content[:100]}..." ({status})')
 
         return "\n".join(lines) if lines else "No prior Q&A involving you."
 

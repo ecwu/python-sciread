@@ -39,9 +39,7 @@ class ReActDeps:
 # ReAct agent implementation
 
 
-def load_and_process_document(
-    file_path: str | Path, to_markdown: bool = True
-) -> Document:
+def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -57,9 +55,7 @@ def load_and_process_document(
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(
-        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
-    )
+    logger.info(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
     logger.info(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -156,9 +152,7 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.debug(
-        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
-    )
+    logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
 
@@ -190,9 +184,7 @@ def analyze_document_with_react(
     """
     logger.info(f"Starting ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(
-        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
-    )
+    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -259,9 +251,7 @@ class ReActAgent:
             )
 
         @self.agent.tool
-        async def read_section(
-            ctx: RunContext[ReActDeps], section_names: list[str] | None = None
-        ) -> str:
+        async def read_section(ctx: RunContext[ReActDeps], section_names: list[str] | None = None) -> str:
             """Read one or more document sections and update progress state."""
             deps = ctx.deps
 
@@ -269,12 +259,8 @@ class ReActAgent:
                 return "READ_LIMIT_REACHED: You have reached max read attempts. Finish using existing evidence and return final report."
 
             available_sections = deps.document.get_section_names()
-            unprocessed_sections = [
-                s for s in available_sections if s not in deps.processed_sections
-            ]
-            requested_sections = (
-                section_names or deps.current_sections or unprocessed_sections[:1]
-            )
+            unprocessed_sections = [s for s in available_sections if s not in deps.processed_sections]
+            requested_sections = section_names or deps.current_sections or unprocessed_sections[:1]
 
             resolved_sections: list[str] = []
             for section in requested_sections:
@@ -286,13 +272,9 @@ class ReActAgent:
                 if matched and matched not in resolved_sections:
                     resolved_sections.append(matched)
 
-            next_sections = [
-                s for s in resolved_sections if s not in deps.processed_sections
-            ]
+            next_sections = [s for s in resolved_sections if s not in deps.processed_sections]
             if not next_sections:
-                remaining = [
-                    s for s in available_sections if s not in deps.processed_sections
-                ]
+                remaining = [s for s in available_sections if s not in deps.processed_sections]
                 return (
                     "NO_NEW_SECTIONS: Requested sections are already processed or not found. "
                     f"Remaining unprocessed sections: {remaining if remaining else 'None'}."
@@ -303,25 +285,18 @@ class ReActAgent:
 
             section_content = get_section_content(deps.document, next_sections)
             if not section_content.strip():
-                return (
-                    "SECTION_CONTENT_EMPTY: No content found for selected sections. "
-                    "Select different sections."
-                )
+                return "SECTION_CONTENT_EMPTY: No content found for selected sections. Select different sections."
 
             for section in next_sections:
                 if section not in deps.processed_sections:
                     deps.processed_sections.append(section)
 
-            remaining = [
-                s for s in available_sections if s not in deps.processed_sections
-            ]
+            remaining = [s for s in available_sections if s not in deps.processed_sections]
 
             if deps.show_progress:
                 print(f"\n--- Loop {deps.loop_count}/{deps.max_loops} ---")
                 print(f"Sections analyzed: {', '.join(next_sections)}")
-                print(
-                    f"Remaining sections: {', '.join(remaining) if remaining else 'None'}"
-                )
+                print(f"Remaining sections: {', '.join(remaining) if remaining else 'None'}")
                 print("-" * 50)
 
             return (
@@ -333,9 +308,7 @@ class ReActAgent:
             )
 
         @self.agent.tool
-        async def append_to_report(
-            ctx: RunContext[ReActDeps], report_fragment: str
-        ) -> str:
+        async def append_to_report(ctx: RunContext[ReActDeps], report_fragment: str) -> str:
             """Append new analysis content to the cumulative report."""
             deps = ctx.deps
 
@@ -350,15 +323,9 @@ class ReActAgent:
             if deps.show_progress:
                 print(f"Report updated: {len(deps.current_report)} characters")
 
-            return (
-                "REPORT_UPDATED: "
-                f"Current length={len(deps.current_report)} chars; "
-                f"processed_sections={len(deps.processed_sections)}."
-            )
+            return f"REPORT_UPDATED: Current length={len(deps.current_report)} chars; processed_sections={len(deps.processed_sections)}."
 
-        self.logger.info(
-            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
-        )
+        self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
 
     def _run_agent_sync(self, prompt: str, deps: ReActDeps):
         """Run the async agent from sync code without using deprecated loop APIs."""
@@ -389,9 +356,7 @@ class ReActAgent:
 
         return outcome.get("result")
 
-    def analyze_document(
-        self, document: Document, task: str, show_progress: bool = True
-    ) -> str:
+    def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> str:
         """Main analysis method using a single native tool-calling run.
 
         Args:
@@ -418,9 +383,7 @@ class ReActAgent:
                 "Start analysis. Use tools to read sections and append report fragments, then return the final consolidated report.",
                 deps=deps,
             )
-            final_report = (
-                result.output.strip() if isinstance(result.output, str) else ""
-            )
+            final_report = result.output.strip() if isinstance(result.output, str) else ""
         except Exception as e:
             self.logger.error(f"Agent execution failed: {e}")
             self.logger.error(f"Exception type: {type(e)}")
