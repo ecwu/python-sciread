@@ -4,28 +4,27 @@ This module implements a ReAct (Reasoning and Acting) agent for intelligent
 iterative document analysis using pydantic-ai framework.
 """
 
+import asyncio
 import traceback
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
+from threading import Thread
 
 from pydantic_ai import Agent
-from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 
 from ..document import Document
 from ..document.document_renderers import get_sections_content
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .models.react_models import ReActAgentOutput
-from .prompts.react import format_agent_prompt
 
 logger = get_logger(__name__)
 
 
 @dataclass
 class ReActDeps:
-    """Dependencies for ReActAgent iterative analysis."""
+    """Dependencies for ReActAgent tool-driven analysis."""
 
     document: Document
     task: str
@@ -37,20 +36,12 @@ class ReActDeps:
     loop_count: int = 0
 
 
-@dataclass
-class ReActState:
-    """State management for ReAct analysis using message history."""
-
-    current_sections: list[str] = field(default_factory=list)
-    processed_sections: list[str] = field(default_factory=list)
-    current_report: str = ""
-    loop_count: int = 0
-
-
 # ReAct agent implementation
 
 
-def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
+def load_and_process_document(
+    file_path: str | Path, to_markdown: bool = True
+) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -66,7 +57,9 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
+    logger.info(
+        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
+    )
     logger.info(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -163,71 +156,11 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
-
-    return combined_content
-
-
-def build_react_content(
-    document: Document,
-    current_report: str,
-    processed_sections: list[str] | None,
-    current_sections: list[str] | None,
-    max_tokens: int | None = None,
-) -> str:
-    """Compose content block for ReAct iteration using Document helpers."""
-    content_parts: list[str] = []
-    if current_report:
-        content_parts.append("CURRENT ANALYSIS:")
-        content_parts.append(current_report)
-        content_parts.append("")
-
-    all_sections = document.get_section_names()
-    processed = processed_sections or []
-    unprocessed = [s for s in all_sections if s not in processed]
-
-    if not unprocessed:
-        content_parts.append("No more unprocessed sections available.")
-        return "\n\n".join(content_parts)
-
-    next_sections: list[str]
-    if current_sections:
-        # Use provided selection but limit to available
-        next_sections = [s for s in current_sections if s in all_sections]
-    else:
-        next_sections = []
-
-    if not next_sections:
-        next_sections = unprocessed[:1]
-
-    # Fetch content with cleaning and truncation
-    sections = get_sections_content(
-        document,
-        section_names=next_sections,
-        clean_text=True,
-        max_chars_per_section=2000,
+    logger.debug(
+        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
     )
 
-    token_limit = max_tokens * 4 if max_tokens else None
-    total_chars = sum(len(part) for part in content_parts)
-
-    content_parts.append("NEXT SECTION(S) TO ANALYZE:")
-    content_parts.append(f"Processed: {len(processed)}")
-    content_parts.append(f"Remaining: {len(unprocessed)}")
-    content_parts.append("")
-
-    for name, content in sections:
-        section_text = f"=== {name.upper()} ===\n{content}"
-        if token_limit and total_chars + len(section_text) > token_limit:
-            remaining = token_limit - total_chars - 20
-            if remaining > 100:
-                section_text = f"=== {name.upper()} ===\n{content[:remaining]}...[truncated due to token limit]"
-            else:
-                break
-        content_parts.append(section_text)
-        total_chars += len(section_text)
-
-    return "\n\n".join(content_parts)
+    return combined_content
 
 
 def analyze_document_with_react(
@@ -257,7 +190,9 @@ def analyze_document_with_react(
     """
     logger.info(f"Starting ReAct analysis for file: {document_file}")
     logger.info(f"Task: {task[:100]}...")
-    logger.info(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
+    logger.info(
+        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
+    )
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -294,48 +229,170 @@ class ReActAgent:
         self.model = get_model(model)
         self.model_identifier = model
 
-        # Create the pydantic-ai agent with dependencies and structured output
+        # Create a native tool-calling ReAct agent.
         self.agent = Agent(
             model=self.model,
             deps_type=ReActDeps,
-            output_type=ReActAgentOutput,
+            output_type=str,
         )
 
-        # Add context-aware system prompt with better error handling
+        # Use tool-calling to read sections and accumulate a report until complete.
         @self.agent.system_prompt
         async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
-            """Generate system prompt with current analysis state."""
+            """Generate system prompt for tool-driven ReAct analysis."""
             deps = ctx.deps
 
-            section_content = build_react_content(
-                document=deps.document,
-                current_report=deps.current_report,
-                processed_sections=deps.processed_sections,
-                current_sections=deps.current_sections,
-                max_tokens=4000,
+            return (
+                "You are an expert academic research analyst using a native ReAct tool-calling workflow.\n\n"
+                f"Task: {deps.task}\n"
+                f"Available sections: {', '.join(deps.document.get_section_names())}\n"
+                f"Max read_section calls: {deps.max_loops}\n\n"
+                "You MUST use tools to analyze the paper:\n"
+                "1) Call read_section(section_names) to fetch one or more sections.\n"
+                "2) After each read, extract key findings and call append_to_report(report_fragment).\n"
+                "3) Repeat until the report clearly covers research questions, methodology, results, and contributions.\n"
+                "4) Then return the final consolidated report as plain text.\n\n"
+                "Rules:\n"
+                "- Do not invent content that was not read via tools.\n"
+                "- Prefer unprocessed sections first.\n"
+                "- Keep report updates non-redundant and evidence-driven.\n"
             )
 
-            if not section_content.strip():
-                raise ModelRetry(
-                    f"No content found for sections: {deps.current_sections}. "
-                    "Please select different sections or provide more specific guidance."
+        @self.agent.tool
+        async def read_section(
+            ctx: RunContext[ReActDeps], section_names: list[str] | None = None
+        ) -> str:
+            """Read one or more document sections and update progress state."""
+            deps = ctx.deps
+
+            if deps.loop_count >= deps.max_loops:
+                return "READ_LIMIT_REACHED: You have reached max read attempts. Finish using existing evidence and return final report."
+
+            available_sections = deps.document.get_section_names()
+            unprocessed_sections = [
+                s for s in available_sections if s not in deps.processed_sections
+            ]
+            requested_sections = (
+                section_names or deps.current_sections or unprocessed_sections[:1]
+            )
+
+            resolved_sections: list[str] = []
+            for section in requested_sections:
+                if section in available_sections and section not in resolved_sections:
+                    resolved_sections.append(section)
+                    continue
+
+                matched = deps.document.get_closest_section_name(section, threshold=0.7)
+                if matched and matched not in resolved_sections:
+                    resolved_sections.append(matched)
+
+            next_sections = [
+                s for s in resolved_sections if s not in deps.processed_sections
+            ]
+            if not next_sections:
+                remaining = [
+                    s for s in available_sections if s not in deps.processed_sections
+                ]
+                return (
+                    "NO_NEW_SECTIONS: Requested sections are already processed or not found. "
+                    f"Remaining unprocessed sections: {remaining if remaining else 'None'}."
                 )
 
-            status = f"Analyzing sections (loop {deps.loop_count + 1} of {deps.max_loops})"
+            deps.loop_count += 1
+            deps.current_sections = next_sections
 
-            return format_agent_prompt(
-                task=deps.task,
-                available_sections=deps.document.get_section_names(),
-                status=status,
-                section_content=section_content,
-                current_report=deps.current_report,
-                processed_sections=deps.processed_sections.copy(),
+            section_content = get_section_content(deps.document, next_sections)
+            if not section_content.strip():
+                return (
+                    "SECTION_CONTENT_EMPTY: No content found for selected sections. "
+                    "Select different sections."
+                )
+
+            for section in next_sections:
+                if section not in deps.processed_sections:
+                    deps.processed_sections.append(section)
+
+            remaining = [
+                s for s in available_sections if s not in deps.processed_sections
+            ]
+
+            if deps.show_progress:
+                print(f"\n--- Loop {deps.loop_count}/{deps.max_loops} ---")
+                print(f"Sections analyzed: {', '.join(next_sections)}")
+                print(
+                    f"Remaining sections: {', '.join(remaining) if remaining else 'None'}"
+                )
+                print("-" * 50)
+
+            return (
+                f"READ_RESULT\n"
+                f"Loop: {deps.loop_count}/{deps.max_loops}\n"
+                f"Read sections: {', '.join(next_sections)}\n"
+                f"Remaining sections: {', '.join(remaining) if remaining else 'None'}\n\n"
+                f"{section_content}"
             )
 
-        self.logger.info(f"Initialized ReActAgent with model: {model} (max_loops={max_loops})")
+        @self.agent.tool
+        async def append_to_report(
+            ctx: RunContext[ReActDeps], report_fragment: str
+        ) -> str:
+            """Append new analysis content to the cumulative report."""
+            deps = ctx.deps
 
-    def analyze_document(self, document: Document, task: str, show_progress: bool = True) -> str:
-        """Main analysis method that orchestrates the ReAct loop using native message history.
+            fragment = report_fragment.strip()
+            if not fragment:
+                return "REPORT_NOT_UPDATED: Empty fragment provided."
+
+            if deps.current_report:
+                deps.current_report += "\n\n"
+            deps.current_report += fragment
+
+            if deps.show_progress:
+                print(f"Report updated: {len(deps.current_report)} characters")
+
+            return (
+                "REPORT_UPDATED: "
+                f"Current length={len(deps.current_report)} chars; "
+                f"processed_sections={len(deps.processed_sections)}."
+            )
+
+        self.logger.info(
+            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
+        )
+
+    def _run_agent_sync(self, prompt: str, deps: ReActDeps):
+        """Run the async agent from sync code without using deprecated loop APIs."""
+
+        async def _runner():
+            return await self.agent.run(prompt, deps=deps)
+
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return asyncio.run(_runner())
+
+        # If a loop is already running in this thread, execute in a dedicated thread.
+        outcome: dict[str, object] = {}
+
+        def _target() -> None:
+            try:
+                outcome["result"] = asyncio.run(_runner())
+            except Exception as e:  # pragma: no cover - rare path
+                outcome["error"] = e
+
+        thread = Thread(target=_target, daemon=True)
+        thread.start()
+        thread.join()
+
+        if "error" in outcome:
+            raise outcome["error"]  # type: ignore[misc]
+
+        return outcome.get("result")
+
+    def analyze_document(
+        self, document: Document, task: str, show_progress: bool = True
+    ) -> str:
+        """Main analysis method using a single native tool-calling run.
 
         Args:
             document: Processed document with natural markdown sections
@@ -347,103 +404,49 @@ class ReActAgent:
         """
         self.logger.info(f"Starting ReAct analysis for task: {task[:100]}...")
 
-        # Initialize analysis state
-        state = ReActState()
-        state.current_sections = get_initial_sections(document)
-        message_history = []
+        deps = ReActDeps(
+            document=document,
+            task=task,
+            max_loops=self.max_loops,
+            show_progress=show_progress,
+            current_sections=get_initial_sections(document),
+        )
 
-        # Main ReAct loop with message history
-        while state.loop_count < self.max_loops:
-            state.loop_count += 1
+        try:
+            self.logger.debug("Running ReAct agent in a single tool-calling session")
+            result = self._run_agent_sync(
+                "Start analysis. Use tools to read sections and append report fragments, then return the final consolidated report.",
+                deps=deps,
+            )
+            final_report = (
+                result.output.strip() if isinstance(result.output, str) else ""
+            )
+        except Exception as e:
+            self.logger.error(f"Agent execution failed: {e}")
+            self.logger.error(f"Exception type: {type(e)}")
+            self.logger.error(f"Full traceback: {traceback.format_exc()}")
+            final_report = ""
 
-            self.logger.info(f"Loop {state.loop_count}/{self.max_loops}: Analyzing sections: {state.current_sections}")
+        if not final_report:
+            final_report = deps.current_report
 
-            try:
-                # Create dependencies for this iteration
-                deps = ReActDeps(
-                    document=document,
-                    task=task,
-                    max_loops=self.max_loops,
-                    show_progress=show_progress,
-                    current_sections=state.current_sections,
-                    processed_sections=state.processed_sections,
-                    current_report=state.current_report,
-                    loop_count=state.loop_count,
-                )
-
-                # Run the agent with message history for context persistence
-                self.logger.debug("Running agent with message history")
-                result = self.agent.run_sync(
-                    "Execute analysis iteration",
-                    deps=deps,
-                    message_history=message_history,
-                )
-                agent_output = result.output
-
-                self.logger.debug(f"Agent response: should_stop={agent_output.should_stop}, next_sections={agent_output.next_sections}")
-
-                # Print reasoning for this iteration if show_progress is enabled
-                if show_progress:
-                    print(f"\n--- Loop {state.loop_count}/{self.max_loops} ---")
-                    print(f"Sections analyzed: {', '.join(state.current_sections)}")
-                    print(f"Reasoning: {agent_output.reasoning}")
-                    if agent_output.should_stop:
-                        print("Decision: STOP - Analysis complete")
-                    else:
-                        print(f"Next sections to read: {', '.join(agent_output.next_sections) if agent_output.next_sections else 'None'}")
-                    print("-" * 50)
-
-                # Update state
-                if agent_output.report_section.strip():
-                    if state.current_report:
-                        state.current_report += "\n\n"
-                    state.current_report += agent_output.report_section
-
-                # Mark sections as processed
-                for section in state.current_sections:
-                    if section not in state.processed_sections:
-                        state.processed_sections.append(section)
-
-                # Update message history with this iteration
-                message_history.extend(result.new_messages())
-
-                # Check if agent wants to stop
-                if agent_output.should_stop:
-                    self.logger.info(f"Agent chose to stop after loop {state.loop_count}: {agent_output.reasoning}")
-                    break
-
-                # Determine next sections
-                next_sections = [s for s in agent_output.next_sections if s not in state.processed_sections]
-
-                if not next_sections:
-                    self.logger.info("No new sections to analyze (all selected sections already processed)")
-                    break
-
-                state.current_sections = next_sections
-
-            except Exception as e:
-                self.logger.error(f"Agent execution failed in loop {state.loop_count}: {e}")
-                self.logger.error(f"Exception type: {type(e)}")
-                self.logger.error(f"Full traceback: {traceback.format_exc()}")
-                break
-
-        self.logger.info(f"ReAct analysis completed after {state.loop_count} loops")
+        self.logger.info(f"ReAct analysis completed after {deps.loop_count} read loops")
 
         # Log and print the final report
-        if state.current_report:
-            self.logger.info(f"Report length: {len(state.current_report)} characters")
+        if final_report:
+            self.logger.info(f"Report length: {len(final_report)} characters")
 
             # Print the final report to console
             print("\n" + "=" * 80)
             print("FINAL ANALYSIS REPORT")
             print("=" * 80)
-            print(state.current_report)
+            print(final_report)
             print("=" * 80)
         else:
             self.logger.warning("No final report generated")
             print("\nWarning: No analysis report was generated")
 
-        return state.current_report
+        return final_report
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""

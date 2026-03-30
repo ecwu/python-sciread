@@ -38,7 +38,9 @@ class SubAgentExecutionError(AgentError):
     """Raised when sub-agent execution fails in coordinate analysis."""
 
 
-def handle_model_retry(error: Exception, context: str, fallback_message: str | None = None) -> ModelRetry:
+def handle_model_retry(
+    error: Exception, context: str, fallback_message: str | None = None
+) -> ModelRetry:
     """Convert various exceptions to ModelRetry for pydantic-ai retry mechanism.
 
     Args:
@@ -52,12 +54,15 @@ def handle_model_retry(error: Exception, context: str, fallback_message: str | N
     error_msg = fallback_message or f"Error in {context}: {error!s}"
     logger.warning(f"Model retry triggered in {context}: {error}")
 
-    if isinstance(error, (ValueError, TypeError)):
-        return ModelRetry(f"Data validation error in {context}: {error!s}. Please check your input and try again.")
-    elif isinstance(error, TimeoutError):
-        return ModelRetry(f"Timeout occurred in {context}: {error!s}. Please try with a shorter document or simpler task.")
-    else:
-        return ModelRetry(error_msg)
+    if isinstance(error, ValueError | TypeError):
+        return ModelRetry(
+            f"Data validation error in {context}: {error!s}. Please check your input and try again."
+        )
+    if isinstance(error, TimeoutError):
+        return ModelRetry(
+            f"Timeout occurred in {context}: {error!s}. Please try with a shorter document or simpler task."
+        )
+    return ModelRetry(error_msg)
 
 
 def validate_document_content(document: Any, operation: str = "analysis") -> None:
@@ -77,7 +82,9 @@ def validate_document_content(document: Any, operation: str = "analysis") -> Non
         elif hasattr(document, "text"):
             text = document.text
         else:
-            raise DocumentProcessingError(f"Document object doesn't have expected content methods for {operation}")
+            raise DocumentProcessingError(
+                f"Document object doesn't have expected content methods for {operation}"
+            )
 
         if not text or not text.strip():
             raise DocumentProcessingError(
@@ -87,10 +94,14 @@ def validate_document_content(document: Any, operation: str = "analysis") -> Non
     except Exception as e:
         if isinstance(e, DocumentProcessingError):
             raise
-        raise DocumentProcessingError(f"Failed to validate document content for {operation}: {e}") from e
+        raise DocumentProcessingError(
+            f"Failed to validate document content for {operation}: {e}"
+        ) from e
 
 
-def validate_section_content(document: Any, sections: list[str], analysis_type: str) -> None:
+def validate_section_content(
+    document: Any, sections: list[str], analysis_type: str
+) -> None:
     """Validate that sections have content for analysis.
 
     Args:
@@ -102,12 +113,16 @@ def validate_section_content(document: Any, sections: list[str], analysis_type: 
         ContentValidationError: If sections lack content
     """
     if not sections:
-        raise ContentValidationError(f"No sections specified for {analysis_type} analysis")
+        raise ContentValidationError(
+            f"No sections specified for {analysis_type} analysis"
+        )
 
     try:
         # Check if document has section retrieval method
         if not hasattr(document, "get_sections_by_name"):
-            raise ContentValidationError(f"Document doesn't support section retrieval for {analysis_type} analysis")
+            raise ContentValidationError(
+                f"Document doesn't support section retrieval for {analysis_type} analysis"
+            )
 
         # Validate each section has content
         empty_sections = []
@@ -125,10 +140,14 @@ def validate_section_content(document: Any, sections: list[str], analysis_type: 
     except Exception as e:
         if isinstance(e, ContentValidationError):
             raise
-        raise ContentValidationError(f"Failed to validate section content for {analysis_type} analysis: {e}") from e
+        raise ContentValidationError(
+            f"Failed to validate section content for {analysis_type} analysis: {e}"
+        ) from e
 
 
-async def safe_agent_execution(coro, timeout: float, operation_name: str, error_type: type[AgentError] = AgentError) -> Any:
+async def safe_agent_execution(
+    coro, timeout: float, operation_name: str, error_type: type[AgentError] = AgentError
+) -> Any:
     """Safely execute an agent coroutine with timeout and error handling.
 
     Args:
@@ -151,7 +170,9 @@ async def safe_agent_execution(coro, timeout: float, operation_name: str, error_
 
     except TimeoutError as e:
         logger.error(f"{operation_name} timed out after {timeout}s")
-        raise error_type(f"{operation_name} timed out after {timeout} seconds. Please try with a shorter document or simpler task.") from e
+        raise error_type(
+            f"{operation_name} timed out after {timeout} seconds. Please try with a shorter document or simpler task."
+        ) from e
 
     except Exception as e:
         logger.error(f"{operation_name} failed: {e}")
@@ -180,7 +201,9 @@ def format_error_for_user(error: AgentError, operation: str) -> str:
         return f"Error in {operation}: {error}. Please try again or contact support if the issue persists."
 
 
-def create_retry_message(original_error: Exception, context: str, suggestions: list[str] | None = None) -> str:
+def create_retry_message(
+    original_error: Exception, context: str, suggestions: list[str] | None = None
+) -> str:
     """Create a detailed retry message for ModelRetry.
 
     Args:

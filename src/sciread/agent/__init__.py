@@ -41,8 +41,7 @@ Example Usage:
     discussion_result = await discussion_agent.analyze_document(doc)
 """
 
-# Agent classes
-# Discussion system imports
+from .coordinate_agent import CoordinateAgent
 from .discussion import AgentInsight
 from .discussion import AgentPersonality
 from .discussion import ConsensusBuilder
@@ -57,12 +56,11 @@ from .discussion import Response
 from .discussion import Task
 from .discussion import TaskPriority
 from .discussion import TaskQueue
+from .discussion import TaskQueueManager
 from .discussion import TaskResult
 from .discussion import TaskStatus
 from .discussion import TaskType
 from .discussion import create_personality_agent
-
-from .coordinate_agent import CoordinateAgent
 
 # CoordinateAgent models - now imported from models folder
 from .models.coordinate_models import AnalysisPlan
@@ -81,7 +79,6 @@ from .models.react_models import ReActAgentOutput
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
 
-
 # ReActAgent and utility functions
 from .react_agent import ReActAgent
 from .react_agent import analyze_document_with_react
@@ -89,7 +86,6 @@ from .react_agent import format_status_summary
 from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
 from .simple_agent import SimpleAgent
-from .discussion import TaskQueueManager
 from .text_utils import remove_references
 
 __all__ = [

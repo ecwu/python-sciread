@@ -15,21 +15,17 @@ from .coordinate_models import ResearchQuestionsResult
 from .react_models import ReActAgentInput
 from .react_models import ReActAgentOutput
 from .simple_models import SimpleAnalysisResult
-from .react_models import ReActAgentOutput
-from .simple_models import SimpleAnalysisResult
 
 __all__ = [
+    "AnalysisPlan",
+    "ComprehensiveAnalysisResult",
+    "ExperimentResult",
+    "FutureDirectionsResult",
     "MetadataExtractionResult",
     "MethodologyResult",
     "PreviousMethodsResult",
-    "Question",
-    # ReActAgent models
     "ReActAgentInput",
     "ReActAgentOutput",
     "ResearchQuestionsResult",
-    "Response",
-    # SimpleAgent models
-    "SimpleAnalysisResult",
-    # Task models
     "SimpleAnalysisResult",
 ]
