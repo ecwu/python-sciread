@@ -63,16 +63,16 @@ def load_and_process_document(
     Returns:
         Document instance with processed chunks using natural markdown sections
     """
-    logger.info(f"Loading document from {file_path} (to_markdown={to_markdown})")
+    logger.debug(f"Loading document from {file_path} (to_markdown={to_markdown})")
 
     # Create document with markdown conversion and auto-splitting
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.info(
+    logger.debug(
         f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
     )
-    logger.info(f"Available sections: {document.get_section_names()}")
+    logger.debug(f"Available sections: {document.get_section_names()}")
 
     return document
 
@@ -122,7 +122,7 @@ def get_initial_sections(document: Document) -> list[str]:
         if not initial_sections and available_sections:
             initial_sections = [available_sections[0]]
 
-    logger.info(f"Initial sections selected: {initial_sections}")
+    logger.debug(f"Initial sections selected: {initial_sections}")
     return initial_sections
 
 
@@ -232,9 +232,9 @@ async def analyze_document_with_react(
         FileNotFoundError: If the document file is not found
         Exception: If the analysis fails
     """
-    logger.info(f"Starting ReAct analysis for file: {document_file}")
-    logger.info(f"Task: {task[:100]}...")
-    logger.info(
+    logger.debug(f"Starting ReAct analysis for file: {document_file}")
+    logger.debug(f"Task: {task[:100]}...")
+    logger.debug(
         f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
     )
 
@@ -277,6 +277,7 @@ def analyze_document_with_react_sync(
 react_agent = Agent(
     deps_type=ReActDeps,
     output_type=AnalysisReport,
+    retries=3,
 )
 
 
@@ -377,8 +378,8 @@ async def read_section(
 
     if deps.show_progress:
         print(f"\n--- Loop {state.loop_count}/{deps.max_loops} ---")
-        print(f"Sections analyzed: {', '.join(next_sections)}")
-        print(f"Remaining sections: {', '.join(remaining) if remaining else 'None'}")
+        print(f"Sections selected: {', '.join(next_sections)}")
+        print(f"Remaining sections: {len(remaining)} sections")
         print("-" * 50)
 
     return (
@@ -455,7 +456,7 @@ class ReActAgent:
         Returns:
             Structured analysis report
         """
-        self.logger.info(f"Starting ReAct analysis for task: {task[:100]}...")
+        self.logger.debug(f"Starting ReAct analysis for task: {task[:100]}...")
 
         deps = ReActDeps(
             document=document,

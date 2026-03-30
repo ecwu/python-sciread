@@ -39,7 +39,7 @@ def setup_logging(
     # Default format
     if format_string is None:
         format_string = (
-            "<green>{time:HH:mm:ss}</green> | "
+            "<green>{time:HH:mm:ss.SSS}</green> | "
             "<level>{level: <5}</level> | "
             "<level>{message}</level> | "
             "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan>"
