@@ -38,6 +38,8 @@ REPORT WRITING:
 - Focus exclusively on the paper's content and findings
 - Structure your analysis logically around the key research elements
 - Add new insights that build upon previous sections
+- Write each iteration as a report fragment that can be appended to the cumulative report
+- Avoid rewriting prior report content unless you are correcting a clear inconsistency
 
 SECTION SELECTION STRATEGY:
 - After abstract/introduction, typically prioritize: methods → results → discussion → conclusion
@@ -54,7 +56,12 @@ Remember: You are building a comprehensive understanding of the research piece b
 
 
 def format_agent_prompt(
-    task: str, available_sections: list[str], status: str, section_content: str, current_report: str, processed_sections: list[str]
+    task: str,
+    available_sections: list[str],
+    status: str,
+    section_content: str,
+    current_report: str,
+    processed_sections: list[str],
 ) -> str:
     """Format the agent prompt with all necessary information.
 
@@ -92,7 +99,7 @@ Based on the sections provided above and your existing analysis, please:
 
 Please provide your response as a structured analysis with the following components:
 - Should you stop analysis? (true/false)
-- New report content to add based on these sections
+- New report fragment to append based on these sections
 - Which sections to read next (if continuing)
 - Your reasoning for these decisions
 

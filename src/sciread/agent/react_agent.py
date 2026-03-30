@@ -306,13 +306,14 @@ async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
         "   - section_names should be a JSON array of strings.\n"
         '   - Preferred: {"section_names": ["1 introduction", "2 method"]}\n'
         '   - Also tolerated: {"section_names": "[\\"1 introduction\\", \\"2 method\\"]"}\n'
-        "2) Immediately after each read, call update_report(updated_full_report) with the full revised report containing all known information.\n"
+        "2) Immediately after each read, call update_report(report_fragment) with only the new report fragment derived from the just-read sections.\n"
         "3) Repeat until the report clearly covers research questions, methodology, results, and contributions.\n"
         "4) Then return the final structured analysis.\n\n"
         "Rules:\n"
         "- Do not invent content that was not read via tools.\n"
         "- Prefer unprocessed sections first.\n"
-        "- Every update_report call must replace the entire report, not append only a new fragment.\n"
+        "- update_report appends to the cumulative report; do not rewrite the entire report each turn.\n"
+        "- Each report_fragment should contain only new findings from the latest read sections, merged with minimal overlap.\n"
         "- After reading a section, do not call read_section again until the report has been updated.\n"
         "- Keep report updates non-redundant and evidence-driven.\n"
         "- The final answer must populate: summary, research_questions, methodology, key_findings, contributions, limitations, sections_covered, and final_report.\n"
@@ -386,26 +387,34 @@ async def read_section(
         f"Read sections: {', '.join(next_sections)}\n"
         f"Remaining sections: {', '.join(remaining) if remaining else 'None'}\n\n"
         f"{section_content}\n\n"
-        "NEXT_ACTION_REQUIRED: Call update_report with the full revised report before reading more sections."
+        "NEXT_ACTION_REQUIRED: Call update_report with only the newly written report fragment before reading more sections."
     )
 
 
 @react_agent.tool
-async def update_report(ctx: RunContext[ReActDeps], updated_full_report: str) -> str:
-    """Replace the cumulative report with a fully revised report."""
+async def update_report(ctx: RunContext[ReActDeps], report_fragment: str) -> str:
+    """Append a newly written report fragment to the cumulative report."""
     deps = ctx.deps
     state = _get_state(ctx)
 
-    report = updated_full_report.strip()
-    if not report:
+    fragment = report_fragment.strip()
+    if not fragment:
         return "REPORT_NOT_UPDATED: Empty report provided."
 
-    state.current_report = report
+    if state.current_report.strip():
+        state.current_report = f"{state.current_report}\n\n{fragment}"
+    else:
+        state.current_report = fragment
 
     if deps.show_progress:
-        print(f"Report updated: {len(state.current_report)} characters")
+        print(
+            f"Report fragment appended: +{len(fragment)} chars, total {len(state.current_report)} chars"
+        )
 
-    return f"REPORT_UPDATED: {len(state.current_report)} chars, {len(state.processed_sections)} sections covered."
+    return (
+        f"REPORT_APPENDED: +{len(fragment)} chars, total {len(state.current_report)} chars, "
+        f"{len(state.processed_sections)} sections covered."
+    )
 
 
 class ReActAgent:
@@ -459,7 +468,7 @@ class ReActAgent:
         try:
             self.logger.debug("Running ReAct agent in a single tool-calling session")
             result = await self.agent.run(
-                "Start analysis. Use tools to read sections, replace the report with a full revised version after each read, then return the final consolidated report.",
+                "Start analysis. Use tools to read sections, append a report fragment after each read, then return the final consolidated report.",
                 deps=deps,
                 model=self.model,
                 metadata={"react_state": state},
