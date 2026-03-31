@@ -3,14 +3,14 @@
 import asyncio
 import json
 import traceback
-from rich.console import Console
-from rich.markdown import Markdown
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
+from rich.console import Console
+from rich.markdown import Markdown
 
 from ..document import Document
 from ..document.document_renderers import get_sections_content
@@ -227,95 +227,93 @@ async def react_iteration_system_prompt(
     is_final_iteration = deps.current_loop >= deps.max_loops
     is_first_iteration = deps.current_loop == 1
 
-    previous_context = f"Previous thoughts:\n{iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
+    previous_context = f"上一轮思考：\n{iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
     processed_sections_str = (
-        f"Already processed: {', '.join(iteration_input.processed_sections)}"
-        if iteration_input.processed_sections
-        else "No sections processed yet."
+        f"已处理章节：{', '.join(iteration_input.processed_sections)}" if iteration_input.processed_sections else "尚未处理任何章节。"
     )
     unprocessed = [s for s in iteration_input.available_sections if s not in iteration_input.processed_sections]
-    unprocessed_str = f"Remaining unprocessed sections: {', '.join(unprocessed)}" if unprocessed else "All sections have been read."
+    unprocessed_str = f"剩余未处理章节：{', '.join(unprocessed)}" if unprocessed else "所有章节都已阅读。"
 
     # ── FINAL ITERATION: synthesis only, no new reading ──────────────────────
     if is_final_iteration:
         return (
-            f"TASK: {deps.task}\n\n"
-            f"=== FINAL ITERATION ({deps.current_loop}/{deps.max_loops}) — SYNTHESIS ONLY ===\n\n"
+            f"任务：{deps.task}\n\n"
+            f"=== 最终迭代（{deps.current_loop}/{deps.max_loops}）——仅做综合 ===\n\n"
             f"{processed_sections_str}\n\n"
             f"{previous_context}\n\n"
-            f"STRICT RULES FOR THIS ITERATION:\n"
-            f"  ✗ DO NOT call read_section() — all reading is finished.\n"
-            f"  ✓ Step 1: Call get_all_memory() to retrieve every finding accumulated so far.\n"
-            f"  ✓ Step 2: Synthesize those findings into a final structured report (see format below).\n"
-            f"  ✓ Step 3: Return ReActIterationOutput with should_continue=False and report populated.\n\n"
-            f"=== FINAL REPORT FORMAT ===\n"
-            f"Write a concise, contribution-focused report. Do NOT produce a section-by-section recap.\n"
-            f"Structure it as follows:\n\n"
-            f"1. **Core Research Question & Thesis**\n"
-            f"   What gap does this paper address? What is the central claim?\n\n"
-            f"2. **Key Contributions** (the most important section)\n"
-            f"   List 3–5 concrete, specific contributions the paper makes.\n"
-            f"   Use precise language — name methods, datasets, metrics, improvements.\n\n"
-            f"3. **Methodology (conceptual)**\n"
-            f"   Describe the approach at an architectural/algorithmic level, not implementation detail.\n\n"
-            f"4. **Main Results & Implications**\n"
-            f"   What did the experiments show? What do the numbers mean?\n\n"
-            f"5. **Limitations & Open Questions**\n"
-            f"   What does the paper acknowledge as unresolved or out of scope?\n\n"
-            f"Tone: precise, academic, analytical. Avoid filler phrases like 'the paper discusses...' — state claims directly."
+            f"本轮严格规则：\n"
+            f"  ✗ 不要调用 read_section() —— 所有阅读已结束。\n"
+            f"  ✓ 第 1 步：调用 get_all_memory()，获取到目前为止累计的全部发现。\n"
+            f"  ✓ 第 2 步：基于这些发现综合生成最终结构化报告（见下方格式）。\n"
+            f"  ✓ 第 3 步：返回 ReActIterationOutput，并设置 should_continue=False 且填写 report。\n\n"
+            f"=== 最终报告格式 ===\n"
+            f"撰写简洁、聚焦贡献的报告。不要按章节逐段复述。\n"
+            f"请按以下结构输出：\n\n"
+            f"1. **核心研究问题与主张**\n"
+            f"   论文试图填补什么空白？核心论断是什么？\n\n"
+            f"2. **关键贡献**（最重要部分）\n"
+            f"   列出 3-5 条具体且明确的贡献。\n"
+            f"   语言要精确：指出方法、数据集、指标、性能提升等要点。\n\n"
+            f"3. **方法论（概念层）**\n"
+            f"   从架构/算法层描述方法，不展开实现细节。\n\n"
+            f"4. **主要结果与意义**\n"
+            f"   实验显示了什么？关键数字代表什么意义？\n\n"
+            f"5. **局限性与开放问题**\n"
+            f"   论文承认了哪些尚未解决或不在范围内的问题？\n\n"
+            f"语气要求：精确、学术、分析性。避免“论文讨论了……”这类空泛表达，直接陈述结论。"
         )
 
     # ── NORMAL ITERATION ──────────────────────────────────────────────────────
     planning_block = (
-        f"=== FIRST ITERATION: PLAN YOUR READING STRATEGY ===\n"
-        f"Before reading anything, survey all available sections and decide:\n"
-        f"  • Which sections most directly reveal the paper's CLAIMS and CONTRIBUTIONS?\n"
-        f"    (Abstract, Introduction, Conclusion, and any 'Contributions' subsection are highest priority.)\n"
-        f"  • Which sections contain experimental evidence you will need?\n"
-        f"  • Which sections are low-value for the task (e.g., appendices, acknowledgements)?\n"
-        f"Start with the highest-signal sections. You may batch multiple related sections in one read_section() call.\n"
-        f"Record your reading plan in the 'thoughts' field of your output.\n\n"
+        "=== 首轮迭代：先制定阅读策略 ===\n"
+        "在开始阅读前，先浏览所有可用章节并判断：\n"
+        "  • 哪些章节最能直接揭示论文的主张（CLAIMS）与贡献（CONTRIBUTIONS）？\n"
+        "    （摘要、引言、结论，以及任何“贡献”小节优先级最高。）\n"
+        "  • 哪些章节包含你后续需要的实验证据？\n"
+        "  • 哪些章节对当前任务价值较低（如附录、致谢）？\n"
+        "先读信息密度最高的章节。你可以在一次 read_section() 调用中批量读取多个相关章节。\n"
+        "请在输出的 thoughts 字段中记录你的阅读计划。\n\n"
         if is_first_iteration
         else ""
     )
 
     return (
-        f"TASK: {deps.task}\n\n"
-        f"=== ITERATION {deps.current_loop}/{deps.max_loops} "
-        f"(loops remaining after this: {remaining_loops}) ===\n\n"
+        f"任务：{deps.task}\n\n"
+        f"=== 迭代 {deps.current_loop}/{deps.max_loops} "
+        f"（本轮结束后剩余轮次：{remaining_loops}）===\n\n"
         f"{planning_block}"
         f"{processed_sections_str}\n"
         f"{unprocessed_str}\n\n"
         f"{previous_context}\n\n"
-        f"=== RULES FOR THIS ITERATION ===\n"
-        f"1. Call read_section() EXACTLY ONCE.\n"
-        f"   • Choose sections STRATEGICALLY — not just the next one in sequence.\n"
-        f"   • Prefer sections that directly answer: What does this paper CLAIM? What is NEW?\n"
-        f"   • You may batch multiple thematically related sections in one call.\n"
-        f"   • Remaining loops: {remaining_loops}. If only 1 loop remains after this,\n"
-        f"     focus on the highest-value unread sections; skip low-priority ones.\n\n"
-        f"2. Call add_memory() EXACTLY ONCE.\n"
-        f"   • Record CONTRIBUTIONS, CLAIMS, and KEY FINDINGS — NOT a content summary.\n"
-        f"   • Format your memory as bullet points:\n"
-        f"     - [CLAIM] <what the paper asserts>\n"
-        f"     - [CONTRIBUTION] <what is novel>\n"
-        f"     - [RESULT] <key empirical finding with numbers if available>\n"
-        f"     - [METHOD] <core technique, only if architecturally significant>\n"
-        f"   • Omit anything that is background, motivation, or boilerplate.\n\n"
-        f"3. Return ReActIterationOutput immediately — no further tool calls.\n"
-        f"   • thoughts: Your reading rationale and what you plan to read next (and why).\n"
-        f"   • should_continue: \n"
-        f"     - Set True if high-value unread sections remain.\n"
-        f"     - Set False ONLY WHEN you are ready to write the final report YOURSELF in this same output.\n"
-        f"       WARNING: Setting should_continue=False means THIS IS YOUR LAST CHANCE to produce a report.\n"
-        f"       If you set should_continue=False, you MUST also populate the 'report' field with the full\n"
-        f"       structured analysis — there is NO automatic synthesis step after this.\n"
-        f"       Do NOT set should_continue=False if report will be empty.\n\n"
-        f"   • report: Leave EMPTY (synthesis happens only in the final iteration).\n\n"
-        f"=== TOOLS ALLOWED THIS ITERATION ===\n"
-        f"  ✓ read_section(section_names)  — call ONCE\n"
-        f"  ✓ add_memory(memory)           — call ONCE\n"
-        f"  ✗ get_all_memory()             — FORBIDDEN in normal iterations; reserved for final only\n"
+        f"=== 本轮规则 ===\n"
+        f"1. 必须且仅能调用一次 read_section()。\n"
+        f"   • 章节选择要有策略，不要只按顺序读下一个。\n"
+        f"   • 优先选择能直接回答：论文主张了什么？创新点是什么？\n"
+        f"   • 可在一次调用中批量读取多个主题相关章节。\n"
+        f"   • 剩余轮次：{remaining_loops}。如果本轮后只剩 1 轮，\n"
+        f"     请聚焦最高价值的未读章节，跳过低优先级内容。\n\n"
+        f"2. 必须且仅能调用一次 add_memory()。\n"
+        f"   • 记录贡献（CONTRIBUTIONS）、主张（CLAIMS）和关键发现（KEY FINDINGS），不要写内容摘要。\n"
+        f"   • 记忆内容请使用要点格式：\n"
+        f"     - [CLAIM] <论文提出的主张>\n"
+        f"     - [CONTRIBUTION] <论文的新颖贡献>\n"
+        f"     - [RESULT] <关键实验结果，尽量包含数字>\n"
+        f"     - [METHOD] <核心技术，仅在架构层面重要时记录>\n"
+        f"   • 不要记录背景、动机或模板化描述。\n\n"
+        f"3. 立即返回 ReActIterationOutput，不要继续调用其他工具。\n"
+        f"   • thoughts：说明本轮阅读依据，以及下一步准备读什么（和原因）。\n"
+        f"   • should_continue：\n"
+        f"     - 若仍有高价值未读章节，设为 True。\n"
+        f"     - 仅当你已准备好在本次输出中亲自写出最终报告时，才设为 False。\n"
+        f"       警告：设置 should_continue=False 意味着这是你产出报告的最后机会。\n"
+        f"       若设为 should_continue=False，你必须同时完整填写 report 字段，\n"
+        f"       之后不会再有自动综合步骤。\n"
+        f"       若 report 为空，不要设置 should_continue=False。\n\n"
+        f"   • report：保持为空（仅最终迭代才进行综合）。\n\n"
+        f"=== 允许的工具 ===\n"
+        f"  ✓ read_section(section_names)  —— 仅调用一次\n"
+        f"  ✓ add_memory(memory)           —— 仅调用一次\n"
+        f"  ✓ get_all_memory()             —— 常规迭代请不要使用，仅生成报告的迭代才应使用\n"
     )
 
 
@@ -333,7 +331,7 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
 
     # Enforce single-call rule
     if iteration_state.read_section_called:
-        return "ERROR: read_section already called in this iteration. Cannot call it again."
+        return "错误：本轮已调用过 read_section()，不能重复调用。"
 
     iteration_state.read_section_called = True
 
@@ -342,7 +340,7 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     unprocessed = [s for s in available_sections if s not in processed]
 
     if not unprocessed:
-        return "INFO: All sections already processed. No content to read."
+        return "提示：所有章节都已处理，没有可读取内容。"
 
     # Normalize and resolve requested section names
     normalized_section_names = normalize_section_names(section_names)
@@ -361,12 +359,12 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     # Filter to only unprocessed sections
     next_sections = [s for s in resolved_sections if s not in processed]
     if not next_sections:
-        return f"INFO: Requested sections {resolved_sections} are already processed. Unprocessed available: {unprocessed}"
+        return f"提示：请求章节 {resolved_sections} 已处理。当前未处理章节：{unprocessed}"
 
     # Fetch content
     section_content = get_section_content(deps.document, next_sections)
     if not section_content.strip():
-        return f"WARNING: No content found for sections {next_sections}. Try different sections."
+        return f"警告：在章节 {next_sections} 中未找到内容，请尝试其他章节。"
 
     iteration_state.sections_read = next_sections
     iteration_state.section_content = section_content
@@ -374,9 +372,7 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     if deps.show_progress:
         print(f"\n[Iteration] Read sections: {', '.join(next_sections)}")
 
-    return (
-        f"SECTION_CONTENT (read from: {', '.join(next_sections)}):\n\n{section_content}\n\nNow call add_memory() with extracted findings."
-    )
+    return f"章节内容（读取自：{', '.join(next_sections)}）：\n\n{section_content}\n\n现在请调用 add_memory() 记录提取到的发现。"
 
 
 @react_iteration_agent.tool
@@ -386,22 +382,21 @@ async def add_memory(ctx: RunContext[ReActIterationDeps], memory: str) -> str:
     Args:
         memory: Extracted findings and key information from newly read sections.
     """
-    deps = ctx.deps
     iteration_state = _get_iteration_state(ctx)
 
     # Enforce single-call rule
     if iteration_state.add_memory_called:
-        return "ERROR: add_memory already called in this iteration. Cannot call it again."
+        return "错误：本轮已调用过 add_memory()，不能重复调用。"
 
     iteration_state.add_memory_called = True
 
     fragment = memory.strip()
     if not fragment:
-        return "WARNING: Empty memory text."
+        return "警告：记忆文本为空。"
 
     iteration_state.memory_text = fragment
 
-    return "MEMORY RECORDED"
+    return "记忆已记录"
 
 
 @react_iteration_agent.tool
@@ -414,13 +409,9 @@ async def get_all_memory(ctx: RunContext[ReActIterationDeps]) -> str:
     deps = ctx.deps
 
     if not deps.accumulated_memory.strip():
-        return "INFO: No accumulated memory yet from previous iterations."
+        return "提示：目前还没有来自前几轮的累计记忆。"
 
-    return (
-        f"FULL_ACCUMULATED_MEMORY:\n\n"
-        f"{deps.accumulated_memory}\n\n"
-        f"Use this complete memory to guide final reasoning and final report generation."
-    )
+    return f"完整累计记忆：\n\n{deps.accumulated_memory}\n\n请基于这份完整记忆进行最终推理并生成最终报告。"
 
 
 class ReActAgent:
@@ -480,10 +471,9 @@ class ReActAgent:
 
         try:
             user_message = (
-                "FINAL ITERATION — DO NOT call read_section(). "
-                "Call get_all_memory() first, then return a structured final report with should_continue=False."
+                "最终迭代——不要调用 read_section()。先调用 get_all_memory()，然后返回结构化最终报告，并设置 should_continue=False。"
                 if deps.current_loop >= deps.max_loops
-                else "Read the most strategically valuable unprocessed sections, extract contributions and claims into memory, then return your thoughts and reading plan."
+                else "读取最具策略价值的未处理章节，将贡献与主张提炼为记忆，然后返回你的思考与阅读计划。"
             )
             result = await self.agent.run(
                 user_message,
@@ -577,7 +567,7 @@ class ReActAgent:
             remaining_sections = [section for section in available_sections if section not in processed_sections]
 
             if show_progress:
-                print(f"[Thoughts] {iteration_output.thoughts}...")
+                console.print(Markdown(current_thoughts))
 
             # Prepare next iteration input
             iteration_input = ReActIterationInput(
