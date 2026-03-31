@@ -65,9 +65,7 @@ class TestModelFactory:
     @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_deepseek(self, mock_config):
         """Test creating DeepSeek model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://api.deepseek.com"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://api.deepseek.com"
         mock_config.return_value.get_api_key.return_value = "test-key"
 
         with patch.object(DeepSeekProvider, "create_model") as mock_create:
@@ -82,9 +80,7 @@ class TestModelFactory:
     @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_volcengine(self, mock_config):
         """Test creating Volcengine model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://ark.cn-beijing.volces.com/api/coding/v3"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
         mock_config.return_value.get_api_key.return_value = "test-key"
 
         with patch.object(VolcengineProvider, "create_model") as mock_create:
@@ -99,9 +95,7 @@ class TestModelFactory:
     @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_ollama(self, mock_config):
         """Test creating Ollama model."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "http://localhost:11434/v1"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
 
         with patch.object(OllamaProvider, "create_model") as mock_create:
             mock_model = MagicMock()
@@ -120,9 +114,7 @@ class TestModelFactory:
     def test_create_model_unsupported_model(self):
         """Test creating model with unsupported model."""
         with patch("sciread.llm_provider.factory.get_config"):
-            with patch.object(
-                DeepSeekProvider, "is_model_supported", return_value=False
-            ):
+            with patch.object(DeepSeekProvider, "is_model_supported", return_value=False):
                 with pytest.raises(UnsupportedModelError):
                     ModelFactory.create_model("deepseek/unsupported-model")
 

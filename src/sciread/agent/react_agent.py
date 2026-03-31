@@ -1,4 +1,4 @@
-"""ReAct agent for intelligent document analysis."""
+"""ReAct agent for intelligent document analysis with single-iteration loops."""
 
 import asyncio
 import json
@@ -14,46 +14,49 @@ from ..document import Document
 from ..document.document_renderers import get_sections_content
 from ..llm_provider import get_model
 from ..logging_config import get_logger
-from .models.react_models import AnalysisReport
+from .models.react_models import ReActIterationInput
+from .models.react_models import ReActIterationOutput
 
 logger = get_logger(__name__)
 
 
 @dataclass
-class ReActDeps:
-    """Immutable dependencies for ReActAgent tool-driven analysis."""
+class ReActIterationDeps:
+    """Immutable dependencies for a single ReAct iteration."""
 
     document: Document
     task: str
+    iteration_input: ReActIterationInput
+    current_loop: int = 1
     max_loops: int = 8
+    accumulated_memory: str = ""
     show_progress: bool = True
 
 
 @dataclass
-class ReActState:
-    """Mutable runtime state managed on the Python side."""
+class ReActIterationState:
+    """Mutable per-iteration state: track tool invocations to enforce single-call rules."""
 
-    current_sections: list[str] = field(default_factory=list)
-    processed_sections: list[str] = field(default_factory=list)
-    current_report: str = ""
-    loop_count: int = 0
+    read_section_called: bool = False
+    add_memory_called: bool = False
+    sections_read: list[str] = field(default_factory=list)
+    section_content: str = ""
+    memory_text: str = ""
 
 
-def _get_state(ctx: RunContext[ReActDeps]) -> ReActState:
-    """Retrieve per-run mutable state from agent metadata."""
+def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationState:
+    """Retrieve per-iteration mutable state from agent metadata."""
     metadata = ctx.metadata or {}
-    state = metadata.get("react_state")
-    if not isinstance(state, ReActState):
-        raise RuntimeError("ReAct runtime state is missing from run metadata.")
+    state = metadata.get("iteration_state")
+    if not isinstance(state, ReActIterationState):
+        raise RuntimeError("ReAct iteration state is missing from run metadata.")
     return state
 
 
 # ReAct agent implementation
 
 
-def load_and_process_document(
-    file_path: str | Path, to_markdown: bool = True
-) -> Document:
+def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
     Args:
@@ -69,9 +72,7 @@ def load_and_process_document(
     # Document.from_file() automatically loads and splits the document when auto_split=True
     document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
 
-    logger.debug(
-        f"Document processed into {len(document.chunks)} chunks with natural markdown sections"
-    )
+    logger.debug(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
     logger.debug(f"Available sections: {document.get_section_names()}")
 
     return document
@@ -168,9 +169,7 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         content_parts.append(f"=== {section_name.upper()} ===\n{content}")
 
     combined_content = "\n\n".join(content_parts)
-    logger.debug(
-        f"Retrieved content for sections {section_names}: {len(combined_content)} characters"
-    )
+    logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
 
@@ -185,9 +184,7 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
         return None
 
     if isinstance(section_names, list):
-        return [
-            name for name in section_names if isinstance(name, str) and name.strip()
-        ]
+        return [name for name in section_names if isinstance(name, str) and name.strip()]
 
     if isinstance(section_names, str):
         raw = section_names.strip()
@@ -197,9 +194,7 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, list):
-                return [
-                    name for name in parsed if isinstance(name, str) and name.strip()
-                ]
+                return [name for name in parsed if isinstance(name, str) and name.strip()]
         except json.JSONDecodeError:
             # Fallback: treat as a single section name.
             return [raw]
@@ -214,8 +209,8 @@ async def analyze_document_with_react(
     max_loops: int = 8,
     to_markdown: bool = True,
     show_progress: bool = True,
-) -> AnalysisReport:
-    """Analyze a document using the ReAct agent.
+) -> ReActIterationOutput:
+    """Analyze a document using the ReAct agent with multi-iteration loops.
 
     Args:
         document_file: Path to the document file (PDF or TXT)
@@ -234,9 +229,7 @@ async def analyze_document_with_react(
     """
     logger.debug(f"Starting ReAct analysis for file: {document_file}")
     logger.debug(f"Task: {task[:100]}...")
-    logger.debug(
-        f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}"
-    )
+    logger.debug(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
     # Check if file exists
     if not Path(document_file).exists():
@@ -246,8 +239,8 @@ async def analyze_document_with_react(
     document = load_and_process_document(document_file, to_markdown=to_markdown)
 
     # Create and run the ReAct agent
-    agent = ReActAgent(model=model, max_loops=max_loops)
-    result = await agent.analyze_document(document, task, show_progress=show_progress)
+    agent = ReActAgent(model=model)
+    result = await agent.analyze_document(document, task, max_loops=max_loops, show_progress=show_progress)
 
     logger.debug("ReAct analysis completed successfully!")
     return result
@@ -260,7 +253,7 @@ def analyze_document_with_react_sync(
     max_loops: int = 8,
     to_markdown: bool = True,
     show_progress: bool = True,
-) -> AnalysisReport:
+) -> ReActIterationOutput:
     """Synchronous wrapper for top-level callers such as the CLI."""
     return asyncio.run(
         analyze_document_with_react(
@@ -274,76 +267,99 @@ def analyze_document_with_react_sync(
     )
 
 
-react_agent = Agent(
-    deps_type=ReActDeps,
-    output_type=AnalysisReport,
+react_iteration_agent = Agent(
+    deps_type=ReActIterationDeps,
+    output_type=ReActIterationOutput,
     retries=3,
 )
 
 
-@react_agent.system_prompt
-async def react_system_prompt(ctx: RunContext[ReActDeps]) -> str:
-    """Generate system prompt for tool-driven ReAct analysis."""
-    deps = ctx.deps
-    state = _get_state(ctx)
-    current_report = state.current_report or "[No report yet]"
-    processed_sections = (
-        ", ".join(state.processed_sections) if state.processed_sections else "None"
-    )
-
-    return (
-        "You are an expert academic research analyst using a native ReAct tool-calling workflow.\n\n"
-        f"Task: {deps.task}\n"
-        f"Available sections: {', '.join(deps.document.get_section_names())}\n"
-        f"Already processed sections: {processed_sections}\n"
-        f"Current report:\n{current_report}\n\n"
-        f"Max read_section calls: {deps.max_loops}\n\n"
-        "Context rules:\n"
-        "- In each turn, you can only rely on the current full report and the newly read section content.\n"
-        "- Previously read section content will not remain available unless you write it into the report now.\n"
-        "- If information is not incorporated into the report in the current turn, it will be lost in later turns.\n\n"
-        "You MUST use tools to analyze the paper:\n"
-        "1) Call read_section(section_names) to fetch one or more sections.\n"
-        "   - section_names should be a JSON array of strings.\n"
-        '   - Preferred: {"section_names": ["1 introduction", "2 method"]}\n'
-        '   - Also tolerated: {"section_names": "[\\"1 introduction\\", \\"2 method\\"]"}\n'
-        "2) Immediately after each read, call update_report(report_fragment) with only the new report fragment derived from the just-read sections.\n"
-        "3) Repeat until the report clearly covers research questions, methodology, results, and contributions.\n"
-        "4) Then return the final structured analysis.\n\n"
-        "Rules:\n"
-        "- Do not invent content that was not read via tools.\n"
-        "- Prefer unprocessed sections first.\n"
-        "- update_report appends to the cumulative report; do not rewrite the entire report each turn.\n"
-        "- Each report_fragment should contain only new findings from the latest read sections, merged with minimal overlap.\n"
-        "- After reading a section, do not call read_section again until the report has been updated.\n"
-        "- Keep report updates non-redundant and evidence-driven.\n"
-        "- The final answer must populate: summary, research_questions, methodology, key_findings, contributions, limitations, sections_covered, and final_report.\n"
-    )
-
-
-@react_agent.tool
-async def read_section(
-    ctx: RunContext[ReActDeps], section_names: list[str] | str | None = None
+@react_iteration_agent.system_prompt
+async def react_iteration_system_prompt(
+    ctx: RunContext[ReActIterationDeps],
 ) -> str:
-    """Read one or more document sections and update progress state.
+    """Generate system prompt for a single ReAct iteration.
 
-    section_names is expected as a list, but stringified JSON lists are
-    accepted for model compatibility.
+    This iteration performs EXACTLY ONE read_section call and ONE add_memory call,
+    then returns thoughts and whether to continue.
     """
     deps = ctx.deps
-    state = _get_state(ctx)
+    iteration_input = deps.iteration_input
+    remaining_loops = max(deps.max_loops - deps.current_loop, 0)
+    is_final_iteration = deps.current_loop >= deps.max_loops
 
-    if state.loop_count >= deps.max_loops:
-        return "READ_LIMIT_REACHED: You have reached max read attempts. Finish using existing evidence and return final report."
+    # Format previous context
+    previous_context = f"Previous thoughts: {iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
+    processed_sections = f"Already processed: {', '.join(iteration_input.processed_sections)}" if iteration_input.processed_sections else ""
 
-    available_sections = deps.document.get_section_names()
-    unprocessed_sections = [
-        s for s in available_sections if s not in state.processed_sections
-    ]
-    normalized_section_names = normalize_section_names(section_names)
-    requested_sections = (
-        normalized_section_names or state.current_sections or unprocessed_sections[:1]
+    unprocessed = [s for s in iteration_input.available_sections if s not in iteration_input.processed_sections]
+    unprocessed_str = f"Unprocessed sections available: {', '.join(unprocessed)}" if unprocessed else "All sections processed"
+
+    return (
+        f"Task: {deps.task}\n\n"
+        f"=== ITERATION CONTEXT ===\n"
+        f"Current loop: {deps.current_loop}/{deps.max_loops}\n"
+        f"Remaining loops after this one: {remaining_loops}\n"
+        f"Final iteration now: {'YES' if is_final_iteration else 'NO'}\n\n"
+        f"=== SINGLE-ITERATION MODE ===\n"
+        f"This iteration MUST:\n"
+        f"1. Call read_section() EXACTLY ONCE with one or more unprocessed sections\n"
+        f"2. Call add_memory() EXACTLY ONCE with discovered findings from the read section(s)\n"
+        f"3. Immediately return structured output; do not call any more tools\n"
+        f"After returning, external loop will decide if more iterations are needed.\n\n"
+        f"{processed_sections}\n"
+        f"{unprocessed_str}\n\n"
+        f"{previous_context}\n\n"
+        f"=== AVAILABLE TOOLS (per iteration) ===\n"
+        f"1. read_section(section_names): Read unprocessed sections. Call EXACTLY ONCE per iteration.\n"
+        f"   - section_names: list of section names or comma-separated string\n"
+        f"2. add_memory(memory): Extract and store only NEW findings from just-read content. Call EXACTLY ONCE per iteration.\n"
+        f"   - memory: Key points extracted from newly read sections\n"
+        f"3. get_all_memory(): Call this ONLY on the final iteration before structuring the complete final report.\n"
+        f"   - Returns the complete accumulated memory from all previous iterations\n"
+        f"   - Use this to synthesize findings into final structured output\n\n"
+        f"After calling one read + one add_memory (and optionally get_all_memory at end), return ReActIterationOutput with:\n"
+        f"- thoughts: Your reasoning about what you read and what to do next\n"
+        f"- should_continue: True if more iterations needed, False if analysis complete\n"
+        f"- report: Final report text. Usually keep empty in normal iterations; populate when should_continue is False.\n"
+        + (
+            "\nFINAL-ITERATION REQUIREMENT:\n"
+            "- This is the final allowed loop. You MUST set should_continue=False.\n"
+            "- Call get_all_memory() if needed and provide a non-empty final report in report.\n"
+            if is_final_iteration
+            else ""
+        )
     )
+
+
+@react_iteration_agent.tool
+async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[str] | str | None = None) -> str:
+    """Read one or more unprocessed sections. Call EXACTLY ONCE per iteration.
+
+    Args:
+        section_names: Section names to read (list or comma-separated string).
+                      If None, reads the first unprocessed section.
+    """
+    deps = ctx.deps
+    iteration_state = _get_iteration_state(ctx)
+    iteration_input = deps.iteration_input
+
+    # Enforce single-call rule
+    if iteration_state.read_section_called:
+        return "ERROR: read_section already called in this iteration. Cannot call it again."
+
+    iteration_state.read_section_called = True
+
+    available_sections = iteration_input.available_sections
+    processed = iteration_input.processed_sections
+    unprocessed = [s for s in available_sections if s not in processed]
+
+    if not unprocessed:
+        return "INFO: All sections already processed. No content to read."
+
+    # Normalize and resolve requested section names
+    normalized_section_names = normalize_section_names(section_names)
+    requested_sections = normalized_section_names or [unprocessed[0]]
 
     resolved_sections: list[str] = []
     for section in requested_sections:
@@ -355,180 +371,293 @@ async def read_section(
         if matched and matched not in resolved_sections:
             resolved_sections.append(matched)
 
-    next_sections = [s for s in resolved_sections if s not in state.processed_sections]
+    # Filter to only unprocessed sections
+    next_sections = [s for s in resolved_sections if s not in processed]
     if not next_sections:
-        remaining = [s for s in available_sections if s not in state.processed_sections]
-        return (
-            "NO_NEW_SECTIONS: Requested sections are already processed or not found. "
-            f"Remaining unprocessed sections: {remaining if remaining else 'None'}."
-        )
+        return f"INFO: Requested sections {resolved_sections} are already processed. Unprocessed available: {unprocessed}"
 
-    state.loop_count += 1
-    state.current_sections = next_sections
-
+    # Fetch content
     section_content = get_section_content(deps.document, next_sections)
     if not section_content.strip():
-        return "SECTION_CONTENT_EMPTY: No content found for selected sections. Select different sections."
+        return f"WARNING: No content found for sections {next_sections}. Try different sections."
 
-    for section in next_sections:
-        if section not in state.processed_sections:
-            state.processed_sections.append(section)
-
-    remaining = [s for s in available_sections if s not in state.processed_sections]
+    iteration_state.sections_read = next_sections
+    iteration_state.section_content = section_content
 
     if deps.show_progress:
-        print(f"\n--- Loop {state.loop_count}/{deps.max_loops} ---")
-        print(f"Sections selected: {', '.join(next_sections)}")
-        print(f"Remaining sections: {len(remaining)} sections")
-        print("-" * 50)
+        print(f"\n[Iteration] Read sections: {', '.join(next_sections)}")
 
     return (
-        f"READ_RESULT\n"
-        f"Loop: {state.loop_count}/{deps.max_loops}\n"
-        f"Read sections: {', '.join(next_sections)}\n"
-        f"Remaining sections: {', '.join(remaining) if remaining else 'None'}\n\n"
-        f"{section_content}\n\n"
-        "NEXT_ACTION_REQUIRED: Call update_report with only the newly written report fragment before reading more sections."
+        f"SECTION_CONTENT (read from: {', '.join(next_sections)}):\n\n{section_content}\n\nNow call add_memory() with extracted findings."
     )
 
 
-@react_agent.tool
-async def update_report(ctx: RunContext[ReActDeps], report_fragment: str) -> str:
-    """Append a newly written report fragment to the cumulative report."""
+@react_iteration_agent.tool
+async def add_memory(ctx: RunContext[ReActIterationDeps], memory: str) -> str:
+    """Record discovered memory from the current read. Call EXACTLY ONCE per iteration.
+
+    Args:
+        memory: Extracted findings and key information from newly read sections.
+    """
     deps = ctx.deps
-    state = _get_state(ctx)
+    iteration_state = _get_iteration_state(ctx)
 
-    fragment = report_fragment.strip()
+    # Enforce single-call rule
+    if iteration_state.add_memory_called:
+        return "ERROR: add_memory already called in this iteration. Cannot call it again."
+
+    iteration_state.add_memory_called = True
+
+    fragment = memory.strip()
     if not fragment:
-        return "REPORT_NOT_UPDATED: Empty report provided."
+        return "WARNING: Empty memory text. Include extracted findings."
 
-    if state.current_report.strip():
-        state.current_report = f"{state.current_report}\n\n{fragment}"
-    else:
-        state.current_report = fragment
+    iteration_state.memory_text = fragment
 
     if deps.show_progress:
-        print(
-            f"Report fragment appended: +{len(fragment)} chars, total {len(state.current_report)} chars"
-        )
+        print(f"[Iteration] Memory recorded: {len(fragment)} chars")
+
+    return f"MEMORY_RECORDED: {len(fragment)} characters of findings captured."
+
+
+@react_iteration_agent.tool
+async def get_all_memory(ctx: RunContext[ReActIterationDeps]) -> str:
+    """Read the complete accumulated memory from all previous iterations.
+
+    Use this ONLY on the final iteration when preparing the complete structured analysis.
+    Returns the full synthesized memory built up across all iterations.
+    """
+    deps = ctx.deps
+
+    if not deps.accumulated_memory.strip():
+        return "INFO: No accumulated memory yet from previous iterations."
 
     return (
-        f"REPORT_APPENDED: +{len(fragment)} chars, total {len(state.current_report)} chars, "
-        f"{len(state.processed_sections)} sections covered."
+        f"FULL_ACCUMULATED_MEMORY:\n\n"
+        f"{deps.accumulated_memory}\n\n"
+        f"Use this complete memory to guide final reasoning and final report generation."
     )
 
 
 class ReActAgent:
-    """ReAct agent for intelligent document analysis with iterative section exploration.
+    """ReAct agent for intelligent document analysis with single-iteration loops.
 
-    This agent implements the Reasoning and Acting pattern to analyze documents
-    by iteratively reading sections, making decisions about what to read next,
-    and building a comprehensive report using native message history.
+    This agent performs one read + one memory update per iteration, enabling
+    controlled iterative analysis with reduced context accumulation.
     """
 
-    def __init__(self, model: str = "deepseek-chat", max_loops: int = 8):
+    def __init__(self, model: str = "deepseek-chat"):
         """Initialize the ReAct agent.
 
         Args:
             model: Model identifier for the LLM provider
-            max_loops: Maximum number of analysis iterations
         """
         self.logger = get_logger(__name__)
-        self.max_loops = max_loops
         self.model = get_model(model)
         self.model_identifier = model
-        self.agent = react_agent
+        self.agent = react_iteration_agent
 
-        self.logger.info(
-            f"Initialized ReActAgent with model: {model} (max_loops={max_loops})"
+        self.logger.info(f"Initialized ReActAgent with model: {model}")
+
+    async def analyze_one_iteration(
+        self,
+        document: Document,
+        iteration_input: ReActIterationInput,
+        current_loop: int = 1,
+        max_loops: int = 8,
+        accumulated_memory: str = "",
+        show_progress: bool = True,
+    ) -> tuple[ReActIterationOutput, ReActIterationState]:
+        """Perform a single ReAct iteration: read once, add memory once, return thoughts.
+
+        Args:
+            document: The document to analyze
+            iteration_input: Input state from previous iteration(s)
+            current_loop: Current iteration number (1-based)
+            max_loops: Maximum number of iterations allowed
+            accumulated_memory: Complete accumulated memory from all previous iterations
+            show_progress: Whether to print debug progress
+
+        Returns:
+            Tuple of iteration output and internal iteration state
+        """
+        self.logger.debug("Starting single ReAct iteration")
+
+        deps = ReActIterationDeps(
+            document=document,
+            task=iteration_input.task,
+            iteration_input=iteration_input,
+            current_loop=current_loop,
+            max_loops=max_loops,
+            accumulated_memory=accumulated_memory,
+            show_progress=show_progress,
         )
+        iteration_state = ReActIterationState()
+
+        try:
+            self.logger.debug("Running single-iteration agent")
+            result = await self.agent.run(
+                (
+                    "You are analyzing one section this iteration and must return valid ReActIterationOutput. "
+                    "Step 1: Call read_section() with unprocessed sections. "
+                    "Step 2: Call add_memory() with what you discovered. "
+                    "Step 3: Stop tool use and return ReActIterationOutput with thoughts, should_continue, and optional final report."
+                ),
+                deps=deps,
+                model=self.model,
+                metadata={"iteration_state": iteration_state},
+            )
+
+            output = result.output if isinstance(result.output, ReActIterationOutput) else None
+        except Exception as e:
+            self.logger.error(f"Iteration failed: {e}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            output = None
+
+        # If agent fails to produce valid output, construct fallback
+        if output is None:
+            output = ReActIterationOutput(
+                thoughts="Iteration failed: could not complete analysis.",
+                should_continue=True,
+            )
+
+        # Ensure convergence at hard loop limit even if model still asks to continue.
+        if current_loop >= max_loops and output.should_continue:
+            self.logger.info("Final loop reached with should_continue=True; forcing should_continue=False")
+            output.should_continue = False
+            if not output.report.strip() and accumulated_memory.strip():
+                output.report = accumulated_memory.strip()
+
+        return output, iteration_state
 
     async def analyze_document(
-        self, document: Document, task: str, show_progress: bool = True
-    ) -> AnalysisReport:
-        """Main analysis method using a single native tool-calling run.
+        self,
+        document: Document,
+        task: str,
+        max_loops: int = 8,
+        show_progress: bool = True,
+    ) -> ReActIterationOutput:
+        """Main analysis method: iterate up to max_loops times, accumulating memory.
 
         Args:
             document: Processed document with natural markdown sections
             task: Analysis task or question about the document
-            show_progress: Whether to print reasoning at each step
+            max_loops: Maximum number of iterations to perform
+            show_progress: Whether to print progress information
 
         Returns:
-            Structured analysis report
+            Final ReAct iteration output with should_continue=False and final report populated
         """
-        self.logger.debug(f"Starting ReAct analysis for task: {task[:100]}...")
+        self.logger.debug(f"Starting ReAct multi-iteration analysis (max_loops={max_loops})")
 
-        deps = ReActDeps(
-            document=document,
+        available_sections = document.get_section_names()
+        processed_sections: list[str] = []
+        accumulated_memory = ""
+        current_thoughts = ""
+
+        # Initialize with first iteration input
+        iteration_input = ReActIterationInput(
             task=task,
-            max_loops=self.max_loops,
-            show_progress=show_progress,
-        )
-        state = ReActState(current_sections=get_initial_sections(document))
-
-        try:
-            self.logger.debug("Running ReAct agent in a single tool-calling session")
-            result = await self.agent.run(
-                "Start analysis. Use tools to read sections, append a report fragment after each read, then return the final consolidated report.",
-                deps=deps,
-                model=self.model,
-                metadata={"react_state": state},
-            )
-            report = (
-                result.output if isinstance(result.output, AnalysisReport) else None
-            )
-        except Exception as e:
-            self.logger.error(f"Agent execution failed: {e}")
-            self.logger.error(f"Exception type: {type(e)}")
-            self.logger.error(f"Full traceback: {traceback.format_exc()}")
-            report = None
-
-        if report is None:
-            report = AnalysisReport(
-                summary="",
-                research_questions=[],
-                methodology="",
-                key_findings=[],
-                contributions=[],
-                limitations=None,
-                sections_covered=list(state.processed_sections),
-                final_report=state.current_report,
-            )
-        elif not report.final_report.strip() and state.current_report.strip():
-            report.final_report = state.current_report
-            if not report.sections_covered:
-                report.sections_covered = list(state.processed_sections)
-
-        self.logger.info(
-            f"ReAct analysis completed after {state.loop_count} read loops"
+            previous_thoughts="",
+            processed_sections=[],
+            available_sections=available_sections,
         )
 
-        # Log and print the final report
-        if report.final_report:
-            self.logger.info(f"Report length: {len(report.final_report)} characters")
+        # Run iterations
+        for loop_num in range(1, max_loops + 1):
+            self.logger.info(f"Starting iteration {loop_num}/{max_loops}")
+            if show_progress:
+                print(f"\n{'=' * 60}")
+                print(f"Iteration {loop_num}/{max_loops}")
+                print(f"{'=' * 60}")
 
-            # Print the final report to console
-            print("\n" + "=" * 80)
+            # Run one iteration
+            iteration_output, iteration_state = await self.analyze_one_iteration(
+                document=document,
+                iteration_input=iteration_input,
+                current_loop=loop_num,
+                max_loops=max_loops,
+                accumulated_memory=accumulated_memory,
+                show_progress=show_progress,
+            )
+
+            # Update tracking
+            for section in iteration_state.sections_read:
+                if section not in processed_sections:
+                    processed_sections.append(section)
+
+            if iteration_state.memory_text:
+                accumulated_memory = (
+                    f"{accumulated_memory}\n\n{iteration_state.memory_text}" if accumulated_memory else iteration_state.memory_text
+                )
+            current_thoughts = iteration_output.thoughts
+
+            remaining_sections = [section for section in available_sections if section not in processed_sections]
+
+            if show_progress:
+                print(f"[Thoughts] {iteration_output.thoughts}...")
+
+            # Prepare next iteration input
+            iteration_input = ReActIterationInput(
+                task=task,
+                previous_thoughts=current_thoughts,
+                processed_sections=processed_sections,
+                available_sections=available_sections,
+            )
+
+            # Check stopping conditions
+            if not iteration_output.should_continue:
+                self.logger.info(f"Agent decided to stop after iteration {loop_num}")
+                if show_progress:
+                    print("Agent completed analysis")
+                break
+
+            if not remaining_sections:
+                self.logger.info(f"All sections processed after iteration {loop_num}")
+                if show_progress:
+                    print("All available sections have been read")
+                break
+
+        self.logger.info(f"Multi-iteration analysis completed after {loop_num} iterations")
+
+        final_thoughts = current_thoughts or "Analysis complete."
+        final_report = accumulated_memory.strip()
+        if not final_report:
+            final_report = "No memory content was generated during analysis."
+
+        final_output = ReActIterationOutput(
+            thoughts=final_thoughts,
+            should_continue=False,
+            report=final_report,
+        )
+
+        if show_progress:
+            print(f"\n{'=' * 80}")
             print("FINAL ANALYSIS REPORT")
-            print("=" * 80)
-            print(report.final_report)
-            print("=" * 80)
-        else:
-            self.logger.warning("No final report generated")
-            print("\nWarning: No analysis report was generated")
+            print(f"{'=' * 80}")
+            if final_output.report:
+                print(final_output.report)
+            print(f"{'=' * 80}\n")
 
-        return report
+        return final_output
 
     def analyze_document_sync(
-        self, document: Document, task: str, show_progress: bool = True
-    ) -> AnalysisReport:
+        self,
+        document: Document,
+        task: str,
+        max_loops: int = 8,
+        show_progress: bool = True,
+    ) -> ReActIterationOutput:
         """Synchronous wrapper for top-level sync callers such as the CLI."""
         return asyncio.run(
             self.analyze_document(
-                document=document, task=task, show_progress=show_progress
+                document=document,
+                task=task,
+                max_loops=max_loops,
+                show_progress=show_progress,
             )
         )
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""
-        return f"ReActAgent(model={self.model_identifier}, max_loops={self.max_loops})"
+        return f"ReActAgent(model={self.model_identifier})"

@@ -71,7 +71,7 @@ from .models.coordinate_models import MetadataExtractionResult
 from .models.coordinate_models import MethodologyResult
 from .models.coordinate_models import PreviousMethodsResult
 from .models.coordinate_models import ResearchQuestionsResult
-from .models.react_models import AnalysisReport
+from .models.react_models import ReActIterationOutput
 
 # SimpleAgent models - now imported from models folder
 from .models.simple_models import SimpleAnalysisResult
@@ -90,7 +90,6 @@ __all__ = [
     "AgentInsight",
     "AgentPersonality",
     "AnalysisPlan",
-    "AnalysisReport",
     "ComprehensiveAnalysisResult",
     "ConsensusBuilder",
     "ConsensusPoint",
@@ -107,6 +106,7 @@ __all__ = [
     "PreviousMethodsResult",
     "Question",
     "ReActAgent",
+    "ReActIterationOutput",
     "ResearchQuestionsResult",
     "Response",
     "SimpleAgent",

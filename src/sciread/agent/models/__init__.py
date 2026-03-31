@@ -12,18 +12,18 @@ from .coordinate_models import MetadataExtractionResult
 from .coordinate_models import MethodologyResult
 from .coordinate_models import PreviousMethodsResult
 from .coordinate_models import ResearchQuestionsResult
-from .react_models import AnalysisReport
+from .react_models import ReActIterationOutput
 from .simple_models import SimpleAnalysisResult
 
 __all__ = [
     "AnalysisPlan",
-    "AnalysisReport",
     "ComprehensiveAnalysisResult",
     "ExperimentResult",
     "FutureDirectionsResult",
     "MetadataExtractionResult",
     "MethodologyResult",
     "PreviousMethodsResult",
+    "ReActIterationOutput",
     "ResearchQuestionsResult",
     "SimpleAnalysisResult",
 ]

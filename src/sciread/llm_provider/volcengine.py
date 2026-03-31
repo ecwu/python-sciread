@@ -40,23 +40,16 @@ class VolcengineProvider:
         """
         if model_name not in cls.SUPPORTED_MODELS:
             supported = ", ".join(cls.SUPPORTED_MODELS.keys())
-            raise ValueError(
-                f"Unsupported Volcengine model: {model_name}. Supported models: {supported}"
-            )
+            raise ValueError(f"Unsupported Volcengine model: {model_name}. Supported models: {supported}")
 
         config = get_config()
         provider_config = config.get_provider_config("volcengine")
 
         api_key = provider_config.api_key or os.getenv("VOLCES_API")
         if not api_key:
-            raise ValueError(
-                "No API key found for provider 'volcengine'. Set VOLCES_API environment variable or configure in config file."
-            )
+            raise ValueError("No API key found for provider 'volcengine'. Set VOLCES_API environment variable or configure in config file.")
 
-        base_url = (
-            provider_config.base_url
-            or "https://ark.cn-beijing.volces.com/api/coding/v3"
-        )
+        base_url = provider_config.base_url or "https://ark.cn-beijing.volces.com/api/coding/v3"
 
         provider = PydanticOpenAIProvider(api_key=api_key, base_url=base_url)
         return OpenAIChatModel(model_name=model_name, provider=provider, **kwargs)

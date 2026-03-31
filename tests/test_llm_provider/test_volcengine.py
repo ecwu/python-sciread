@@ -14,20 +14,12 @@ class TestVolcengineProvider:
     @patch("sciread.llm_provider.volcengine.get_config")
     def test_create_model_success(self, mock_config):
         """Test successful model creation."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://ark.cn-beijing.volces.com/api/coding/v3"
-        )
-        mock_config.return_value.get_provider_config.return_value.api_key = (
-            "test-api-key"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
+        mock_config.return_value.get_provider_config.return_value.api_key = "test-api-key"
 
         with (
-            patch(
-                "sciread.llm_provider.volcengine.OpenAIChatModel"
-            ) as mock_model_class,
-            patch(
-                "sciread.llm_provider.volcengine.PydanticOpenAIProvider"
-            ) as mock_provider,
+            patch("sciread.llm_provider.volcengine.OpenAIChatModel") as mock_model_class,
+            patch("sciread.llm_provider.volcengine.PydanticOpenAIProvider") as mock_provider,
         ):
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
@@ -40,28 +32,18 @@ class TestVolcengineProvider:
                 api_key="test-api-key",
                 base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
             )
-            mock_model_class.assert_called_once_with(
-                model_name="glm-4.7", provider=mock_provider_instance
-            )
+            mock_model_class.assert_called_once_with(model_name="glm-4.7", provider=mock_provider_instance)
             assert result == mock_model
 
     @patch("sciread.llm_provider.volcengine.get_config")
     def test_create_model_with_custom_base_url(self, mock_config):
         """Test model creation with custom base URL."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://custom.volcengine.com/v1"
-        )
-        mock_config.return_value.get_provider_config.return_value.api_key = (
-            "test-api-key"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://custom.volcengine.com/v1"
+        mock_config.return_value.get_provider_config.return_value.api_key = "test-api-key"
 
         with (
-            patch(
-                "sciread.llm_provider.volcengine.OpenAIChatModel"
-            ) as mock_model_class,
-            patch(
-                "sciread.llm_provider.volcengine.PydanticOpenAIProvider"
-            ) as mock_provider,
+            patch("sciread.llm_provider.volcengine.OpenAIChatModel") as mock_model_class,
+            patch("sciread.llm_provider.volcengine.PydanticOpenAIProvider") as mock_provider,
         ):
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model
@@ -69,9 +51,7 @@ class TestVolcengineProvider:
 
             VolcengineProvider.create_model("doubao-seed-2.0-code", temperature=0.7)
 
-            mock_provider.assert_called_once_with(
-                api_key="test-api-key", base_url="https://custom.volcengine.com/v1"
-            )
+            mock_provider.assert_called_once_with(api_key="test-api-key", base_url="https://custom.volcengine.com/v1")
             mock_model_class.assert_called_once_with(
                 model_name="doubao-seed-2.0-code",
                 provider=mock_provider.return_value,
@@ -86,9 +66,7 @@ class TestVolcengineProvider:
     @patch("sciread.llm_provider.volcengine.get_config")
     def test_create_model_missing_api_key(self, mock_config):
         """Test creating model when API key is missing."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://ark.cn-beijing.volces.com/api/coding/v3"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
         mock_config.return_value.get_provider_config.return_value.api_key = None
 
         with patch.dict("os.environ", {}, clear=True):
@@ -98,19 +76,13 @@ class TestVolcengineProvider:
     @patch("sciread.llm_provider.volcengine.get_config")
     def test_create_model_api_key_from_env(self, mock_config):
         """Test reading API key from VOLCES_API when config key is empty."""
-        mock_config.return_value.get_provider_config.return_value.base_url = (
-            "https://ark.cn-beijing.volces.com/api/coding/v3"
-        )
+        mock_config.return_value.get_provider_config.return_value.base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
         mock_config.return_value.get_provider_config.return_value.api_key = None
 
         with (
             patch.dict("os.environ", {"VOLCES_API": "env-api-key"}),
-            patch(
-                "sciread.llm_provider.volcengine.OpenAIChatModel"
-            ) as mock_model_class,
-            patch(
-                "sciread.llm_provider.volcengine.PydanticOpenAIProvider"
-            ) as mock_provider,
+            patch("sciread.llm_provider.volcengine.OpenAIChatModel") as mock_model_class,
+            patch("sciread.llm_provider.volcengine.PydanticOpenAIProvider") as mock_provider,
         ):
             mock_model = MagicMock()
             mock_model_class.return_value = mock_model

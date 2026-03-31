@@ -4,34 +4,27 @@ from pydantic import BaseModel
 from pydantic import Field
 
 
-class AnalysisReport(BaseModel):
-    """Structured final output for ReAct-based document analysis."""
+class ReActIterationInput(BaseModel):
+    """Input to a single ReAct analysis iteration (one loop)."""
 
-    summary: str = Field(
-        default="", description="High-level summary of the paper and its main purpose"
-    )
-    research_questions: list[str] = Field(
-        default_factory=list, description="Primary research questions or objectives"
-    )
-    methodology: str = Field(
-        default="", description="Summary of the methodology and technical approach"
-    )
-    key_findings: list[str] = Field(
+    task: str = Field(description="The overall analysis task or question")
+    previous_thoughts: str = Field(default="", description="Thoughts from the previous iteration to guide this one")
+    processed_sections: list[str] = Field(
         default_factory=list,
-        description="Main findings and empirical or theoretical results",
+        description="Section names already read in previous iterations",
     )
-    contributions: list[str] = Field(
-        default_factory=list,
-        description="Main contributions and significance of the work",
+    available_sections: list[str] = Field(description="All available section names in the document")
+
+
+class ReActIterationOutput(BaseModel):
+    """Output of a single ReAct analysis iteration (one tool call + thoughts)."""
+
+    thoughts: str = Field(description="Agent's reasoning, observations, and decisions for the next action")
+    should_continue: bool = Field(
+        default=True,
+        description="Whether analysis should continue to the next iteration",
     )
-    limitations: str | None = Field(
-        default=None, description="Key limitations, caveats, or unresolved issues"
-    )
-    sections_covered: list[str] = Field(
-        default_factory=list,
-        description="Document sections incorporated into the analysis",
-    )
-    final_report: str = Field(
+    report: str = Field(
         default="",
-        description="Complete human-readable report synthesizing all known information",
+        description="Final report text. Usually empty in normal iterations; populated when finishing analysis.",
     )

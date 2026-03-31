@@ -81,9 +81,7 @@ class ModelFactory:
         """
         if provider_name not in cls.PROVIDERS:
             supported = ", ".join(cls.PROVIDERS.keys())
-            raise UnsupportedModelError(
-                f"Unsupported provider: {provider_name}. Supported providers: {supported}"
-            )
+            raise UnsupportedModelError(f"Unsupported provider: {provider_name}. Supported providers: {supported}")
         return cls.PROVIDERS[provider_name]
 
     @classmethod
