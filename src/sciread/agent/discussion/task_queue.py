@@ -43,7 +43,6 @@ class TaskQueueManager:
             max_concurrent_tasks=self.max_concurrent_tasks,
         )
         self.queues[name] = queue
-        logger.info(f"Created task queue '{name}'")
         return queue
 
     def get_queue(self, name: str) -> TaskQueue | None:
@@ -199,7 +198,6 @@ class TaskQueueManager:
 
         self.is_running = True
         self._background_task = asyncio.create_task(self._processing_loop())
-        logger.info("Started task queue processing loop")
 
     async def stop_processing(self) -> None:
         """Stop the background task processing loop."""
@@ -218,7 +216,6 @@ class TaskQueueManager:
 
     async def _processing_loop(self) -> None:
         """Main background processing loop."""
-        logger.info("Task processing loop started")
 
         while self.is_running:
             try:

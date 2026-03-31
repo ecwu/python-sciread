@@ -20,6 +20,8 @@ import asyncio
 import sys
 
 import logfire
+from rich.console import Console
+from rich.markdown import Markdown
 
 from .core import comprehensive_analysis
 from .core import discussion_analysis
@@ -29,6 +31,7 @@ from .logging_config import logger
 
 logfire.configure()
 logfire.instrument_pydantic_ai()
+console = Console()
 
 
 def run(argv=sys.argv):
@@ -209,82 +212,81 @@ MODELS:
         try:
             result = asyncio.run(discussion_analysis(args.document_file, args.model))
 
-            print("=" * 80)
-            print("DISCUSSION-BASED ANALYSIS RESULT:")
-            print("=" * 80)
-            print(f"Document: {result.document_title}")
-            print(f"Overall Confidence: {result.confidence_score:.2f}")
-            print(f"Total Insights: {len(result.final_insights)}")
-            print(f"Consensus Points: {len(result.consensus_points)}")
-            print(f"Divergent Views: {len(result.divergent_views)}")
+            markdown_lines = [
+                "# Discussion-Based Analysis Result",
+                "",
+                "## Overview",
+                f"- **Document:** {result.document_title}",
+                f"- **Overall Confidence:** {result.confidence_score:.2f}",
+                f"- **Total Insights:** {len(result.final_insights)}",
+                f"- **Consensus Points:** {len(result.consensus_points)}",
+                f"- **Divergent Views:** {len(result.divergent_views)}",
+            ]
 
             if result.discussion_metadata:
-                print("\nDiscussion Metadata:")
+                markdown_lines.extend(["", "## Discussion Metadata"])
                 for key, value in result.discussion_metadata.items():
                     if key != "error":
-                        print(f"  {key.replace('_', ' ').title()}: {value}")
+                        markdown_lines.append(f"- **{key.replace('_', ' ').title()}:** {value}")
 
-            print()
-            print("ANALYSIS SUMMARY:")
-            print(result.summary)
+            markdown_lines.extend(["", "## Analysis Summary", result.summary])
 
             if result.key_contributions:
-                print()
-                print("KEY CONTRIBUTIONS:")
-                for i, contribution in enumerate(result.key_contributions, 1):
-                    print(f"  {i}. {contribution}")
+                markdown_lines.extend(["", "## Key Contributions"])
+                for contribution in result.key_contributions:
+                    markdown_lines.append(f"- {contribution}")
 
             if result.significance:
-                print()
-                print("SIGNIFICANCE ASSESSMENT:")
-                print(result.significance)
+                markdown_lines.extend(["", "## Significance Assessment", result.significance])
 
             if result.final_insights:
-                print()
-                print("FINAL INSIGHTS FROM DISCUSSION:")
+                markdown_lines.extend(["", "## Final Insights From Discussion"])
                 for i, insight in enumerate(result.final_insights, 1):
-                    print(
-                        f"  {i}. From {insight.agent_id} (Confidence: {insight.confidence:.2f}, Importance: {insight.importance_score:.2f})"
+                    markdown_lines.extend(
+                        [
+                            "",
+                            f"### {i}. From {insight.agent_id}",
+                            f"- **Confidence:** {insight.confidence:.2f}",
+                            f"- **Importance:** {insight.importance_score:.2f}",
+                            "",
+                            insight.content,
+                        ]
                     )
-                    # Print full content with proper indentation for multi-line text
-                    content_lines = insight.content.split("\n")
-                    for line in content_lines:
-                        print(f"     {line}")
                     if insight.supporting_evidence:
-                        print("     Supporting Evidence:")
+                        markdown_lines.append("\n**Supporting Evidence:**")
                         for evidence in insight.supporting_evidence:
-                            print(f"       - {evidence}")
+                            markdown_lines.append(f"- {evidence}")
                     if insight.related_sections:
-                        print(f"     Related Sections: {', '.join(insight.related_sections)}")
-                    if i < len(result.final_insights):
-                        print()
+                        markdown_lines.append(f"\n**Related Sections:** {', '.join(insight.related_sections)}")
 
             if result.consensus_points:
-                print()
-                print("CONSENSUS POINTS:")
+                markdown_lines.extend(["", "## Consensus Points"])
                 for i, point in enumerate(result.consensus_points, 1):
-                    print(f"  {i}. {point.topic} (Strength: {point.strength:.2f})")
-                    # Print full content with proper indentation for multi-line text
-                    content_lines = point.content.split("\n")
-                    for line in content_lines:
-                        print(f"     {line}")
-                    print(f"     Supporting agents: {point.supporting_agents}")
-                    if i < len(result.consensus_points):
-                        print()
+                    markdown_lines.extend(
+                        [
+                            "",
+                            f"### {i}. {point.topic}",
+                            f"- **Strength:** {point.strength:.2f}",
+                            f"- **Supporting Agents:** {point.supporting_agents}",
+                            "",
+                            point.content,
+                        ]
+                    )
 
             if result.divergent_views:
-                print()
-                print("DIVERGENT VIEWS:")
+                markdown_lines.extend(["", "## Divergent Views"])
                 for i, view in enumerate(result.divergent_views, 1):
-                    print(f"  {i}. {view.topic} (Held by: {view.holding_agent})")
-                    # Print full content with proper indentation for multi-line text
-                    content_lines = view.content.split("\n")
-                    for line in content_lines:
-                        print(f"     {line}")
-                    if i < len(result.divergent_views):
-                        print()
+                    markdown_lines.extend(
+                        [
+                            "",
+                            f"### {i}. {view.topic}",
+                            f"- **Held By:** {view.holding_agent}",
+                            "",
+                            view.content,
+                        ]
+                    )
 
-            print("=" * 80)
+            console.print(Markdown("\n".join(markdown_lines)))
             return 0
         except Exception as e:
             logger.error(f"Discussion analysis failed: {e}")

@@ -6,6 +6,9 @@ from datetime import datetime
 from datetime import timedelta
 
 from pydantic_ai import Agent
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.table import Table
 
 from ...document import Document
 from ...llm_provider import get_model
@@ -22,6 +25,7 @@ from .task_models import TaskType
 from .task_queue import TaskQueueManager
 
 logger = get_logger(__name__)
+console = Console()
 
 
 class DiscussionAgent:
@@ -75,7 +79,6 @@ class DiscussionAgent:
 
     async def analyze_document(self, document: Document) -> DiscussionResult:
         """Main entry point for document analysis."""
-        logger.info(f"Starting multi-agent discussion analysis for document: {document.metadata.title or 'Untitled'}")
 
         try:
             # Initialize discussion
@@ -127,8 +130,6 @@ class DiscussionAgent:
         self.all_responses = []
         self.question_id_gen = QuestionIdGenerator()
 
-        logger.info("Discussion initialized")
-
     async def _run_discussion_phases(self, document: Document):
         """Run through all discussion phases."""
         while not self._should_terminate_discussion():
@@ -163,7 +164,6 @@ class DiscussionAgent:
 
     async def _run_initial_analysis_phase(self, document: Document):
         """Run initial analysis phase where all agents generate insights."""
-        logger.info("Starting initial analysis phase")
 
         # Create insight generation tasks for all agents
         tasks = []
@@ -197,11 +197,8 @@ class DiscussionAgent:
         self.discussion_state.current_phase = DiscussionPhase.QUESTIONING
         self.discussion_state.iteration_count += 1
 
-        logger.info(f"Initial analysis phase completed. Total insights: {sum(len(insights) for insights in self.agent_insights.values())}")
-
     async def _run_questioning_phase(self):
         """Run questioning phase (batch mode)."""
-        logger.info("Starting questioning phase (batch)")
 
         question_tasks = []
 
@@ -250,11 +247,8 @@ class DiscussionAgent:
         else:
             self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
-        logger.info(f"Questioning phase completed. Questions generated: {len(self.all_questions)}")
-
     async def _run_responding_phase(self):
         """Run responding phase (batch mode)."""
-        logger.info("Starting responding phase (batch)")
 
         response_tasks = []
 
@@ -301,11 +295,8 @@ class DiscussionAgent:
         # Update phase
         self.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
 
-        logger.info(f"Responding phase completed. Total responses: {len(self.all_responses)}")
-
     async def _run_convergence_phase(self):
         """Run convergence evaluation phase."""
-        logger.info("Starting convergence phase")
 
         # Evaluate convergence from all agents
         convergence_tasks = []
@@ -352,7 +343,6 @@ class DiscussionAgent:
 
     async def _run_consensus_phase(self, document: Document):
         """Run final consensus building phase."""
-        logger.info("Starting consensus phase")
 
         # Import here to avoid circular imports
         from .consensus import ConsensusBuilder
@@ -505,13 +495,25 @@ class DiscussionAgent:
         return f"  - {insight_id} [importance={importance:.2f}, confidence={confidence:.2f}] {content}"
 
     def _log_insight_batch(self, personality: AgentPersonality, insights: list) -> None:
-        """Log a batch of generated insights."""
+        """Render a batch of generated insights as markdown heading + rich table."""
         if not insights:
             return
 
-        print(f"{self._format_agent_name(personality)} insights:")
+        table = Table(title="", show_lines=True)
+        table.add_column("Insight ID", style="cyan", no_wrap=True)
+        table.add_column("Importance", style="magenta", justify="right", no_wrap=True)
+        table.add_column("Confidence", style="green", justify="right", no_wrap=True)
+        table.add_column("Content", style="white")
+
         for insight in insights:
-            print(self._format_insight_log_entry(insight))
+            insight_id = str(getattr(insight, "insight_id", "INS-??"))
+            importance = float(getattr(insight, "importance_score", 0.0))
+            confidence = float(getattr(insight, "confidence", 0.0))
+            content = self._truncate_for_log(getattr(insight, "content", ""), limit=280)
+            table.add_row(insight_id, f"{importance:.2f}", f"{confidence:.2f}", content)
+
+        console.print(Markdown(f"### {self._format_agent_name(personality)} Insights"))
+        console.print(table)
 
     def _format_question_log_entry(self, question) -> str:
         """Format a single question log line."""
@@ -521,14 +523,9 @@ class DiscussionAgent:
         return f"  - {question.question_id} [{question.question_type}, p={question.priority:.2f}] {from_name} -> {to_name}: {content}"
 
     def _log_question_batch(self, personality: AgentPersonality, questions: list) -> None:
-        """Log a batch of generated questions."""
-        if not questions:
-            print(f"{self._format_agent_name(personality)} asked no follow-up questions.")
-            return
-
-        print(f"{self._format_agent_name(personality)} questions:")
-        for question in questions:
-            print(self._format_question_log_entry(question))
+        """Suppress question-only logs to reduce noise in discussion output."""
+        _ = personality
+        _ = questions
 
     def _format_response_log_entry(self, response, question=None) -> str:
         """Format a single response log line."""
@@ -543,15 +540,42 @@ class DiscussionAgent:
         return f"{base} | A: {answer_text}"
 
     def _log_response_batch(self, personality: AgentPersonality, responses: list) -> None:
-        """Log a batch of generated responses."""
+        """Render answered Q&A pairs as markdown heading + rich table."""
         if not responses:
-            print(f"{self._format_agent_name(personality)} had no responses to provide.")
             return
 
         question_map = {question.question_id: question for question in self.all_questions}
-        print(f"{self._format_agent_name(personality)} responses:")
+
+        table = Table(title="", show_lines=True)
+        table.add_column("Meta", style="cyan", max_width=44, overflow="fold")
+        table.add_column("Question", style="yellow", ratio=2, overflow="fold")
+        table.add_column("Answer", style="white", ratio=3, overflow="fold")
+
+        rendered_rows = 0
         for response in responses:
-            print(self._format_response_log_entry(response, question_map.get(response.question_id)))
+            question = question_map.get(response.question_id)
+            if not question:
+                continue
+
+            from_name = self._format_agent_name(response.from_agent)
+            to_name = self._format_agent_name(question.from_agent)
+            question_text = (question.content or "").strip()
+            answer_text = (response.content or "").strip()
+            meta_text = f"{response.question_id}\n{from_name} -> {to_name}\n{response.stance}, c={response.confidence:.2f}"
+
+            table.add_row(
+                meta_text,
+                question_text,
+                answer_text,
+            )
+            rendered_rows += 1
+
+        if rendered_rows == 0:
+            return
+
+        agent_name = self._format_agent_name(personality)
+        console.print(Markdown(f"### {agent_name} Q&A"))
+        console.print(table)
 
     async def _collect_questions_from_tasks(self, task_ids: list[str]):
         """Collect questions and assign short IDs."""
@@ -643,12 +667,10 @@ class DiscussionAgent:
         from .tools import clear_agent_cache
 
         clear_agent_cache()
-        logger.info("DiscussionAgent: Cleared all cached agent instances")
 
     def get_agent_cache_status(self) -> dict:
         """Get current agent cache status for debugging."""
         from .tools import get_agent_cache_status
 
         status = get_agent_cache_status()
-        logger.info(f"DiscussionAgent: Cache status - {status}")
         return status

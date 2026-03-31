@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+
 from .agent import CoordinateAgent
 from .agent import DiscussionAgent
 from .agent import SimpleAgent
@@ -9,6 +13,7 @@ from .document import Document
 from .logging_config import get_logger
 
 logger = get_logger(__name__)
+console = Console()
 
 
 def compute(args):
@@ -82,8 +87,6 @@ Here are some important constraints:
             remove_references=True,
             clean_text=True,
         )
-
-        logger.info("Analysis completed successfully!")
         return result
 
     except Exception as e:
@@ -226,7 +229,6 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
         FileNotFoundError: If the document file is not found
         Exception: If the analysis fails
     """
-    logger.info(f"Starting discussion-based analysis with DiscussionAgent for file: {document_file_path}")
 
     # Check if file exists
     if not Path(document_file_path).exists():
@@ -248,52 +250,45 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     logger.debug(f"Discovered {len(section_names)} sections: {section_names}")
 
     # Display document information to user
-    print("\nDocument Analysis - Discussion Mode")
-    print(f"Document: {doc.metadata.title or 'Untitled'}")
-    print(f"Total Content: {len(doc.text)} characters")
-    print(f"Chunks: {len(doc.chunks)}")
+    console.print()
+    console.print(Panel.fit("Document Analysis - Discussion Mode", border_style="cyan"))
+
+    overview_table = Table(title="Document Overview", show_header=False)
+    overview_table.add_column("Field", style="cyan", no_wrap=True)
+    overview_table.add_column("Value", style="white")
+    overview_table.add_row("Document", doc.metadata.title or "Untitled")
+    overview_table.add_row("Total Content", f"{len(doc.text)} characters")
+    overview_table.add_row("Chunks", str(len(doc.chunks)))
 
     if section_names:
-        print(f"Sections: {len(section_names)} main sections identified")
-        print("Available sections for analysis:")
-        for i, section_name in enumerate(section_names[:10], 1):  # Show first 10
-            print(f"  {i}. {section_name.title()}")
-        if len(section_names) > 10:
-            print(f"  ... and {len(section_names) - 10} more sections")
+        overview_table.add_row("Sections", f"{len(section_names)} main sections identified")
     else:
-        print("Sections: No named sections found - analyzing as continuous text")
-    print()
+        overview_table.add_row("Sections", "No named sections found (continuous text analysis)")
+
+    console.print(overview_table)
+
+    if section_names:
+        sections_table = Table(title="Available Sections for Analysis (Top 10)", show_lines=True)
+        sections_table.add_column("#", style="green", justify="right", no_wrap=True)
+        sections_table.add_column("Section", style="yellow")
+
+        for i, section_name in enumerate(section_names[:10], 1):
+            sections_table.add_row(str(i), section_name.title())
+
+        if len(section_names) > 10:
+            sections_table.caption = f"... and {len(section_names) - 10} more sections"
+
+        console.print(sections_table)
+
+    console.print()
 
     # Check if document was loaded successfully
     if not doc.text.strip():
         raise ValueError("Failed to load document: no text content extracted")
 
-    # Display information about the discussion agents
-    from .agent import AgentPersonality
-
-    print("Discussion Agents:")
-    for personality in AgentPersonality:
-        role_name = personality.value.replace("_", " ").title()
-        print(f"  - {role_name} - Analyzes from their unique perspective")
-    print()
-
     # Run discussion-based analysis
-    logger.info("Starting discussion-based document analysis with multiple personality agents...")
-    logger.info("Agents will engage in discussion, questioning, and consensus-building")
-
     try:
-        print("Starting multi-agent discussion analysis...")
-        print("This may take several minutes as agents collaborate and build consensus...")
-        print()
-
         result = await discussion_agent.analyze_document(doc)
-
-        logger.info("Discussion-based analysis completed successfully!")
-        logger.info(f"Analysis completed with confidence score: {result.confidence_score:.2f}")
-        logger.info(f"Total insights generated: {len(result.final_insights)}")
-        logger.info(f"Consensus points identified: {len(result.consensus_points)}")
-        logger.info(f"Divergent views noted: {len(result.divergent_views)}")
-
         return result
 
     except Exception as e:
