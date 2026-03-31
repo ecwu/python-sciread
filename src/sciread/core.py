@@ -228,7 +228,6 @@ async def run_react_analysis(
             show_progress=show_progress,
         )
 
-        logger.debug("ReAct analysis completed successfully!")
         return result
 
     except Exception as e:

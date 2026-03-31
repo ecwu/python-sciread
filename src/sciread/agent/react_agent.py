@@ -3,6 +3,8 @@
 import asyncio
 import json
 import traceback
+from rich.console import Console
+from rich.markdown import Markdown
 from dataclasses import dataclass
 from dataclasses import field
 from pathlib import Path
@@ -18,6 +20,8 @@ from .models.react_models import ReActIterationInput
 from .models.react_models import ReActIterationOutput
 
 logger = get_logger(__name__)
+
+console = Console()
 
 
 @dataclass
@@ -179,6 +183,8 @@ async def analyze_document_with_react(
     agent = ReActAgent(model=model)
     result = await agent.analyze_document(document, task, max_loops=max_loops, show_progress=show_progress)
 
+    console.print(Markdown(result.report))
+
     logger.debug("ReAct analysis completed successfully!")
     return result
 
@@ -215,57 +221,101 @@ react_iteration_agent = Agent(
 async def react_iteration_system_prompt(
     ctx: RunContext[ReActIterationDeps],
 ) -> str:
-    """Generate system prompt for a single ReAct iteration.
-
-    This iteration performs EXACTLY ONE read_section call and ONE add_memory call,
-    then returns thoughts and whether to continue.
-    """
     deps = ctx.deps
     iteration_input = deps.iteration_input
     remaining_loops = max(deps.max_loops - deps.current_loop, 0)
     is_final_iteration = deps.current_loop >= deps.max_loops
+    is_first_iteration = deps.current_loop == 1
 
-    # Format previous context
-    previous_context = f"Previous thoughts: {iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
-    processed_sections = f"Already processed: {', '.join(iteration_input.processed_sections)}" if iteration_input.processed_sections else ""
-
+    previous_context = f"Previous thoughts:\n{iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
+    processed_sections_str = (
+        f"Already processed: {', '.join(iteration_input.processed_sections)}"
+        if iteration_input.processed_sections
+        else "No sections processed yet."
+    )
     unprocessed = [s for s in iteration_input.available_sections if s not in iteration_input.processed_sections]
-    unprocessed_str = f"Unprocessed sections available: {', '.join(unprocessed)}" if unprocessed else "All sections processed"
+    unprocessed_str = f"Remaining unprocessed sections: {', '.join(unprocessed)}" if unprocessed else "All sections have been read."
+
+    # ── FINAL ITERATION: synthesis only, no new reading ──────────────────────
+    if is_final_iteration:
+        return (
+            f"TASK: {deps.task}\n\n"
+            f"=== FINAL ITERATION ({deps.current_loop}/{deps.max_loops}) — SYNTHESIS ONLY ===\n\n"
+            f"{processed_sections_str}\n\n"
+            f"{previous_context}\n\n"
+            f"STRICT RULES FOR THIS ITERATION:\n"
+            f"  ✗ DO NOT call read_section() — all reading is finished.\n"
+            f"  ✓ Step 1: Call get_all_memory() to retrieve every finding accumulated so far.\n"
+            f"  ✓ Step 2: Synthesize those findings into a final structured report (see format below).\n"
+            f"  ✓ Step 3: Return ReActIterationOutput with should_continue=False and report populated.\n\n"
+            f"=== FINAL REPORT FORMAT ===\n"
+            f"Write a concise, contribution-focused report. Do NOT produce a section-by-section recap.\n"
+            f"Structure it as follows:\n\n"
+            f"1. **Core Research Question & Thesis**\n"
+            f"   What gap does this paper address? What is the central claim?\n\n"
+            f"2. **Key Contributions** (the most important section)\n"
+            f"   List 3–5 concrete, specific contributions the paper makes.\n"
+            f"   Use precise language — name methods, datasets, metrics, improvements.\n\n"
+            f"3. **Methodology (conceptual)**\n"
+            f"   Describe the approach at an architectural/algorithmic level, not implementation detail.\n\n"
+            f"4. **Main Results & Implications**\n"
+            f"   What did the experiments show? What do the numbers mean?\n\n"
+            f"5. **Limitations & Open Questions**\n"
+            f"   What does the paper acknowledge as unresolved or out of scope?\n\n"
+            f"Tone: precise, academic, analytical. Avoid filler phrases like 'the paper discusses...' — state claims directly."
+        )
+
+    # ── NORMAL ITERATION ──────────────────────────────────────────────────────
+    planning_block = (
+        f"=== FIRST ITERATION: PLAN YOUR READING STRATEGY ===\n"
+        f"Before reading anything, survey all available sections and decide:\n"
+        f"  • Which sections most directly reveal the paper's CLAIMS and CONTRIBUTIONS?\n"
+        f"    (Abstract, Introduction, Conclusion, and any 'Contributions' subsection are highest priority.)\n"
+        f"  • Which sections contain experimental evidence you will need?\n"
+        f"  • Which sections are low-value for the task (e.g., appendices, acknowledgements)?\n"
+        f"Start with the highest-signal sections. You may batch multiple related sections in one read_section() call.\n"
+        f"Record your reading plan in the 'thoughts' field of your output.\n\n"
+        if is_first_iteration
+        else ""
+    )
 
     return (
-        f"Task: {deps.task}\n\n"
-        f"=== ITERATION CONTEXT ===\n"
-        f"Current loop: {deps.current_loop}/{deps.max_loops}\n"
-        f"Remaining loops after this one: {remaining_loops}\n"
-        f"Final iteration now: {'YES' if is_final_iteration else 'NO'}\n\n"
-        f"=== SINGLE-ITERATION MODE ===\n"
-        f"This iteration MUST:\n"
-        f"1. Call read_section() EXACTLY ONCE with one or more unprocessed sections\n"
-        f"2. Call add_memory() EXACTLY ONCE with discovered findings from the read section(s)\n"
-        f"3. Immediately return structured output; do not call any more tools\n"
-        f"After returning, external loop will decide if more iterations are needed.\n\n"
-        f"{processed_sections}\n"
+        f"TASK: {deps.task}\n\n"
+        f"=== ITERATION {deps.current_loop}/{deps.max_loops} "
+        f"(loops remaining after this: {remaining_loops}) ===\n\n"
+        f"{planning_block}"
+        f"{processed_sections_str}\n"
         f"{unprocessed_str}\n\n"
         f"{previous_context}\n\n"
-        f"=== AVAILABLE TOOLS (per iteration) ===\n"
-        f"1. read_section(section_names): Read unprocessed sections. Call EXACTLY ONCE per iteration.\n"
-        f"   - section_names: list of section names or comma-separated string\n"
-        f"2. add_memory(memory): Extract and store only NEW findings from just-read content. Call EXACTLY ONCE per iteration.\n"
-        f"   - memory: Key points extracted from newly read sections\n"
-        f"3. get_all_memory(): Call this ONLY on the final iteration before structuring the complete final report.\n"
-        f"   - Returns the complete accumulated memory from all previous iterations\n"
-        f"   - Use this to synthesize findings into final structured output\n\n"
-        f"After calling one read + one add_memory (and optionally get_all_memory at end), return ReActIterationOutput with:\n"
-        f"- thoughts: Your reasoning about what you read and what to do next\n"
-        f"- should_continue: True if more iterations needed, False if analysis complete\n"
-        f"- report: Final report text. Usually keep empty in normal iterations; populate when should_continue is False.\n"
-        + (
-            "\nFINAL-ITERATION REQUIREMENT:\n"
-            "- This is the final allowed loop. You MUST set should_continue=False.\n"
-            "- Call get_all_memory() if needed and provide a non-empty final report in report.\n"
-            if is_final_iteration
-            else ""
-        )
+        f"=== RULES FOR THIS ITERATION ===\n"
+        f"1. Call read_section() EXACTLY ONCE.\n"
+        f"   • Choose sections STRATEGICALLY — not just the next one in sequence.\n"
+        f"   • Prefer sections that directly answer: What does this paper CLAIM? What is NEW?\n"
+        f"   • You may batch multiple thematically related sections in one call.\n"
+        f"   • Remaining loops: {remaining_loops}. If only 1 loop remains after this,\n"
+        f"     focus on the highest-value unread sections; skip low-priority ones.\n\n"
+        f"2. Call add_memory() EXACTLY ONCE.\n"
+        f"   • Record CONTRIBUTIONS, CLAIMS, and KEY FINDINGS — NOT a content summary.\n"
+        f"   • Format your memory as bullet points:\n"
+        f"     - [CLAIM] <what the paper asserts>\n"
+        f"     - [CONTRIBUTION] <what is novel>\n"
+        f"     - [RESULT] <key empirical finding with numbers if available>\n"
+        f"     - [METHOD] <core technique, only if architecturally significant>\n"
+        f"   • Omit anything that is background, motivation, or boilerplate.\n\n"
+        f"3. Return ReActIterationOutput immediately — no further tool calls.\n"
+        f"   • thoughts: Your reading rationale and what you plan to read next (and why).\n"
+        f"   • should_continue: \n"
+        f"     - Set True if high-value unread sections remain.\n"
+        f"     - Set False ONLY WHEN you are ready to write the final report YOURSELF in this same output.\n"
+        f"       WARNING: Setting should_continue=False means THIS IS YOUR LAST CHANCE to produce a report.\n"
+        f"       If you set should_continue=False, you MUST also populate the 'report' field with the full\n"
+        f"       structured analysis — there is NO automatic synthesis step after this.\n"
+        f"       Do NOT set should_continue=False if report will be empty.\n\n"
+        f"   • report: Leave EMPTY (synthesis happens only in the final iteration).\n\n"
+        f"=== TOOLS ALLOWED THIS ITERATION ===\n"
+        f"  ✓ read_section(section_names)  — call ONCE\n"
+        f"  ✓ add_memory(memory)           — call ONCE\n"
+        f"  ✗ get_all_memory()             — FORBIDDEN in normal iterations; reserved for final only\n"
     )
 
 
@@ -347,14 +397,11 @@ async def add_memory(ctx: RunContext[ReActIterationDeps], memory: str) -> str:
 
     fragment = memory.strip()
     if not fragment:
-        return "WARNING: Empty memory text. Include extracted findings."
+        return "WARNING: Empty memory text."
 
     iteration_state.memory_text = fragment
 
-    if deps.show_progress:
-        print(f"[Iteration] Memory recorded: {len(fragment)} chars")
-
-    return f"MEMORY_RECORDED: {len(fragment)} characters of findings captured."
+    return "MEMORY RECORDED"
 
 
 @react_iteration_agent.tool
@@ -432,14 +479,14 @@ class ReActAgent:
         iteration_state = ReActIterationState()
 
         try:
-            self.logger.debug("Running single-iteration agent")
+            user_message = (
+                "FINAL ITERATION — DO NOT call read_section(). "
+                "Call get_all_memory() first, then return a structured final report with should_continue=False."
+                if deps.current_loop >= deps.max_loops
+                else "Read the most strategically valuable unprocessed sections, extract contributions and claims into memory, then return your thoughts and reading plan."
+            )
             result = await self.agent.run(
-                (
-                    "You are analyzing one section this iteration and must return valid ReActIterationOutput. "
-                    "Step 1: Call read_section() with unprocessed sections. "
-                    "Step 2: Call add_memory() with what you discovered. "
-                    "Step 3: Stop tool use and return ReActIterationOutput with thoughts, should_continue, and optional final report."
-                ),
+                user_message,
                 deps=deps,
                 model=self.model,
                 metadata={"iteration_state": iteration_state},
@@ -491,6 +538,7 @@ class ReActAgent:
         processed_sections: list[str] = []
         accumulated_memory = ""
         current_thoughts = ""
+        last_iteration_output: ReActIterationOutput | None = None
 
         # Initialize with first iteration input
         iteration_input = ReActIterationInput(
@@ -513,6 +561,7 @@ class ReActAgent:
                 accumulated_memory=accumulated_memory,
                 show_progress=show_progress,
             )
+            last_iteration_output = iteration_output
 
             # Update tracking
             for section in iteration_state.sections_read:
@@ -554,7 +603,11 @@ class ReActAgent:
         self.logger.info(f"Multi-iteration analysis completed after {loop_num} iterations")
 
         final_thoughts = current_thoughts or "Analysis complete."
-        final_report = accumulated_memory.strip()
+        final_report = (
+            last_iteration_output.report.strip()
+            if last_iteration_output and last_iteration_output.report.strip()
+            else accumulated_memory.strip()
+        )
         if not final_report:
             final_report = "No memory content was generated during analysis."
 
@@ -563,14 +616,6 @@ class ReActAgent:
             should_continue=False,
             report=final_report,
         )
-
-        if show_progress:
-            print(f"\n{'=' * 80}")
-            print("FINAL ANALYSIS REPORT")
-            print(f"{'=' * 80}")
-            if final_output.report:
-                print(final_output.report)
-            print(f"{'=' * 80}\n")
 
         return final_output
 

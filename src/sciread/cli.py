@@ -201,13 +201,6 @@ MODELS:
                     show_progress=not args.no_progress,
                 )
             )
-            # The final report is already printed if show_progress=True
-            if args.no_progress:
-                print("=" * 60)
-                print("REACT ANALYSIS RESULT:")
-                print("=" * 60)
-                print(result.report)
-                print("=" * 60)
             return 0
         except Exception as e:
             logger.error(f"ReAct analysis failed: {e}")
