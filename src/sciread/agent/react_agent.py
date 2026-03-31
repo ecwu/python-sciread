@@ -78,69 +78,6 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     return document
 
 
-def get_initial_sections(document: Document) -> list[str]:
-    """Get the initial sections to start analysis (abstract and introduction).
-
-    Args:
-        document: Processed document instance
-
-    Returns:
-        List of section names to start with
-    """
-    available_sections = document.get_section_names()
-    initial_sections = []
-
-    try:
-        # Use unified section matching for better results
-        # Look for abstract first
-        abstract_match = document.get_closest_section_name("abstract", threshold=0.7)
-        if abstract_match:
-            initial_sections.append(abstract_match)
-
-        # Look for introduction next
-        intro_match = document.get_closest_section_name("introduction", threshold=0.7)
-        if intro_match and intro_match not in initial_sections:
-            initial_sections.append(intro_match)
-
-        # If no matches found, use first section
-        if not initial_sections and available_sections:
-            initial_sections = [available_sections[0]]
-
-    except Exception as e:
-        logger.warning(f"Unified section matching failed, using fallback approach: {e}")
-
-        # Fallback to original approach
-        for section in available_sections:
-            if "abstract" in section.lower():
-                initial_sections.append(section)
-                break
-
-        for section in available_sections:
-            if "introduction" in section.lower() and section not in initial_sections:
-                initial_sections.append(section)
-                break
-
-        if not initial_sections and available_sections:
-            initial_sections = [available_sections[0]]
-
-    logger.debug(f"Initial sections selected: {initial_sections}")
-    return initial_sections
-
-
-def format_status_summary(stage: str, current_loop: int, max_loops: int) -> str:
-    """Format status summary combining stage, loop count, and remaining loops.
-
-    Args:
-        stage: Current analysis stage description
-        current_loop: Current iteration number (1-based)
-        max_loops: Maximum number of loops allowed
-
-    Returns:
-        Formatted status summary string
-    """
-    return f"{stage} (loop {current_loop} of {max_loops})"
-
-
 def get_section_content(document: Document, section_names: list[str]) -> str:
     """Get content for specified sections.
 
@@ -509,7 +446,7 @@ class ReActAgent:
             )
 
             output = result.output if isinstance(result.output, ReActIterationOutput) else None
-        except Exception as e:
+        except (RuntimeError, ValueError, TypeError) as e:
             self.logger.error(f"Iteration failed: {e}")
             self.logger.error(f"Traceback: {traceback.format_exc()}")
             output = None
@@ -565,11 +502,7 @@ class ReActAgent:
 
         # Run iterations
         for loop_num in range(1, max_loops + 1):
-            self.logger.info(f"Starting iteration {loop_num}/{max_loops}")
-            if show_progress:
-                print(f"\n{'=' * 60}")
-                print(f"Iteration {loop_num}/{max_loops}")
-                print(f"{'=' * 60}")
+            self.logger.debug(f"Starting iteration {loop_num}/{max_loops}")
 
             # Run one iteration
             iteration_output, iteration_state = await self.analyze_one_iteration(
@@ -640,23 +573,6 @@ class ReActAgent:
             print(f"{'=' * 80}\n")
 
         return final_output
-
-    def analyze_document_sync(
-        self,
-        document: Document,
-        task: str,
-        max_loops: int = 8,
-        show_progress: bool = True,
-    ) -> ReActIterationOutput:
-        """Synchronous wrapper for top-level sync callers such as the CLI."""
-        return asyncio.run(
-            self.analyze_document(
-                document=document,
-                task=task,
-                max_loops=max_loops,
-                show_progress=show_progress,
-            )
-        )
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""

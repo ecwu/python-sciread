@@ -80,8 +80,6 @@ from .models.simple_models import SimpleAnalysisResult
 from .react_agent import ReActAgent
 from .react_agent import analyze_document_with_react
 from .react_agent import analyze_document_with_react_sync
-from .react_agent import format_status_summary
-from .react_agent import get_initial_sections
 from .react_agent import load_and_process_document
 from .simple_agent import SimpleAgent
 from .text_utils import remove_references
@@ -121,8 +119,6 @@ __all__ = [
     "analyze_document_with_react",
     "analyze_document_with_react_sync",
     "create_personality_agent",
-    "format_status_summary",
-    "get_initial_sections",
     "load_and_process_document",
     "remove_references",
 ]
