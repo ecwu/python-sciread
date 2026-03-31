@@ -53,12 +53,7 @@ def _build_simple_content(
     section_names = document.get_section_names()
     if remove_references:
         section_names = [
-            name
-            for name in section_names
-            if not any(
-                keyword in name.lower()
-                for keyword in ["reference", "bibliography", "citation"]
-            )
+            name for name in section_names if not any(keyword in name.lower() for keyword in ["reference", "bibliography", "citation"])
         ]
 
     content = document.get_for_llm(
@@ -182,9 +177,7 @@ class SimpleAgent:
         Returns:
             Generated analysis report as a string
         """
-        self.logger.debug(
-            f"Starting document analysis for: {document.source_path or 'text document'}"
-        )
+        self.logger.debug(f"Starting document analysis for: {document.source_path or 'text document'}")
 
         # Create dependencies object
         deps = SimpleAnalysisDeps(
@@ -204,9 +197,6 @@ class SimpleAgent:
                 operation_name="document analysis",
             )
             console.print(Markdown(result.output))
-            self.logger.info(
-                f"Document analysis completed successfully. Total characters in report: {len(result.output)}"
-            )
             return result.output
 
         except Exception as e:
@@ -291,9 +281,6 @@ class SimpleAgent:
                 operation_name="structured document analysis",
             )
             console.print(Markdown(result.output.report))
-            self.logger.info(
-                f"Structured document analysis completed successfully. Report length: {len(result.output.report)}"
-            )
             return result.output
 
         except Exception as e:
