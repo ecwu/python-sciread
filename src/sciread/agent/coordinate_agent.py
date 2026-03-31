@@ -23,6 +23,9 @@ from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.table import Table
 
 from ..document.document import Document
 from ..document.models import Chunk
@@ -53,6 +56,9 @@ from .prompts.coordinate import build_methodology_analysis_prompt
 from .prompts.coordinate import build_previous_methods_analysis_prompt
 from .prompts.coordinate import build_report_synthesis_prompt
 from .prompts.coordinate import build_research_questions_analysis_prompt
+
+
+console = Console()
 
 # Dependency classes for RunContext-based coordination
 
@@ -130,8 +136,20 @@ EXPERT_AGENT_CONFIG = {
 
 EXPERT_SECTION_PREFERENCES = {
     "metadata": ["abstract", "introduction", "title"],
-    "methodology": ["methodology", "method", "approach", "design", "technical approach"],
-    "experiments": ["experiments", "experimental setup", "evaluation", "study design", "case study"],
+    "methodology": [
+        "methodology",
+        "method",
+        "approach",
+        "design",
+        "technical approach",
+    ],
+    "experiments": [
+        "experiments",
+        "experimental setup",
+        "evaluation",
+        "study design",
+        "case study",
+    ],
     "evaluation": ["results", "evaluation", "findings", "outcomes", "performance"],
     "contributions": ["introduction", "contributions", "novelty", "innovation"],
     "limitations": ["limitations", "discussion", "conclusion", "future work"],
@@ -159,7 +177,12 @@ def _select_sections_for_expert(document: Document, analysis_type: str, planned_
     return matched
 
 
-def _build_expert_content(document: Document, analysis_type: str, sections_to_analyze: list[str] | None, max_tokens: int | None) -> str:
+def _build_expert_content(
+    document: Document,
+    analysis_type: str,
+    sections_to_analyze: list[str] | None,
+    max_tokens: int | None,
+) -> str:
     """Assemble expert-oriented content using the unified Document helper."""
     section_names = _select_sections_for_expert(document, analysis_type, sections_to_analyze)
     return document.get_for_llm(
@@ -207,8 +230,6 @@ class CoordinateAgent:
         else:
             self.model = model
             self.model_identifier = getattr(model, "model_name", "unknown")
-
-        self.logger.info(f"Initialized CoordinateAgent controller with model: {self.model_identifier}")
 
         # Create main coordinate agent with dependencies and structured output
         self.coordinate_agent = Agent(
@@ -282,7 +303,7 @@ class CoordinateAgent:
                 content = _build_expert_content(
                     document=deps.document,
                     analysis_type=deps.analysis_type,
-                    sections_to_analyze=deps.sections_to_analyze if deps.sections_to_analyze else None,
+                    sections_to_analyze=(deps.sections_to_analyze if deps.sections_to_analyze else None),
                     max_tokens=6000,  # Reasonable limit for expert analysis
                 )
 
@@ -302,30 +323,24 @@ class CoordinateAgent:
 
         return agent
 
-    def display_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]) -> str:
-        """Create a clear, readable display of the analysis plan.
+    def display_analysis_plan(self, analysis_plan: AnalysisPlan, section_names: list[str]) -> Table:
+        """Create a rich table display of the analysis plan.
 
         Args:
             analysis_plan: The analysis plan to display
             section_names: List of available sections in the document
 
         Returns:
-            Formatted string displaying the analysis plan
+            Rich Table object displaying the analysis plan
         """
-        # ANSI color codes
-        CYAN = "\033[96m"
-        GREEN = "\033[92m"
-        YELLOW = "\033[93m"
-        BLUE = "\033[94m"
-        MAGENTA = "\033[95m"
-        RESET = "\033[0m"
-        BOLD = "\033[1m"
-
-        plan_display = [
-            f"{BOLD}{CYAN}ANALYSIS PLAN{RESET}",
-            f"{CYAN}{'=' * 80}{RESET}",
-            "",
-        ]
+        table = Table(
+            title=f"Analysis Plan (Available Sections: {len(section_names)})",
+            show_lines=True,
+        )
+        table.add_column("Agent", style="cyan", no_wrap=True)
+        table.add_column("Status", style="green", no_wrap=True)
+        table.add_column("Sections", style="magenta")
+        table.add_column("Notes", style="yellow")
 
         analysis_configs = [
             (
@@ -356,66 +371,19 @@ class CoordinateAgent:
             if getattr(analysis_plan, plan_field):
                 if sections_field == "First 3 chunks (title, authors, abstract)":
                     sections_display = sections_field
+                    note = "Metadata heuristic"
                 else:
                     sections = getattr(analysis_plan, sections_field) or ["All sections"]
                     if sections == ["All sections"]:
-                        sections_display = f"All sections {YELLOW}(fallback){RESET}"
+                        sections_display = "All sections"
+                        note = "Fallback"
                     else:
                         sections_display = f"{', '.join(sections)}"
+                        note = "Section-targeted"
 
-                # Combined display with colors
-                plan_display.append(f"{GREEN}[OK] {BOLD}{agent_name}{RESET}{GREEN} -> {BLUE}{sections_display}{RESET}")
-                plan_display.append("")
+                table.add_row(agent_name, "Enabled", sections_display, note)
 
-        # Add reasoning section with color
-        plan_display.extend(
-            [
-                f"{MAGENTA}{BOLD}Reasoning:{RESET}",
-                f"{MAGENTA}{analysis_plan.reasoning}{RESET}",
-                "",
-            ]
-        )
-
-        # Add section selection quality assessment
-        total_sections_selected = sum(
-            [
-                len(analysis_plan.previous_methods_sections or []),
-                len(analysis_plan.research_questions_sections or []),
-                len(analysis_plan.methodology_sections or []),
-                len(analysis_plan.experiments_sections or []),
-                len(analysis_plan.future_directions_sections or []),
-            ]
-        )
-
-        # Quality assessment with colors
-        if total_sections_selected == 0:
-            plan_display.extend(
-                [
-                    f"{YELLOW}WARNING: No specific sections selected. All agents will use 'All sections'.{RESET}",
-                    f"{YELLOW}   This may result in longer processing times and less focused analysis.{RESET}",
-                    "",
-                ]
-            )
-        elif total_sections_selected > 25:
-            plan_display.extend(
-                [
-                    f"{BLUE}INFO: Many sections selected ({total_sections_selected}). Ensure all are relevant.{RESET}",
-                    "",
-                ]
-            )
-        else:
-            plan_display.extend(
-                [
-                    f"{GREEN}Good: Comprehensive section selection with {total_sections_selected} relevant sections.{RESET}",
-                    "",
-                ]
-            )
-
-        if analysis_plan.estimated_relevance_scores:
-            scores_text = ", ".join([f"{k}: {v:.2f}" for k, v in analysis_plan.estimated_relevance_scores.items()])
-            plan_display.append(f"{CYAN}Relevance Scores: {scores_text}{RESET}")
-
-        return "\n".join(plan_display)
+        return table
 
     def _create_filtered_document(self, original_document: Document, chunks: list[Chunk]) -> Document:
         """Create a new Document object containing only specified chunks.
@@ -473,8 +441,39 @@ class CoordinateAgent:
             analysis_plan: The analysis plan to log
             section_names: Available sections in the document
         """
-        plan_display = self.display_analysis_plan(analysis_plan, section_names)
-        self.logger.info(f"Analysis Plan:\n{plan_display}")
+        plan_table = self.display_analysis_plan(analysis_plan, section_names)
+        console.print(plan_table)
+
+        total_sections_selected = sum(
+            [
+                len(analysis_plan.previous_methods_sections or []),
+                len(analysis_plan.research_questions_sections or []),
+                len(analysis_plan.methodology_sections or []),
+                len(analysis_plan.experiments_sections or []),
+                len(analysis_plan.future_directions_sections or []),
+            ]
+        )
+
+        if total_sections_selected == 0:
+            quality_note = "Warning: No specific sections selected; all agents may fall back to broad analysis."
+        elif total_sections_selected > 25:
+            quality_note = f"Info: Many sections selected ({total_sections_selected}); verify relevance."
+        else:
+            quality_note = f"Good: Focused section selection ({total_sections_selected} section picks)."
+
+        plan_notes = [
+            "### Reasoning",
+            analysis_plan.reasoning or "(empty)",
+            "",
+            "### Plan Quality",
+            quality_note,
+        ]
+
+        if analysis_plan.estimated_relevance_scores:
+            scores_text = ", ".join([f"{k}: {v:.2f}" for k, v in analysis_plan.estimated_relevance_scores.items()])
+            plan_notes.extend(["", "### Relevance Scores", scores_text])
+
+        console.print(Markdown("\n".join(plan_notes)))
 
     def extract_abstract(self, document: Document) -> str:
         """Extract abstract from document using semantic sectioning.
@@ -485,7 +484,7 @@ class CoordinateAgent:
         Returns:
             Abstract text as string
         """
-        self.logger.info("Extracting abstract from document using semantic sections")
+        self.logger.debug("Extracting abstract from document using semantic sections")
 
         # Try to find abstract section using semantic sectioning
         abstract_section_names = []
@@ -549,10 +548,6 @@ class CoordinateAgent:
         # Extract abstract from document
         abstract = self.extract_abstract(document)
 
-        self.logger.info(
-            f"Planning analysis based on abstract ({len(abstract) if abstract else 0} chars) and {len(section_names)} available sections"
-        )
-
         if not abstract or not abstract.strip():
             self.logger.warning("Empty abstract provided, using default comprehensive analysis plan")
             return AnalysisPlan(
@@ -581,11 +576,10 @@ class CoordinateAgent:
 
             # Run the coordinate agent to generate analysis plan
             result = await asyncio.wait_for(
-                self.coordinate_agent.run("Generate analysis plan", deps=deps),
+                self.coordinate_agent.run("请生成分析计划", deps=deps),
                 timeout=self.timeout,
             )
 
-            self.logger.info("Analysis plan created successfully")
             self.logger.debug(f"Result type: {type(result)}, Output type: {type(result.output)}")
             # Log controller agent interaction at debug level
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
@@ -659,7 +653,6 @@ class CoordinateAgent:
         Returns:
             Dictionary containing results from executed sub-agents
         """
-        self.logger.info("Executing sub-agents based on analysis plan")
         start_time = asyncio.get_event_loop().time()
 
         results = {}
@@ -735,12 +728,12 @@ class CoordinateAgent:
                 expert_deps = ExpertAgentDeps(
                     document=document,
                     analysis_type=agent_key,
-                    sections_to_analyze=sections_analyzed[result_key] if result_key in sections_analyzed else [],
+                    sections_to_analyze=(sections_analyzed[result_key] if result_key in sections_analyzed else []),
                 )
 
                 task = asyncio.create_task(
                     self._safe_execute_agent(
-                        agent.run("Execute expert analysis", deps=expert_deps),
+                        agent.run("请执行专家分析", deps=expert_deps),
                         agent_key,
                     )
                 )
@@ -751,7 +744,6 @@ class CoordinateAgent:
             return results
 
         # Execute tasks in parallel
-        self.logger.info(f"Executing {len(tasks)} sub-agents in parallel")
         completed_tasks = await asyncio.gather(*[task for _, task in tasks], return_exceptions=True)
 
         # Process results
@@ -760,11 +752,11 @@ class CoordinateAgent:
                 self.logger.error(f"Agent {agent_name} failed: {result}")
                 results[agent_name] = {"error": str(result), "success": False}
             else:
-                self.logger.info(f"Agent {agent_name} completed successfully")
+                self.logger.debug(f"Agent {agent_name} completed successfully")
                 results[agent_name] = {"result": result, "success": True}
 
         execution_time = asyncio.get_event_loop().time() - start_time
-        self.logger.info(f"Sub-agent execution completed in {execution_time:.2f} seconds")
+        self.logger.debug(f"Sub-agent execution completed in {execution_time:.2f} seconds")
 
         # Add sections analyzed information to results
         results["_sections_analyzed"] = sections_analyzed
@@ -797,7 +789,6 @@ class CoordinateAgent:
         Returns:
             Comprehensive synthesized report
         """
-        self.logger.info("Synthesizing final report from sub-agent results using native patterns")
         if not isinstance(sub_agent_results, dict):
             self.logger.error(
                 f"ERROR: sub_agent_results is not a dict! Type: {type(sub_agent_results)}, Content: {str(sub_agent_results)[:500]}"
@@ -853,7 +844,6 @@ class CoordinateAgent:
                 synthesis_agent.run(prompt, deps={"successful_analyses": successful_analyses}),
                 timeout=self.timeout,
             )
-            self.logger.info("Report synthesis completed successfully")
             # Log synthesis agent interaction at debug level
             prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
             output_preview = str(result.output)[:200] + "..." if len(str(result.output)) > 200 else str(result.output)
@@ -920,10 +910,8 @@ class CoordinateAgent:
             # Step 2: Plan analysis (use custom plan if provided)
             if custom_plan:
                 analysis_plan = custom_plan
-                self.logger.info("Using custom analysis plan")
             else:
                 analysis_plan = await self.plan_analysis(document, section_names)
-                self.logger.info("Generated automatic analysis plan")
 
             # Step 4: Display and log the plan
             # print(self.display_analysis_plan(analysis_plan, section_names))  # Show user the plan
@@ -938,6 +926,7 @@ class CoordinateAgent:
                 f"sub_agent_results keys: {list(sub_agent_results.keys()) if isinstance(sub_agent_results, dict) else 'Not a dict'}"
             )
             final_report = await self.synthesize_report(analysis_plan, sub_agent_results, document)
+            console.print(Markdown(final_report))
 
             # Step 7: Build comprehensive result
             total_execution_time = asyncio.get_event_loop().time() - start_time
@@ -991,7 +980,6 @@ class CoordinateAgent:
                 sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
             )
 
-            self.logger.info(f"Comprehensive document analysis completed in {total_execution_time:.2f} seconds")
             return comprehensive_result
 
         except Exception as e:

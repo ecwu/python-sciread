@@ -164,21 +164,6 @@ MODELS:
 
         try:
             result = asyncio.run(comprehensive_analysis(args.pdf_file, args.model))
-
-            print("=" * 60)
-            print("COMPREHENSIVE ANALYSIS RESULT:")
-            print("=" * 60)
-            print(f"Analysis Plan: {result.analysis_plan.reasoning}")
-            print(f"Total Execution Time: {result.total_execution_time:.2f} seconds")
-            print(f"Agents Executed: {result.execution_summary['total_agents_executed']}")
-            print(f"Successful Agents: {result.execution_summary['successful_agents']}")
-            print(f"Failed Agents: {result.execution_summary['failed_agents']}")
-
-            print()
-            print("FINAL REPORT:")
-            print(result.final_report)
-
-            print("=" * 60)
             return 0
         except Exception as e:
             logger.error(f"Coordinate analysis failed: {e}")
