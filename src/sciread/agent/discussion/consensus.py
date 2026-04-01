@@ -97,7 +97,7 @@ class ConsensusBuilder:
         self.model = get_model(model_name)
         self.agent = Agent(
             self.model,
-            system_prompt="You are an expert consensus builder for academic research analysis. Your task is to synthesize insights from multiple expert agents into a comprehensive, balanced assessment.",
+            system_prompt="你是一名学术研究分析领域的共识整合专家。你的任务是综合多个专家智能体的洞见，形成全面、平衡的评估。",
         )
         self.logger = get_logger(__name__)
 
@@ -133,7 +133,7 @@ class ConsensusBuilder:
 
             # Build result
             result = DiscussionResult(
-                document_title=document.metadata.title or "Untitled",
+                document_title=document.metadata.title or "未命名论文",
                 summary=summary,
                 key_contributions=key_contributions,
                 significance=significance,
@@ -160,10 +160,10 @@ class ConsensusBuilder:
             self.logger.error(f"Consensus building failed: {e}")
             # Return minimal result on error
             return DiscussionResult(
-                document_title=document.metadata.title or "Untitled",
-                summary=f"Error building consensus: {e!s}",
+                document_title=document.metadata.title or "未命名论文",
+                summary=f"构建共识结果时出错：{e!s}",
                 key_contributions=[],
-                significance="Analysis failed",
+                significance="分析失败",
                 confidence_score=0.0,
                 discussion_metadata={"error": str(e)},
                 completion_time=datetime.now(UTC),
@@ -315,30 +315,32 @@ class ConsensusBuilder:
         """Generate overall summary and significance assessment."""
         try:
             prompt = f"""
-Based on the following analysis of an academic paper, generate a comprehensive summary and significance assessment.
+请基于以下学术论文分析结果，生成一份综合摘要和整体意义评估。
 
-**Paper Title:** {document.metadata.title}
+**论文标题：** {document.metadata.title}
 
-**Key Insights from Analysis:**
+**分析提炼出的关键洞见：**
 {chr(10).join(f"- {insight.content[:200]}..." for insight in top_insights[:5])}
 
-**Points of Consensus:**
-{chr(10).join(f"- {point.topic}: {point.content[:150]}..." for point in consensus_points[:3]) if consensus_points else "No major consensus points identified."}
+**已形成的主要共识：**
+{chr(10).join(f"- {point.topic}: {point.content[:150]}..." for point in consensus_points[:3]) if consensus_points else "尚未识别出明显的共识点。"}
 
-**Areas of Disagreement:**
-{chr(10).join(f"- {view.topic}: {view.content[:150]}..." for view in divergent_views[:2]) if divergent_views else "No significant disagreements identified."}
+**仍存在分歧的方面：**
+{chr(10).join(f"- {view.topic}: {view.content[:150]}..." for view in divergent_views[:2]) if divergent_views else "目前未识别出显著分歧。"}
 
-**Instructions:**
-1. Generate a concise yet comprehensive summary (300-500 words) that captures the main findings
-2. Assess the overall significance of the paper considering the consensus and disagreements
-3. Highlight both strengths and limitations identified in the analysis
+**要求：**
+1. 生成一段 300-500 字的中文摘要，简洁但完整地概括主要发现
+2. 结合共识与分歧，对论文整体意义进行评估
+3. 同时强调分析中识别出的优势与局限
 
-**Format your response as:**
+**输出格式要求：**
+- 摘要和意义评估的正文必须使用中文。
+- 为兼容现有解析逻辑，请保留以下两个英文标签：
 SUMMARY:
-[Your detailed summary here]
+[请在这里写中文摘要]
 
 SIGNIFICANCE:
-[Your significance assessment here]
+[请在这里写中文意义评估]
 """
 
             result = await self.agent.run(prompt)
@@ -351,14 +353,14 @@ SIGNIFICANCE:
             )
             significance_match = re.search(r"SIGNIFICANCE:\s*(.+)", result.output, re.DOTALL | re.IGNORECASE)
 
-            summary = summary_match.group(1).strip() if summary_match else "Summary generation failed."
-            significance = significance_match.group(1).strip() if significance_match else "Significance assessment failed."
+            summary = summary_match.group(1).strip() if summary_match else "摘要生成失败。"
+            significance = significance_match.group(1).strip() if significance_match else "意义评估生成失败。"
 
             return summary, significance
 
         except Exception as e:
             self.logger.error(f"Error generating summary and significance: {e}")
-            return "Summary generation failed.", "Significance assessment failed."
+            return "摘要生成失败。", "意义评估生成失败。"
 
     async def _extract_key_contributions(
         self,
@@ -512,19 +514,19 @@ SIGNIFICANCE:
 
         # Simple keyword-based topic extraction
         if any(keyword in content_lower for keyword in ["method", "approach", "methodology"]):
-            return "Methodology"
+            return "方法"
         elif any(keyword in content_lower for keyword in ["result", "finding", "outcome"]):
-            return "Results"
+            return "结果"
         elif any(keyword in content_lower for keyword in ["limitation", "weakness", "drawback"]):
-            return "Limitations"
+            return "局限性"
         elif any(keyword in content_lower for keyword in ["application", "use case", "practical"]):
-            return "Applications"
+            return "应用"
         elif any(keyword in content_lower for keyword in ["theory", "framework", "model"]):
-            return "Theoretical Contributions"
+            return "理论贡献"
         elif any(keyword in content_lower for keyword in ["innovation", "novel", "breakthrough"]):
-            return "Innovation"
+            return "创新"
         else:
-            return "General Analysis"
+            return "综合分析"
 
     async def _evaluate_topic_consensus(
         self,
@@ -554,7 +556,7 @@ SIGNIFICANCE:
             avg_confidence = sum(insight.confidence for insight in insights) / len(insights)
 
             # Synthesize consensus content
-            consensus_content = f"Analysis of {topic}: " + "; ".join(
+            consensus_content = f"围绕“{topic}”的综合判断：" + "；".join(
                 [(insight.content[:100] + "..." if len(insight.content) > 100 else insight.content) for insight in insights[:3]]
             )
 

@@ -2,95 +2,95 @@
 
 from typing import Any
 
-DISCUSSION_COORDINATOR_SYSTEM_PROMPT = """You are a Discussion Coordinator for multi-agent academic paper analysis. Your role is to manage and coordinate discussions between four expert agents to achieve a comprehensive understanding of research papers.
+DISCUSSION_COORDINATOR_SYSTEM_PROMPT = """你是一名多智能体学术论文分析的讨论协调者。你的职责是协调四位专家型智能体展开讨论，以形成对论文的全面理解。
 
-Your core responsibilities:
-- Orchestrate multi-phase discussion process
-- Ensure all personality types contribute their unique perspectives
-- Monitor discussion progress and convergence
-- Facilitate constructive dialogue between agents
-- Balance thoroughness with efficiency
+你的核心职责：
+- 组织多阶段讨论流程
+- 确保每种角色都能贡献独特视角
+- 监控讨论进展与收敛情况
+- 促进建设性的多方对话
+- 在分析深度与执行效率之间保持平衡
 
-The four expert agents are:
-1. **Critical Evaluator**: Identifies limitations, methodological flaws, and potential weaknesses
-2. **Innovative Insighter**: Recognizes novel contributions and breakthrough potential
-3. **Practical Applicator**: Assesses real-world applications and implementation feasibility
-4. **Theoretical Integrator**: Analyzes theoretical frameworks and conceptual contributions
+四位专家型智能体分别是：
+1. **批判性评估者**：识别局限、方法缺陷和潜在薄弱点
+2. **创新洞察者**：识别新颖贡献与突破潜力
+3. **实践应用者**：评估真实应用价值与落地可行性
+4. **理论整合者**：分析理论框架与概念贡献
 
-Your coordination strategy should ensure:
-- All agents have opportunities to contribute
-- Discussions remain focused on understanding the paper's significance
-- Questions are constructive and lead to deeper analysis
-- Convergence is achieved without forcing artificial consensus
-- Both strengths and limitations are thoroughly examined
+你的协调策略应确保：
+- 所有智能体都有充分发言机会
+- 讨论始终围绕论文意义展开
+- 提问具有建设性并推动更深层分析
+- 在不强行制造共识的前提下实现收敛
+- 论文的优势与局限都得到充分讨论
 
-You will manage discussion phases:
-1. **Initial Analysis**: Each agent generates initial insights
-2. **Questioning**: Agents ask targeted questions about each other's insights
-3. **Responding**: Agents address questions and potentially revise their insights
-4. **Convergence**: Evaluate if sufficient agreement has been reached
-5. **Consensus Building**: Synthesize final comprehensive assessment
+你需要管理以下阶段：
+1. **初始分析**：各智能体生成初步洞见
+2. **提问阶段**：智能体围绕彼此洞见提出针对性问题
+3. **回应阶段**：智能体回答问题，并在必要时修订洞见
+4. **收敛评估**：判断是否已达到足够共识
+5. **共识构建**：综合形成最终评估
 
-Always maintain academic rigor while ensuring productive dialogue."""
+无论在任何阶段，都要保持学术严谨并确保对话高效推进。"""
 
 
-PHASE_TRANSITION_PROMPT = """Evaluate whether to advance to the next discussion phase based on current progress.
+PHASE_TRANSITION_PROMPT = """请根据当前进展判断是否应进入下一讨论阶段。
 
-**Current Phase:** {current_phase}
-**Iteration:** {iteration}/{max_iterations}
-**Time Elapsed:** {time_elapsed}
+**当前阶段：** {current_phase}
+**轮次：** {iteration}/{max_iterations}
+**已耗时：** {time_elapsed}
 
-**Progress Indicators:**
-- Insights Generated: {total_insights} across {agents_with_insights} agents
-- Questions Asked: {total_questions}
-- Questions Answered: {total_answers}
-- Average Insight Quality: {avg_insight_quality:.2f}
-- Discussion Activity: {activity_level}
+**进度指标：**
+- 已生成洞见：{total_insights} 条，覆盖 {agents_with_insights} 个智能体
+- 已提出问题：{total_questions}
+- 已回答问题：{total_answers}
+- 平均洞见质量：{avg_insight_quality:.2f}
+- 讨论活跃度：{activity_level}
 
-**Phase-Specific Criteria:**
+**阶段判定标准：**
 {phase_criteria}
 
-**Decision Framework:**
-1. **Advance if**: Minimum requirements met and activity is productive
-2. **Continue if**: Progress is steady but more refinement needed
-3. **Timeout if**: Maximum iterations reached or time limit exceeded
+**决策框架：**
+1. **Advance if**：满足最低要求且讨论仍富有成效
+2. **Continue if**：进展稳定，但还需要进一步打磨
+3. **Timeout if**：达到最大轮次或超出时间限制
 
-Provide your recommendation in this format:
+请按以下格式输出建议：
 ```
 Decision: [advance/continue/timeout]
-Reasoning: [Your reasoning for this decision]
-Next Phase: [Next phase name or "current"]
+Reasoning: [请用中文说明你的判断理由]
+Next Phase: [下一阶段名称，或填写 "current"]
 ```
 """
 
 
-INITIAL_ANALYSIS_CRITERIA = """For Initial Analysis Phase:
-- Minimum 2 insights per agent (8 total)
-- Average importance score > 0.5
-- All agents have participated
-- No obvious missing perspectives
-- Quality of insights justifies moving to questioning"""
+INITIAL_ANALYSIS_CRITERIA = """初始分析阶段标准：
+- 每个智能体至少生成 2 条洞见（总计至少 8 条）
+- 平均重要性评分大于 0.5
+- 所有智能体都已参与
+- 没有明显缺失的视角
+- 洞见质量足以进入提问阶段"""
 
-QUESTIONING_CRITERIA = """For Questioning Phase:
-- Minimum 4 questions asked (at least 1 per insight)
-- Questions are targeted and constructive
-- Questions span multiple personality perspectives
-- No agent completely ignored
-- Questions show evidence of careful insight review"""
+QUESTIONING_CRITERIA = """提问阶段标准：
+- 至少提出 4 个问题（平均每条关键洞见至少对应 1 个问题）
+- 问题应具有针对性和建设性
+- 问题覆盖多种角色视角
+- 没有任何智能体被完全忽略
+- 提问能够体现对洞见的认真审阅"""
 
-RESPONDING_CRITERIA = """For Responding Phase:
-- At least 80% of questions answered
-- Responses are thoughtful and specific
-- Some insights revised based on questions
-- Responded questions show understanding of concerns
-- All target agents had opportunity to respond"""
+RESPONDING_CRITERIA = """回应阶段标准：
+- 至少 80% 的问题已得到回答
+- 回答内容具体且经过思考
+- 部分洞见已根据提问进行修订
+- 回答能体现对关切点的理解
+- 所有被提问的智能体都已获得回应机会"""
 
-CONVERGENCE_CRITERIA = """For Convergence Evaluation:
-- Multiple iterations of questioning/responding completed
-- New insights/questions are diminishing
-- Agents report higher convergence scores
-- Key points of agreement identified
-- Remaining disagreements are clearly articulated"""
+CONVERGENCE_CRITERIA = """收敛评估阶段标准：
+- 已完成多轮提问与回应
+- 新洞见和新问题数量开始下降
+- 智能体报告的收敛评分更高
+- 已识别出关键共识点
+- 剩余分歧被清晰表达"""
 
 
 def build_phase_evaluation_prompt(
@@ -104,7 +104,7 @@ def build_phase_evaluation_prompt(
         "convergence": CONVERGENCE_CRITERIA,
     }
 
-    phase_criteria = phase_criteria_map.get(current_phase, "Evaluate if current phase objectives have been met.")
+    phase_criteria = phase_criteria_map.get(current_phase, "请判断当前阶段目标是否已经达成。")
 
     return PHASE_TRANSITION_PROMPT.format(
         current_phase=current_phase,
@@ -116,38 +116,42 @@ def build_phase_evaluation_prompt(
     )
 
 
-CONVERGENCE_EVALUATION_PROMPT = """Evaluate the convergence of the multi-agent discussion and determine if consensus has been reached.
+CONVERGENCE_EVALUATION_PROMPT = """请评估多智能体讨论的收敛程度，并判断是否已经形成足够共识。
 
-**Discussion Statistics:**
-- Iterations Completed: {iterations}
-- Total Insights: {total_insights}
-- Total Questions: {total_questions}
-- Total Responses: {total_responses}
+**讨论统计：**
+- 已完成轮次：{iterations}
+- 总洞见数：{total_insights}
+- 总问题数：{total_questions}
+- 总回答数：{total_responses}
 
-**Agent Participation:**
+**智能体参与情况：**
 {agent_participation}
 
-**Insight Quality Trends:**
+**洞见质量趋势：**
 {quality_trends}
 
-**Key Patterns:**
+**关键模式：**
 {key_patterns}
 
-**Convergence Indicators:**
-- Are insights becoming more consistent across agents?
-- Are questions and answers leading to refinement rather than disagreement?
-- Have major issues been resolved or clearly identified?
-- Are remaining disagreements fundamental or minor?
+**收敛判断指标：**
+- 各智能体的洞见是否越来越一致？
+- 问答过程是否更多带来 refinement，而不是加剧分歧？
+- 主要问题是否已解决，或至少已被清晰识别？
+- 当前剩余分歧是根本性的，还是次要的？
 
-**Evaluation Framework:**
-Rate each aspect on a scale of 0.0-1.0:
+**评估框架：**
+请对以下维度按 0.0-1.0 打分：
 
-1. **Consistency**: How aligned are the insights across different agents?
-2. **Completeness**: Have all important aspects been thoroughly examined?
-3. **Resolution**: Have major conflicts been addressed?
-4. **Stability**: Are insights stabilizing or still changing significantly?
+1. **Consistency**：不同智能体的洞见有多一致？
+2. **Completeness**：重要方面是否都已得到充分审视？
+3. **Resolution**：主要冲突是否已经被处理？
+4. **Stability**：洞见是否趋于稳定，还是仍在显著变化？
 
-**Provide your evaluation:**
+**输出要求：**
+- 解释性内容请使用中文。
+- 以下字段标签保留英文以兼容解析流程。
+
+请按以下格式输出：
 ```
 Consistency Score: [0.0-1.0]
 Completeness Score: [0.0-1.0]
@@ -155,8 +159,8 @@ Resolution Score: [0.0-1.0]
 Stability Score: [0.0-1.0]
 Overall Convergence: [0.0-1.0]
 Continue Discussion: [yes/no]
-Key Issues Remaining: [List of unresolved issues]
-Recommendations: [Suggestions for next steps]
+Key Issues Remaining: [请用中文列出未解决的问题]
+Recommendations: [请用中文给出下一步建议]
 ```
 """
 
@@ -182,34 +186,34 @@ def build_convergence_evaluation_prompt(
     )
 
 
-TASK_CREATION_PROMPT = """Create appropriate tasks for the {phase} phase of multi-agent discussion.
+TASK_CREATION_PROMPT = """请为多智能体讨论的 {phase} 阶段创建合适的任务。
 
-**Discussion Context:**
-- Current Phase: {phase}
-- Iteration: {iteration}/{max_iterations}
-- Time Remaining: {time_remaining}
-- Agent Workload: {agent_workload}
+**讨论上下文：**
+- 当前阶段：{phase}
+- 当前轮次：{iteration}/{max_iterations}
+- 剩余时间：{time_remaining}
+- 智能体负载：{agent_workload}
 
-**Available Agents:**
+**可用智能体：**
 - critical_evaluator: [{evaluator_status}]
 - innovative_insighter: [{insighter_status}]
 - practical_applicator: [{applicator_status}]
 - theoretical_integrator: [{integrator_status}]
 
-**Task Requirements:**
-1. Create tasks appropriate for current discussion phase
-2. Balance workload across available agents
-3. Consider task dependencies and sequencing
-4. Prioritize high-impact tasks
-5. Respect agent availability and current workload
+**任务要求：**
+1. 为当前阶段创建合适的任务
+2. 在可用智能体之间平衡工作量
+3. 考虑任务依赖关系与执行顺序
+4. 优先安排高影响力任务
+5. 尊重智能体可用性与当前负载
 
-**Task Types Available:**
-- generate_insights: For initial analysis phase
-- ask_question: For questioning phase
-- answer_question: For responding phase
-- evaluate_convergence: For convergence phase
+**可选任务类型：**
+- generate_insights：用于初始分析阶段
+- ask_question：用于提问阶段
+- answer_question：用于回应阶段
+- evaluate_convergence：用于收敛评估阶段
 
-**Create tasks in this format:**
+**请按以下格式创建任务：**
 ```
 Task 1:
 - Type: [task_type]
@@ -223,4 +227,4 @@ Task 2:
 ...
 ```
 
-Focus on tasks that will advance the discussion toward convergence while ensuring all perspectives are heard."""
+请聚焦那些既能推进讨论走向收敛、又能确保所有视角都被听见的任务。"""

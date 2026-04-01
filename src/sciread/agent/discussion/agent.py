@@ -44,7 +44,7 @@ class DiscussionAgent:
         self.model = get_model(model_name)
         self.agent = Agent(
             self.model,
-            system_prompt="You are a discussion coordinator for multi-agent academic paper analysis.",
+            system_prompt="你是一名多智能体学术论文分析的讨论协调者。",
         )
 
         # Configuration
@@ -101,13 +101,13 @@ class DiscussionAgent:
             return result
 
         except Exception as e:
-            logger.error(f"Discussion analysis failed: {e}")
+            logger.error(f"讨论式分析失败：{e}")
             # Create error result
             return DiscussionResult(
-                document_title=document.metadata.title or "Untitled",
-                summary=f"Discussion analysis failed: {e!s}",
+                document_title=document.metadata.title or "未命名论文",
+                summary=f"讨论式分析失败：{e!s}",
                 key_contributions=[],
-                significance="Analysis failed",
+                significance="分析失败",
                 confidence_score=0.0,
                 completion_time=datetime.now(UTC),
                 discussion_metadata={"error": str(e)},
@@ -501,7 +501,7 @@ class DiscussionAgent:
         insight.confidence = max(float(getattr(insight, "confidence", 0.0)), float(getattr(response, "confidence", 0.0)))
 
         supporting_evidence = list(getattr(insight, "supporting_evidence", []))
-        revision_note = f"Revised after {response.question_id}: {previous_content}"
+        revision_note = f"在 {response.question_id} 之后修订：{previous_content}"
         if revision_note not in supporting_evidence:
             supporting_evidence.append(revision_note)
             insight.supporting_evidence = supporting_evidence
@@ -520,36 +520,42 @@ class DiscussionAgent:
         lines = []
 
         if asked_by_me:
-            lines.append("Questions you asked:")
+            lines.append("你提出的问题：")
             for q in asked_by_me:
                 resp = next(
                     (r for r in self.all_responses if r.question_id == q.question_id),
                     None,
                 )
-                to_name = str(q.to_agent).replace("_", " ").title()
-                status = f"Answered (stance: {resp.stance})" if resp else "Pending"
+                to_name = self._format_agent_name(q.to_agent)
+                status = f"已回答（立场：{resp.stance}）" if resp else "待处理"
                 lines.append(f'  [{q.question_id}] \u2192 {to_name}: "{q.content[:100]}..." ({status})')
 
         if directed_to_me:
-            lines.append("\nQuestions directed at you:")
+            lines.append("\n指向你的问题：")
             for q in directed_to_me:
                 resp = next(
                     (r for r in self.all_responses if r.question_id == q.question_id),
                     None,
                 )
-                from_name = str(q.from_agent).replace("_", " ").title()
-                status = "Answered" if resp else "Pending - please answer"
-                lines.append(f'  [{q.question_id}] From {from_name}: "{q.content[:100]}..." ({status})')
+                from_name = self._format_agent_name(q.from_agent)
+                status = "已回答" if resp else "待回答"
+                lines.append(f'  [{q.question_id}] 来自 {from_name}: "{q.content[:100]}..." ({status})')
 
-        return "\n".join(lines) if lines else "No prior Q&A involving you."
+        return "\n".join(lines) if lines else "此前没有与你相关的问答。"
 
     def _format_agent_name(self, personality: AgentPersonality | str | None) -> str:
         """Format agent personality names for logs."""
         if personality is None:
-            return "Unknown Agent"
+            return "未知角色"
 
         agent_value = personality.value if isinstance(personality, AgentPersonality) else str(personality)
-        return agent_value.replace("_", " ").title()
+        display_names = {
+            AgentPersonality.CRITICAL_EVALUATOR.value: "批判性评估者",
+            AgentPersonality.INNOVATIVE_INSIGHTER.value: "创新洞察者",
+            AgentPersonality.PRACTICAL_APPLICATOR.value: "实践应用者",
+            AgentPersonality.THEORETICAL_INTEGRATOR.value: "理论整合者",
+        }
+        return display_names.get(agent_value, agent_value.replace("_", " ").title())
 
     def _truncate_for_log(self, text: str | None, limit: int = 160) -> str:
         """Normalize and trim log text to a readable summary."""

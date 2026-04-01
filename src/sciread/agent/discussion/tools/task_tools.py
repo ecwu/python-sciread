@@ -90,7 +90,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
-        error_msg = f"Insight generation failed: {e!s}"
+        error_msg = f"洞见生成失败：{e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -149,7 +149,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
-        error_msg = f"Question generation failed: {e!s}"
+        error_msg = f"问题生成失败：{e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -212,7 +212,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
-        error_msg = f"Answer generation failed: {e!s}"
+        error_msg = f"回答生成失败：{e!s}"
         logger.error(error_msg)
 
         return TaskResult(
@@ -258,7 +258,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
             task_id=task.task_id,
             success=True,
             execution_time=execution_time,
-            analysis_result=f"Convergence score: {evaluation.get('convergence_score', 0.0)}",
+            analysis_result=f"收敛评分：{evaluation.get('convergence_score', 0.0)}",
             confidence=evaluation.get("convergence_score", 0.5),
             metadata={
                 "personality": personality.value,
@@ -271,7 +271,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
 
     except Exception as e:
         execution_time = (datetime.now(UTC) - start_time).total_seconds()
-        error_msg = f"Convergence evaluation failed: {e!s}"
+        error_msg = f"收敛评估失败：{e!s}"
         logger.error(error_msg)
 
         return TaskResult(

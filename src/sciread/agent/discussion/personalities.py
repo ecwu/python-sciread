@@ -22,6 +22,14 @@ from .prompts.personalities import get_personality_system_prompt
 logger = get_logger(__name__)
 
 
+PERSONALITY_DISPLAY_NAMES = {
+    AgentPersonality.CRITICAL_EVALUATOR: "批判性评估者",
+    AgentPersonality.INNOVATIVE_INSIGHTER: "创新洞察者",
+    AgentPersonality.PRACTICAL_APPLICATOR: "实践应用者",
+    AgentPersonality.THEORETICAL_INTEGRATOR: "理论整合者",
+}
+
+
 class PersonalityAgent:
     """Base class for personality-based agents."""
 
@@ -34,6 +42,18 @@ class PersonalityAgent:
         self.logger = get_logger(f"{__name__}.{personality.value}")
         self.message_history: list[ModelMessage] = []
         self.abbrev = AGENT_ABBREVIATIONS.get(personality, "XX")
+
+    def _display_name(self, personality: AgentPersonality | str | None = None) -> str:
+        """Return a Chinese display name for a personality."""
+        target = personality or self.personality
+        if isinstance(target, AgentPersonality):
+            return PERSONALITY_DISPLAY_NAMES.get(target, target.value)
+
+        try:
+            enum_value = AgentPersonality(target)
+            return PERSONALITY_DISPLAY_NAMES.get(enum_value, enum_value.value)
+        except Exception:
+            return str(target)
 
     async def _run_with_history(self, prompt: str):
         """Run agent with message history persistence."""
@@ -55,11 +75,11 @@ class PersonalityAgent:
 
             # Get abstract from document
             abstract_chunks = document.get_sections_by_name(["abstract"])
-            abstract_text = " ".join(chunk.content for chunk in abstract_chunks) if abstract_chunks else "No abstract available"
+            abstract_text = " ".join(chunk.content for chunk in abstract_chunks) if abstract_chunks else "暂无摘要"
 
             # Step 1: Let agent select which sections to read based on personality
             section_names = document.get_section_names()
-            selected_sections = await self._select_sections_to_read(document.metadata.title or "Untitled", abstract_text, section_names)
+            selected_sections = await self._select_sections_to_read(document.metadata.title or "未命名论文", abstract_text, section_names)
 
             self.logger.debug(f"{self.personality.value} selected sections: {selected_sections}")
 
@@ -69,7 +89,7 @@ class PersonalityAgent:
             # Step 3: Build the prompt with actual content
             prompt = build_insight_generation_prompt(
                 personality=self.personality,
-                document_title=document.metadata.title or "Untitled",
+                document_title=document.metadata.title or "未命名论文",
                 document_abstract=abstract_text,
                 key_sections=section_names,
                 selected_sections_content=selected_content,
@@ -107,41 +127,46 @@ class PersonalityAgent:
 
             insights_text = ""
             for insight in target_insights:
-                author_name = str(insight.agent_id).replace("_", " ").title()
-                insights_text += f"\n[{insight.insight_id}] From {author_name} (importance: {insight.importance_score}):\n"
+                author_name = self._display_name(insight.agent_id)
+                insights_text += f"\n[{insight.insight_id}] 来自 {author_name}（重要性：{insight.importance_score}）：\n"
                 insights_text += f'  "{insight.content}"\n'
                 if insight.supporting_evidence:
-                    insights_text += f'  Evidence: "{insight.supporting_evidence[0][:200]}..."\n'
+                    insights_text += f'  证据："{insight.supporting_evidence[0][:200]}..."\n'
 
             qa_summary = self._format_role_qa_summary(discussion_context)
 
             prompt = f"""
-As a {self.personality.value.replace("_", " ").title()}, review the following insights from other agents and decide which to question.
+请你以{self._display_name()}的视角，审阅以下来自其他智能体的洞见，并判断哪些值得继续追问。
 
-**Insights to review:**
+**待审阅洞见：**
 {insights_text}
 
 {qa_summary}
 
-**Discussion Context:**
-Current Phase: {discussion_context.get("phase", "questioning")}
-Iteration: {discussion_context.get("iteration", 1)}
+**讨论上下文：**
+当前阶段：{discussion_context.get("phase", "questioning")}
+当前轮次：{discussion_context.get("iteration", 1)}
 
-**Your Task:**
-For each insight you want to question, provide a specific, critical, or clarifying question.
-Only ask a question if it will meaningfully advance the discussion. If an insight already satisfies your concerns OR your previous questions addressed the topic, choose to skip.
+**你的任务：**
+针对每条洞见，判断是否需要提出具体的追问、质疑或澄清问题。
+只有当提问能实质性推进讨论时才选择提问；如果该洞见已经回应了你的关注点，或者你之前的问题已经覆盖了该主题，请选择跳过。
 
-For each insight you evaluate, use this format:
+**输出要求：**
+- 原因说明和问题内容请使用中文。
+- `Question about [...]`、`Decision:`、`Reason:`、`Question:`、`Priority:`、`Type:` 这些字段标签必须保留英文。
+- `Decision` 只能使用 `ask` 或 `skip`；`Type` 只能使用 `clarification`、`challenge`、`extension` 或 `none`。
+
+对每条洞见，都必须使用如下格式：
 ---
 Question about [INS-XX-01]:
 Decision: [ask|skip]
-Reason: [brief justification]
-Question: [your specific question or "None" if skipping]
-Priority: [0.0-1.0 score, 0.0 for skip]
+Reason: [请用中文简要说明理由]
+Question: [请用中文写出具体问题；若跳过则填写 "None"]
+Priority: [0.0-1.0，若跳过则填写 0.0]
 Type: [clarification/challenge/extension/none]
 ---
 
-Provide a block for EVERY insight listed above.
+上方列出的每条洞见都必须输出一个完整区块。
 """
 
             result = await self._run_with_history(prompt)
@@ -166,39 +191,44 @@ Provide a block for EVERY insight listed above.
 
             questions_text = ""
             for q in questions:
-                from_name = str(q.from_agent).replace("_", " ").title()
-                questions_text += f'\n[{q.question_id}] From {from_name} about insight "{q.target_insight}":\n'
+                from_name = self._display_name(q.from_agent)
+                questions_text += f'\n[{q.question_id}] 来自 {from_name}，针对洞见“{q.target_insight}”：\n'
                 questions_text += f'  "{q.content}"\n'
 
             insights_text = "\n".join([f"- [{i.insight_id}] {i.content}" for i in my_insights])
             qa_summary = self._format_role_qa_summary(discussion_context)
 
             prompt = f"""
-You have the following questions to answer:
+请回答以下问题：
 {questions_text}
 
-**Your Relevant Insights:**
+**与你相关的洞见：**
 {insights_text}
 
 {qa_summary}
 
-**Discussion Context:**
-Current Phase: {discussion_context.get("phase", "responding")}
-Iteration: {discussion_context.get("iteration", 1)}
+**讨论上下文：**
+当前阶段：{discussion_context.get("phase", "responding")}
+当前轮次：{discussion_context.get("iteration", 1)}
 
-**Your Task:**
-For each question, provide your answer. Maintain your personality's perspective, provide clear reasoning, and suggest revisions to your insights if appropriate.
+**你的任务：**
+请逐条作答。回答时要保持你的角色视角，给出清晰推理；如有必要，可以修订自己的洞见。
 
-For each question, provide your answer using this exact format:
+**输出要求：**
+- `Answer to [...]`、`Response:`、`Stance:`、`Revised Insight:`、`Confidence:` 这些字段标签必须保留英文。
+- 回答正文与修订内容请使用中文。
+- `Stance` 必须使用 `agree`、`disagree`、`clarify` 或 `modify` 之一。
+
+每个问题都必须使用以下精确格式：
 ---
 Answer to [Q-XX-01]:
-Response: [Your detailed response]
+Response: [请用中文写出详细回答]
 Stance: [agree/disagree/clarify/modify]
-Revised Insight: [If modifying, provide revised insight text, otherwise "None"]
+Revised Insight: [若需修订，请用中文写出修订后的洞见；否则填写 "None"]
 Confidence: [0.0-1.0]
 ---
 
-Provide a block for EVERY question listed above.
+上方列出的每个问题都必须输出一个完整区块。
 """
 
             result = await self._run_with_history(prompt)
@@ -215,7 +245,7 @@ Provide a block for EVERY question listed above.
         """Format a summary of Q&A involving this agent's role."""
         qa_summary = discussion_context.get("role_qa_summary", "")
         if qa_summary:
-            return f"**Q&A involving you ({self.personality.value.replace('_', ' ').title()}):**\n{qa_summary}"
+            return f"**与你相关的问答（{self._display_name()}）：**\n{qa_summary}"
         return ""
 
     def _parse_batch_questions_response(self, response: str, target_insights: list[AgentInsight]) -> list[Question]:
@@ -291,23 +321,23 @@ Provide a block for EVERY question listed above.
         """Select which sections to read based on personality and paper overview."""
         try:
             prompt = f"""
-As a {self.personality.value.replace("_", " ").title()}, you need to select which sections of a paper to read carefully.
+请你以{self._display_name()}的视角，选择这篇论文中最值得重点阅读的章节。
 
-**Paper Title:** {title}
-**Abstract:** {abstract}
+**论文标题：** {title}
+**摘要：** {abstract}
 
-**Available Sections:**
+**可选章节：**
 {chr(10).join(f"{i + 1}. {section}" for i, section in enumerate(available_sections))}
 
-**Your Task:**
-Based on your analytical focus as a {self.personality.value.replace("_", " ").title()}, select 3-5 sections that are most relevant to your perspective:
-- Critical Evaluator: Focus on methodology, results, limitations
-- Innovative Insighter: Focus on novel approaches, innovations, future work
-- Practical Applicator: Focus on applications, experiments, real-world impact
-- Theoretical Integrator: Focus on theoretical framework, related work, conclusions
+**你的任务：**
+请依据你的分析重点，从中选择 3-5 个最相关的章节：
+- 批判性评估者：重点关注方法、结果、局限
+- 创新洞察者：重点关注新方法、创新点、未来工作
+- 实践应用者：重点关注应用、实验、真实世界影响
+- 理论整合者：重点关注理论框架、相关工作、结论
 
-Respond with ONLY the section names you want to read, one per line, exactly as they appear in the list above.
-Select sections that will help you provide the most valuable insights from your unique perspective.
+请只返回你要阅读的章节名，每行一个，并且必须与上方列表中的章节名完全一致。
+请选择那些最有助于你从自身视角产出高价值洞见的章节。
 """
 
             result = await self._run_with_history(prompt)
@@ -477,7 +507,7 @@ Select sections that will help you provide the most valuable insights from your 
 
             insight_author = getattr(target_insight, "agent_id", target_agent)
             author_value = getattr(insight_author, "value", insight_author)
-            author_name = str(author_value).replace("_", " ").title()
+            author_name = self._display_name(author_value)
 
             prior_qa = discussion_context.get("prior_qa_for_insight", [])
             my_prior_questions = discussion_context.get("my_prior_questions", [])
@@ -486,44 +516,49 @@ Select sections that will help you provide the most valuable insights from your 
             my_prior_text = self._format_my_prior_questions_for_prompt(my_prior_questions)
 
             prompt = f"""
-As a {self.personality.value.replace("_", " ").title()}, review the following insight and decide whether a follow-up question is truly necessary.
+请你以{self._display_name()}的视角审阅以下洞见，并判断是否真的有必要继续追问。
 
-**Insight Author:** {author_name}
-**You Are Asking To:** {target_agent.value.replace("_", " ").title()}
+**洞见作者：** {author_name}
+**提问对象：** {self._display_name(target_agent)}
 
-**Target Insight:**
+**目标洞见：**
 {target_insight.content}
-**Importance Score:** {target_insight.importance_score}
-**Confidence:** {target_insight.confidence}
-**Supporting Evidence:** {", ".join(target_insight.supporting_evidence)}
+**重要性评分：** {target_insight.importance_score}
+**置信度：** {target_insight.confidence}
+**支撑证据：** {", ".join(target_insight.supporting_evidence)}
 
 {prior_qa_text}
 
 {my_prior_text}
 
-**Discussion Context:**
-Current Phase: {discussion_context.get("phase", "questioning")}
-Iteration: {discussion_context.get("iteration", 1)}
-Questions Asked So Far: {discussion_context.get("total_questions", 0)}
+**讨论上下文：**
+当前阶段：{discussion_context.get("phase", "questioning")}
+当前轮次：{discussion_context.get("iteration", 1)}
+当前累计提问数：{discussion_context.get("total_questions", 0)}
 
-**Before deciding to ask anything, reflect on:**
-- Does this insight contain unresolved risks, contradictions, or missing evidence from your perspective?
-- Have your previous questions been answered satisfactorily? If yes, no need to ask again.
-- If your question was answered, does the response address your concern or create new ones?
-- Would asking a NEW question materially change the shared understanding or convergence?
+**在决定是否提问前，请先思考：**
+- 从你的视角看，这条洞见是否仍存在未解决的风险、矛盾或证据缺口？
+- 你之前的问题是否已经得到满意回答？如果是，就不必重复提问。
+- 如果之前的问题已被回答，该回答是否真正回应了你的关切，还是引出了新的问题？
+- 再提出一个新问题，是否会实质性改变当前的共同理解或收敛状态？
 
-Only ask a question if it will meaningfully advance the discussion. If the insight already satisfies your concerns OR your previous question has been answered satisfactorily, choose to skip.
+只有在提问能显著推进讨论时才选择提问。如果该洞见已经回应了你的关切，或者你之前的问题已得到充分回答，请直接跳过。
 
-Provide your response in *exactly* this format:
+**输出要求：**
+- 理由和问题内容请使用中文。
+- `Decision:`、`Reason:`、`Question:`、`Priority:`、`Type:` 这些字段标签必须保留英文。
+- `Decision` 只能填写 `ask` 或 `skip`；`Question: None`、`Priority: 0.0`、`Type: none` 表示跳过。
+
+请严格使用以下格式：
 ```
 Decision: [ask|skip]
-Reason: [brief justification for your decision from your personality's viewpoint]
-Question: [your specific question or "None" if skipping]
-Priority: [0.0-1.0 importance score, use 0.0 when skipping]
+Reason: [请用中文说明你做出该决定的理由]
+Question: [请用中文写出具体问题；若跳过则填写 "None"]
+Priority: [0.0-1.0，若跳过则填写 0.0]
 Type: [clarification/challenge/extension/none]
 ```
-When you choose `Decision: skip`, you must set `Question: None`, `Priority: 0.0`, and `Type: none`.
-When you choose `Decision: ask`, craft one precise question that reflects your personality and advances the dialogue.
+当你选择 `Decision: skip` 时，必须将 `Question` 设为 `None`、`Priority` 设为 `0.0`、`Type` 设为 `none`。
+当你选择 `Decision: ask` 时，请提出一个精准、能推进对话的问题。
 """
 
             result = await self._run_with_history(prompt)
@@ -561,31 +596,36 @@ When you choose `Decision: ask`, craft one precise question that reflects your p
             relevant_insights = self._find_relevant_insights_for_question(my_insights, question)
 
             prompt = f"""
-As a {self.personality.value.replace("_", " ").title()}, answer the following question from {from_agent_str.replace("_", " ").title()}:
+请你以{self._display_name()}的视角，回答来自 {self._display_name(from_agent_str)} 的以下问题：
 
-**Question:**
+**问题：**
 {question.content}
 
-**Your Relevant Insights:**
-{chr(10).join(f"- {insight.content}" for insight in relevant_insights) if relevant_insights else "No direct relevant insights found."}
+**与你相关的洞见：**
+{chr(10).join(f"- {insight.content}" for insight in relevant_insights) if relevant_insights else "暂未检索到可直接对应的洞见，请基于你的角色理解作答。"}
 
-**Discussion Context:**
-Current Phase: {discussion_context.get("phase", "responding")}
-Question Priority: {question.priority}
+**讨论上下文：**
+当前阶段：{discussion_context.get("phase", "responding")}
+问题优先级：{question.priority}
 
-**Your Task:**
-Provide a thoughtful response that:
-1. Directly addresses the question
-2. Maintains your personality's perspective
-3. Provides clear reasoning and evidence
-4. Suggests revisions to your insights if appropriate
+**你的任务：**
+请给出一个经过思考的回答，并满足以下要求：
+1. 直接回应问题本身
+2. 保持你的角色视角
+3. 给出清晰的推理和依据
+4. 如有必要，提出对原洞见的修订
 
-Provide your response in this format:
+**输出要求：**
+- 回答内容请使用中文。
+- `Response:`、`Stance:`、`Revised Insight:`、`Confidence:` 这些字段标签必须保留英文。
+- `Stance` 必须使用 `agree`、`disagree`、`clarify` 或 `modify`。
+
+请按以下格式输出：
 ```
-Response: [Your detailed response]
+Response: [请用中文写出详细回答]
 Stance: [agree/disagree/clarify/modify]
-Revised Insight: [If modifying, provide revised insight text, otherwise "None"]
-Confidence: [0.0-1.0 confidence in your response]
+Revised Insight: [若需修订，请用中文写出修订后的洞见；否则填写 "None"]
+Confidence: [0.0-1.0，表示你对该回答的置信度]
 ```
 """
 
@@ -615,33 +655,37 @@ Confidence: [0.0-1.0 confidence in your response]
             my_questions_answered = self._count_my_answered_questions(all_questions, all_responses)
 
             prompt = f"""
-As a {self.personality.value.replace("_", " ").title()}, evaluate whether the discussion has reached sufficient convergence:
+请你以{self._display_name()}的视角，判断当前讨论是否已经达到足够的收敛程度：
 
-**Current State:**
-- Total Insights: {len(all_insights)}
-- Total Questions: {len(all_questions)}
-- Total Responses: {len(all_responses)}
-- Current Iteration: {discussion_context.get("iteration", 1)}
-- Your questions answered: {my_questions_answered["answered"]}/{my_questions_answered["total"]}
+**当前状态：**
+- 总洞见数：{len(all_insights)}
+- 总问题数：{len(all_questions)}
+- 总回答数：{len(all_responses)}
+- 当前轮次：{discussion_context.get("iteration", 1)}
+- 你提出的问题中已获回答：{my_questions_answered["answered"]}/{my_questions_answered["total"]}
 
-**Recent Insights from All Agents:**
-{chr(10).join(f"{insight.agent_id}: {insight.content[:150]}..." for insight in all_insights[-8:])}
+**各智能体最近的洞见：**
+{chr(10).join(f"{self._display_name(insight.agent_id)}：{insight.content[:150]}..." for insight in all_insights[-8:])}
 
-**Recent Q&A Discussion Thread:**
+**最近的问答线程：**
 {qa_thread}
 
-**Evaluation Criteria:**
-1. Are insights becoming more consistent and aligned?
-2. Are your questions being answered? Were the answers satisfactory?
-3. Are major disagreements being resolved through the Q&A?
-4. From your perspective, is further discussion likely to yield significant new insights?
+**评估标准：**
+1. 各方洞见是否正在变得更加一致？
+2. 你提出的问题是否得到了回答，且回答是否令人满意？
+3. 主要分歧是否正在通过问答被消解？
+4. 从你的视角看，继续讨论是否还可能产生重要新洞见？
 
-**Provide your evaluation in this format:**
+**输出要求：**
+- 解释性内容请使用中文。
+- 为了兼容现有解析流程，以下字段标签必须保留英文，`Continue Discussion` 只能填写 `yes` 或 `no`。
+
+请按以下格式作答：
 ```
 Convergence Score: [0.0-1.0]
 Continue Discussion: [yes/no]
-Key Issues Remaining: [List any major unresolved issues]
-Recommendations: [Any suggestions for next steps]
+Key Issues Remaining: [请用中文列出尚未解决的关键问题]
+Recommendations: [请用中文给出下一步建议]
 ```
 """
 
@@ -658,7 +702,7 @@ Recommendations: [Any suggestions for next steps]
     def _build_qa_thread_summary(self, all_questions: list[Question], all_responses: list[Response]) -> str:
         """Build a summary of Q&A threads for convergence evaluation."""
         if not all_questions:
-            return "(No questions asked yet)"
+            return "（目前还没有提出任何问题）"
 
         response_map = {r.question_id: r for r in all_responses}
         lines = []
@@ -669,15 +713,15 @@ Recommendations: [Any suggestions for next steps]
             response = response_map.get(q.question_id)
 
             q_summary = q.content[:100] + "..." if len(q.content) > 100 else q.content
-            lines.append(f"Q ({from_agent} → {to_agent}): {q_summary}")
+            lines.append(f"问（{self._display_name(from_agent)} → {self._display_name(to_agent)}）：{q_summary}")
 
             if response:
                 r_summary = response.content[:100] + "..." if len(response.content) > 100 else response.content
-                lines.append(f"  A ({response.stance}): {r_summary}")
+                lines.append(f"  答（立场：{response.stance}）：{r_summary}")
             else:
-                lines.append("  A: (Pending)")
+                lines.append("  答：（待回复）")
 
-        return "\n".join(lines) if lines else "(No Q&A yet)"
+        return "\n".join(lines) if lines else "（暂无问答）"
 
     def _count_my_answered_questions(self, all_questions: list[Question], all_responses: list[Response]) -> dict[str, int]:
         """Count how many of this agent's questions have been answered."""
@@ -779,7 +823,7 @@ Recommendations: [Any suggestions for next steps]
                         content=response[:500],
                         importance_score=0.5,
                         confidence=0.5,
-                        supporting_evidence=["(Unstructured response - no specific evidence extracted)"],
+                        supporting_evidence=["（未解析出结构化字段，未能提取明确证据）"],
                         related_sections=document.get_section_names()[:3],
                     )
                 )
@@ -792,7 +836,7 @@ Recommendations: [Any suggestions for next steps]
                     content=response[:500],
                     importance_score=0.5,
                     confidence=0.5,
-                    supporting_evidence=["(Parse error - no evidence extracted)"],
+                    supporting_evidence=["（解析响应失败，未能提取证据）"],
                     related_sections=[],
                 )
             )
@@ -816,20 +860,20 @@ Recommendations: [Any suggestions for next steps]
         if not prior_qa:
             return ""
 
-        lines = ["**Prior Questions & Answers about this insight:**"]
+        lines = ["**关于该洞见的既往问答：**"]
         for qa in prior_qa:
-            from_agent = qa.get("from_agent", "Unknown")
+            from_agent = self._display_name(qa.get("from_agent", "未知角色"))
             question = qa.get("question", "")
             response = qa.get("response")
             stance = qa.get("response_stance")
 
-            lines.append(f"- Q from {from_agent}: {question}")
+            lines.append(f"- 来自 {from_agent} 的问题：{question}")
             if response:
-                lines.append(f"  A: {response[:200]}..." if len(response) > 200 else f"  A: {response}")
+                lines.append(f"  回答：{response[:200]}..." if len(response) > 200 else f"  回答：{response}")
                 if stance:
-                    lines.append(f"  Stance: {stance}")
+                    lines.append(f"  立场：{stance}")
             else:
-                lines.append("  A: (No response yet)")
+                lines.append("  回答：（尚未收到回复）")
 
         return "\n".join(lines)
 
@@ -838,19 +882,19 @@ Recommendations: [Any suggestions for next steps]
         if not my_prior_questions:
             return ""
 
-        lines = ["**Your previous questions about this insight:**"]
+        lines = ["**你此前围绕该洞见提出的问题：**"]
         for qa in my_prior_questions:
             question = qa.get("question", "")
             response = qa.get("response")
             stance = qa.get("response_stance")
 
-            lines.append(f"- Your question: {question}")
+            lines.append(f"- 你的问题：{question}")
             if response:
-                lines.append(f"  Response received: {response[:200]}..." if len(response) > 200 else f"  Response received: {response}")
+                lines.append(f"  已收到回复：{response[:200]}..." if len(response) > 200 else f"  已收到回复：{response}")
                 if stance:
-                    lines.append(f"  Their stance: {stance}")
+                    lines.append(f"  对方立场：{stance}")
             else:
-                lines.append("  (Awaiting response)")
+                lines.append("  （等待回复中）")
 
         return "\n".join(lines)
 
@@ -897,7 +941,7 @@ Recommendations: [Any suggestions for next steps]
             if skip_requested:
                 return {
                     "decision": "skip",
-                    "reason": reason or "No further clarification needed.",
+                    "reason": reason or "当前无需继续澄清。",
                     "question": None,
                     "priority": 0.0,
                     "type": "none",
