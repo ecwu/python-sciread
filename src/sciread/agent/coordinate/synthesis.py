@@ -37,9 +37,7 @@ def build_execution_summary(sub_agent_results: dict[str, Any]) -> dict[str, Any]
             [result for name, result in sub_agent_results.items() if name != "_sections_analyzed" and not result.get("success", False)]
         ),
         "agent_results": {
-            name: {"success": data.get("success", False)}
-            for name, data in sub_agent_results.items()
-            if name != "_sections_analyzed"
+            name: {"success": data.get("success", False)} for name, data in sub_agent_results.items() if name != "_sections_analyzed"
         },
     }
 
@@ -53,17 +51,25 @@ def build_comprehensive_result(
     """Assemble the final coordinate-agent response model."""
     return ComprehensiveAnalysisResult(
         analysis_plan=analysis_plan,
-        metadata_result=sub_agent_results.get("metadata", {}).get("result") if sub_agent_results.get("metadata", {}).get("success") else None,
+        metadata_result=sub_agent_results.get("metadata", {}).get("result")
+        if sub_agent_results.get("metadata", {}).get("success")
+        else None,
         previous_methods_result=(
-            sub_agent_results.get("previous_methods", {}).get("result") if sub_agent_results.get("previous_methods", {}).get("success") else None
+            sub_agent_results.get("previous_methods", {}).get("result")
+            if sub_agent_results.get("previous_methods", {}).get("success")
+            else None
         ),
         research_questions_result=(
             sub_agent_results.get("research_questions", {}).get("result")
             if sub_agent_results.get("research_questions", {}).get("success")
             else None
         ),
-        methodology_result=sub_agent_results.get("methodology", {}).get("result") if sub_agent_results.get("methodology", {}).get("success") else None,
-        experiment_result=sub_agent_results.get("experiments", {}).get("result") if sub_agent_results.get("experiments", {}).get("success") else None,
+        methodology_result=sub_agent_results.get("methodology", {}).get("result")
+        if sub_agent_results.get("methodology", {}).get("success")
+        else None,
+        experiment_result=sub_agent_results.get("experiments", {}).get("result")
+        if sub_agent_results.get("experiments", {}).get("success")
+        else None,
         future_directions_result=(
             sub_agent_results.get("future_directions", {}).get("result")
             if sub_agent_results.get("future_directions", {}).get("success")

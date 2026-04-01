@@ -63,25 +63,12 @@ class Chunk:
         if self.confidence < 0.0 or self.confidence > 1.0:
             raise ValueError("Confidence must be between 0.0 and 1.0")
 
-        # Keep page range fields synchronized.
-        if self.page_range is not None:
-            if self.page_start is None:
-                self.page_start = self.page_range[0]
-            if self.page_end is None:
-                self.page_end = self.page_range[1]
-        elif self.page_start is not None and self.page_end is not None:
-            self.page_range = (self.page_start, self.page_end)
+        self.sync_page_range()
 
         if self.para_index is None:
             self.para_index = self.position
 
-        if not self.section_path and self.chunk_name and self.chunk_name != "unknown":
-            self.section_path = [self.chunk_name]
-        elif self.chunk_name == "unknown" and self.section_path:
-            self.chunk_name = self.section_path[-1]
-
-        if not self.parent_section_id and self.section_path:
-            self.parent_section_id = self.section_path[-1]
+        self.sync_section_metadata()
 
         if not self.citation_key:
             self.citation_key = self.chunk_id
@@ -99,20 +86,44 @@ class Chunk:
         """Backward-compatible chunk identifier alias."""
         self.chunk_id = value
 
+    def sync_page_range(self) -> None:
+        """Keep page range fields synchronized."""
+        if self.page_range is not None:
+            if self.page_start is None:
+                self.page_start = self.page_range[0]
+            if self.page_end is None:
+                self.page_end = self.page_range[1]
+            return
+
+        if self.page_start is not None and self.page_end is not None:
+            self.page_range = (self.page_start, self.page_end)
+
+    def sync_section_metadata(self) -> None:
+        """Keep section fields synchronized across legacy and normalized metadata."""
+        if not self.section_path and self.chunk_name and self.chunk_name != "unknown":
+            self.section_path = [self.chunk_name]
+        elif self.chunk_name == "unknown" and self.section_path:
+            self.chunk_name = self.section_path[-1]
+
+        if not self.parent_section_id and self.section_path:
+            self.parent_section_id = self.section_path[-1]
+
+    def _set_processed_state(self, processed: bool) -> None:
+        """Update processed state and the derived retrievable flag together."""
+        self.processed = processed
+        self.retrievable = not processed
+
     def toggle_processed(self) -> None:
         """Toggle the processed status of this chunk."""
-        self.processed = not self.processed
-        self.retrievable = not self.processed
+        self._set_processed_state(not self.processed)
 
     def mark_processed(self) -> None:
         """Mark this chunk as processed."""
-        self.processed = True
-        self.retrievable = False
+        self._set_processed_state(True)
 
     def mark_unprocessed(self) -> None:
         """Mark this chunk as unprocessed."""
-        self.processed = False
-        self.retrievable = True
+        self._set_processed_state(False)
 
     @property
     def is_processed(self) -> bool:

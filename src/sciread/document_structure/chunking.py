@@ -29,7 +29,9 @@ def calculate_file_hash(file_path: Path, logger: Logger) -> str:
 
 def build_doc_id(document: Document) -> str:
     """Build a stable document identifier used by chunks and retrieval."""
-    return document.metadata.file_hash or (Path(document.metadata.source_path).stem if document.metadata.source_path else "unnamed_document")
+    return document.metadata.file_hash or (
+        Path(document.metadata.source_path).stem if document.metadata.source_path else "unnamed_document"
+    )
 
 
 def build_retrieval_text(section_path: list[str], content_plain: str) -> str:
@@ -81,19 +83,8 @@ def enrich_chunks(document: Document, chunks: list[Chunk]) -> None:
         if chunk.token_count is None:
             chunk.token_count = len(chunk.content_plain.split())
 
-        if chunk.page_range is not None:
-            if chunk.page_start is None:
-                chunk.page_start = chunk.page_range[0]
-            if chunk.page_end is None:
-                chunk.page_end = chunk.page_range[1]
-        elif chunk.page_start is not None and chunk.page_end is not None:
-            chunk.page_range = (chunk.page_start, chunk.page_end)
-
-        if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
-            chunk.section_path = [chunk.chunk_name]
-
-        if not chunk.parent_section_id and chunk.section_path:
-            chunk.parent_section_id = chunk.section_path[-1]
+        chunk.sync_page_range()
+        chunk.sync_section_metadata()
 
         if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
             chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"

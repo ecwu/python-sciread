@@ -46,6 +46,27 @@ class TestDocument:
         assert doc.text == "Some text"
         assert doc.processing_state.loaded_at is not None
 
+    def test_document_from_text_without_auto_split(self):
+        """Test creating document from text without automatic splitting."""
+        doc = Document.from_text("Abstract\nSome text", auto_split=False)
+
+        assert doc.text == "Abstract\nSome text"
+        assert doc.processing_state.loaded_at is not None
+        assert doc.processing_state.split_at is None
+        assert not doc.is_split
+        assert doc.chunks == []
+
+    def test_document_from_file_without_auto_split(self, sample_txt_file):
+        """Test creating document from file without automatic splitting."""
+        doc = Document.from_file(sample_txt_file, auto_split=False)
+
+        assert doc.source_path == sample_txt_file
+        assert len(doc.text) > 0
+        assert doc.processing_state.loaded_at is not None
+        assert doc.processing_state.split_at is None
+        assert not doc.is_split
+        assert doc.chunks == []
+
     def test_split_document(self, sample_txt_file):
         """Test that document is automatically split."""
         doc = Document.from_file(sample_txt_file)

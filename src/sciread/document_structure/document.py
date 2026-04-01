@@ -92,7 +92,12 @@ class Document:
         Returns:
             Document instance with loaded content and optionally split chunks.
         """
-        return DocumentFactory.create_from_file(file_path, to_markdown=to_markdown)
+        return DocumentFactory.create_from_file(
+            file_path,
+            to_markdown=to_markdown,
+            auto_split=auto_split,
+            **split_kwargs,
+        )
 
     @classmethod
     def from_text(
@@ -114,7 +119,12 @@ class Document:
         Returns:
             Document instance with text and optionally split chunks.
         """
-        return DocumentFactory.create_from_text(text, metadata=metadata)
+        return DocumentFactory.create_from_text(
+            text,
+            metadata=metadata,
+            auto_split=auto_split,
+            **split_kwargs,
+        )
 
     @property
     def chunks(self) -> list[Chunk]:
@@ -261,9 +271,7 @@ class Document:
 
         matching_chunks: list[Chunk] = []
         for chunk in self._chunks:
-            section_parts = [part.strip() for part in chunk.section_path if part.strip()]
-            if not section_parts and chunk.chunk_name and chunk.chunk_name != "unknown":
-                section_parts = [chunk.chunk_name]
+            section_parts = self._get_section_parts(chunk)
 
             if not section_parts:
                 continue
@@ -282,6 +290,15 @@ class Document:
                 matching_chunks.append(chunk)
 
         return matching_chunks
+
+    def _get_section_parts(self, chunk: Chunk) -> list[str]:
+        """Get normalized section path parts for a chunk."""
+        section_parts = [part.strip() for part in chunk.section_path if part.strip()]
+        if section_parts:
+            return section_parts
+        if chunk.chunk_name and chunk.chunk_name != "unknown":
+            return [chunk.chunk_name]
+        return []
 
     def get_neighbor_chunks(
         self,

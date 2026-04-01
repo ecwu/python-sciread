@@ -1,9 +1,4 @@
-"""Document processing module for sciread.
-
-This module provides functionality for loading, processing, and managing
-academic documents through a structured approach with loaders, splitters,
-and document management.
-"""
+"""Public compatibility facade for sciread's document APIs."""
 
 from ..document_ingestion import MineruClient
 from ..document_structure import Chunk

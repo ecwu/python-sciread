@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import TYPE_CHECKING
+from typing import Any
 
 if TYPE_CHECKING:
     from .document import Document
@@ -16,6 +17,8 @@ from .models import DocumentMetadata
 from .splitters import BaseSplitter
 from .splitters import MarkdownSplitter
 from .splitters import SemanticSplitter
+
+TEXT_FILE_EXTENSIONS = {".txt", ".text", ".md", ".rst"}
 
 
 class DocumentBuilder:
@@ -50,7 +53,7 @@ class DocumentBuilder:
         auto_split: bool = True,
         build_vector_index: bool = False,
         persist_index: bool = False,
-        embedding_client=None,
+        embedding_client: Any | None = None,
         **split_kwargs,
     ) -> "Document":
         """
@@ -73,12 +76,10 @@ class DocumentBuilder:
         path = Path(file_path)
         self.logger.debug(f"Creating document from file: {path} (to_markdown={to_markdown})")
 
-        # Initialize default loader if none provided
-        if self.loader is None:
-            self.loader = self._create_default_loader(path, to_markdown)
+        loader = self.loader or self._create_default_loader(path, to_markdown)
 
         # Load the document
-        load_result = self.loader.load(path)
+        load_result = loader.load(path)
         if not load_result.success:
             raise RuntimeError(f"Failed to load document: {load_result.errors}")
 
@@ -92,14 +93,14 @@ class DocumentBuilder:
 
         # Update processing state
         doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note(f"Document loaded using {self.loader.loader_name}")
+        doc.processing_state.add_note(f"Document loaded using {loader.loader_name}")
 
         # Add any warnings to processing state
         for warning in load_result.warnings:
             doc.processing_state.add_note(f"Warning: {warning}")
             self.logger.warning(f"Document loading warning: {warning}")
 
-        self.logger.debug(f"Successfully loaded document using {self.loader.loader_name}: {len(load_result.text)} characters")
+        self.logger.debug(f"Successfully loaded document using {loader.loader_name}: {len(load_result.text)} characters")
 
         # Auto-split if requested
         if auto_split:
@@ -120,7 +121,7 @@ class DocumentBuilder:
         is_markdown: bool = False,
         build_vector_index: bool = False,
         persist_index: bool = False,
-        embedding_client=None,
+        embedding_client: Any | None = None,
         **split_kwargs,
     ) -> "Document":
         """
@@ -170,7 +171,7 @@ class DocumentBuilder:
         doc: "Document",
         build_vector_index: bool = False,
         persist_index: bool = False,
-        embedding_client=None,
+        embedding_client: Any | None = None,
     ) -> "Document":
         """Finalize a loaded/split document into agent-ready chunks.
 
@@ -202,15 +203,10 @@ class DocumentBuilder:
                 to_markdown=to_markdown,
                 mineru_client=self.mineru_client,
             )
-        elif suffix in [".txt", ".md", ".rst"]:
+        if suffix in TEXT_FILE_EXTENSIONS:
             return TxtLoader()
-        else:
-            # Try to use available loaders
-            for loader_class in [PdfLoader, TxtLoader]:
-                if suffix in loader_class(None).supported_extensions:
-                    return loader_class()
 
-            raise ValueError(f"Unsupported file format: {suffix}")
+        raise ValueError(f"Unsupported file format: {suffix}")
 
     def _split_document(self, doc: "Document", splitter: BaseSplitter | None = None, **split_kwargs) -> None:
         """
@@ -239,7 +235,7 @@ class DocumentBuilder:
     def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
         """Create appropriate splitter based on document content."""
         # If document was created with markdown conversion, use the dedicated MarkdownSplitter
-        if doc._is_markdown:
+        if doc.is_markdown:
             return MarkdownSplitter(
                 min_chunk_size=200,
                 max_chunk_size=2000,

@@ -16,31 +16,31 @@ class DocumentFactory:
     """Factory class for creating documents with common configurations."""
 
     @staticmethod
-    def create_from_file(file_path: str | Path, to_markdown: bool = False) -> Document:
+    def create_from_file(file_path: str | Path, to_markdown: bool = False, **builder_kwargs) -> Document:
         """
         Create document from file with default configuration.
 
         Args:
             file_path: Path to the file.
             to_markdown: Whether to convert PDF to markdown.
+            **builder_kwargs: Additional arguments forwarded to ``DocumentBuilder.from_file``.
 
         Returns:
             Document instance.
         """
-        builder = DocumentBuilder()
-        return builder.from_file(file_path, to_markdown=to_markdown)
+        return DocumentBuilder().from_file(file_path, to_markdown=to_markdown, **builder_kwargs)
 
     @staticmethod
-    def create_from_text(text: str, metadata: DocumentMetadata | None = None) -> Document:
+    def create_from_text(text: str, metadata: DocumentMetadata | None = None, **builder_kwargs) -> Document:
         """
         Create document from text with default configuration.
 
         Args:
             text: Raw text content.
             metadata: Document metadata.
+            **builder_kwargs: Additional arguments forwarded to ``DocumentBuilder.from_text``.
 
         Returns:
             Document instance.
         """
-        builder = DocumentBuilder()
-        return builder.from_text(text, metadata=metadata)
+        return DocumentBuilder().from_text(text, metadata=metadata, **builder_kwargs)

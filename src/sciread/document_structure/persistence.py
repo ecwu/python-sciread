@@ -24,7 +24,9 @@ def save_document(document: Document, output_path: Path) -> None:
     document.logger.info(f"Saving document state to {output_path}...")
 
     try:
-        vector_index_path = str(document.vector_index.persist_path.resolve()) if document.vector_index and document.vector_index.persist_path else None
+        vector_index_path = (
+            str(document.vector_index.persist_path.resolve()) if document.vector_index and document.vector_index.persist_path else None
+        )
 
         metadata_dict = asdict(document.metadata)
         if metadata_dict.get("source_path"):
