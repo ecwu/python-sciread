@@ -1,4 +1,3 @@
-from .application import compute
 from .application import run_coordinate_analysis
 from .application import run_discussion_analysis
 from .application import run_react_analysis
@@ -17,7 +16,6 @@ __all__ = [
     "EmbeddingFactory",
     "OllamaClient",
     "SiliconFlowClient",
-    "compute",
     "get_embedding_client",
     "get_logger",
     "get_model",
