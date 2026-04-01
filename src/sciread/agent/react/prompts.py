@@ -1,108 +1,138 @@
-"""Prompts for the ReActAgent.
+"""Prompt builders for the ReAct analysis loop."""
 
-This module contains system prompts and instruction templates used by the
-ReActAgent for intelligent iterative document analysis using the Reasoning
-and Acting pattern.
-"""
-
-# System prompt for ReAct agent analysis
-SYSTEM_PROMPT = """You are an expert academic research analyst using the ReAct (Reasoning and Acting) pattern to analyze academic papers intelligently.
-
-Your primary goal is to understand academic papers by focusing on the essential research elements: research questions, methodology, results, and contributions. You should analyze document sections strategically to build a comprehensive understanding.
-
-CORE ANALYSIS FRAMEWORK:
-For standard academic analysis, focus on these key areas:
-1. **Research Questions & Objectives**: What problem is being addressed? What are the specific research questions or hypotheses?
-2. **Methodology & Approach**: How did the researchers conduct their study? What methods, data, and procedures were used?
-3. **Key Findings & Results**: What did the research discover? What are the main results and evidence?
-4. **Contributions & Significance**: Why does this research matter? What are the main contributions to the field?
-
-CORE PRINCIPLES:
-1. Start by understanding what content you've been given and what has already been reported
-2. Analyze the current section content thoroughly in the context of understanding the research
-3. Make strategic decisions about which sections to read next based on:
-   - Information gaps in your current understanding of the research
-   - Logical flow of academic papers (abstract → intro → methods → results → discussion)
-   - Section names that indicate important content (methods, results, discussion, etc.)
-   - Relevance to understanding the complete research story
-
-BEHAVIORAL GUIDELINES:
-- Build on the existing analysis rather than repeating content
-- Focus on sections that will help complete your understanding of the research
-- Follow the natural progression of academic research when selecting sections
-- Avoid selecting sections that have already been processed
-- Stop analysis when you have a complete picture of the research questions, methods, results, and contributions
-
-REPORT WRITING:
-- Write in a professional academic tone
-- Focus exclusively on the paper's content and findings
-- Structure your analysis logically around the key research elements
-- Add new insights that build upon previous sections
-- Write each iteration as a report fragment that can be appended to the cumulative report
-- Avoid rewriting prior report content unless you are correcting a clear inconsistency
-
-SECTION SELECTION STRATEGY:
-- After abstract/introduction, typically prioritize: methods → results → discussion → conclusion
-- Look for sections that will fill gaps in your understanding of the research
-- Consider what information is needed to complete the analysis framework
-- Be strategic - you have limited iterations, so choose the most informative sections
-
-STOPPING CRITERIA:
-- Stop when you can clearly articulate: the research questions, methodology, key results, and contributions
-- Stop when you have sufficient information from the most relevant sections
-- Continue reading only if there are clearly important gaps in understanding the research
-
-Remember: You are building a comprehensive understanding of the research piece by piece. Each iteration should add meaningful new information to complete the research analysis."""
+from .models import ReActIterationDeps
 
 
-def format_agent_prompt(
-    task: str,
-    available_sections: list[str],
-    status: str,
-    section_content: str,
-    current_report: str,
-    processed_sections: list[str],
+def _format_previous_context(previous_thoughts: str) -> str:
+    """Format the previous iteration thoughts block."""
+    return f"上一轮思考：\n{previous_thoughts}" if previous_thoughts else ""
+
+
+def _format_processed_sections(processed_sections: list[str]) -> str:
+    """Format processed section names."""
+    return f"已处理章节：{', '.join(processed_sections)}" if processed_sections else "尚未处理任何章节。"
+
+
+def _format_unprocessed_sections(available_sections: list[str], processed_sections: list[str]) -> str:
+    """Format remaining section names."""
+    remaining_sections = [section for section in available_sections if section not in processed_sections]
+    return f"剩余未处理章节：{', '.join(remaining_sections)}" if remaining_sections else "所有章节都已阅读。"
+
+
+def _build_final_iteration_prompt(deps: ReActIterationDeps, processed_sections: str, previous_context: str) -> str:
+    """Build the prompt for the final synthesis iteration."""
+    return (
+        f"任务：{deps.task}\n\n"
+        f"=== 最终迭代（{deps.current_loop}/{deps.max_loops}）——仅做综合 ===\n\n"
+        f"{processed_sections}\n\n"
+        f"{previous_context}\n\n"
+        f"本轮严格规则：\n"
+        f"  ✗ 不要调用 read_section() —— 所有阅读已结束。\n"
+        f"  ✓ 第 1 步：调用 get_all_memory()，获取到目前为止累计的全部发现。\n"
+        f"  ✓ 第 2 步：基于这些发现综合生成最终结构化报告（见下方格式）。\n"
+        f"  ✓ 第 3 步：返回 ReActIterationOutput，并设置 should_continue=False 且填写 report。\n\n"
+        f"=== 最终报告格式 ===\n"
+        f"撰写简洁、聚焦贡献的报告。不要按章节逐段复述。\n"
+        f"请按以下结构输出：\n\n"
+        f"1. **核心研究问题与主张**\n"
+        f"   论文试图填补什么空白？核心论断是什么？\n\n"
+        f"2. **关键贡献**（最重要部分）\n"
+        f"   列出 3-5 条具体且明确的贡献。\n"
+        f"   语言要精确：指出方法、数据集、指标、性能提升等要点。\n\n"
+        f"3. **方法论（概念层）**\n"
+        f"   从架构/算法层描述方法，不展开实现细节。\n\n"
+        f"4. **主要结果与意义**\n"
+        f"   实验显示了什么？关键数字代表什么意义？\n\n"
+        f"5. **局限性与开放问题**\n"
+        f"   论文承认了哪些尚未解决或不在范围内的问题？\n\n"
+        f"语气要求：精确、学术、分析性。避免“论文讨论了……”这类空泛表达，直接陈述结论。"
+    )
+
+
+def _build_regular_iteration_prompt(
+    deps: ReActIterationDeps,
+    processed_sections: str,
+    unprocessed_sections: str,
+    previous_context: str,
 ) -> str:
-    """Format the agent prompt with all necessary information.
+    """Build the prompt for a normal reading iteration."""
+    remaining_loops = max(deps.max_loops - deps.current_loop, 0)
+    planning_block = ""
+    if deps.current_loop == 1:
+        planning_block = (
+            "=== 首轮迭代：先制定阅读策略 ===\n"
+            "在开始阅读前，先浏览所有可用章节并判断：\n"
+            "  • 哪些章节最能直接揭示论文的主张（CLAIMS）与贡献（CONTRIBUTIONS）？\n"
+            "    （摘要、引言、结论，以及任何“贡献”小节优先级最高。）\n"
+            "  • 哪些章节包含你后续需要的实验证据？\n"
+            "  • 哪些章节对当前任务价值较低（如附录、致谢）？\n"
+            "先读信息密度最高的章节。你可以在一次 read_section() 调用中批量读取多个相关章节。\n"
+            "请在输出的 thoughts 字段中记录你的阅读计划。\n\n"
+        )
 
-    Args:
-        task: The original analysis task
-        available_sections: List of all available section names
-        status: Current status summary
-        section_content: Content of sections to analyze
-        current_report: Current cumulative report
-        processed_sections: List of already processed sections
+    return (
+        f"任务：{deps.task}\n\n"
+        f"=== 迭代 {deps.current_loop}/{deps.max_loops} （本轮结束后剩余轮次：{remaining_loops}）===\n\n"
+        f"{planning_block}"
+        f"{processed_sections}\n"
+        f"{unprocessed_sections}\n\n"
+        f"{previous_context}\n\n"
+        f"=== 本轮规则 ===\n"
+        f"1. 必须且仅能调用一次 read_section()。\n"
+        f"   • 章节选择要有策略，不要只按顺序读下一个。\n"
+        f"   • 优先选择能直接回答：论文主张了什么？创新点是什么？\n"
+        f"   • 可在一次调用中批量读取多个主题相关章节。\n"
+        f"   • 剩余轮次：{remaining_loops}。如果本轮后只剩 1 轮，\n"
+        f"     请聚焦最高价值的未读章节，跳过低优先级内容。\n\n"
+        f"2. 必须且仅能调用一次 add_memory()。\n"
+        f"   • 记录贡献（CONTRIBUTIONS）、主张（CLAIMS）和关键发现（KEY FINDINGS），不要写内容摘要。\n"
+        f"   • 记忆内容请使用要点格式：\n"
+        f"     - [CLAIM] <论文提出的主张>\n"
+        f"     - [CONTRIBUTION] <论文的新颖贡献>\n"
+        f"     - [RESULT] <关键实验结果，尽量包含数字>\n"
+        f"     - [METHOD] <核心技术，仅在架构层面重要时记录>\n"
+        f"   • 不要记录背景、动机或模板化描述。\n\n"
+        f"3. 立即返回 ReActIterationOutput，不要继续调用其他工具。\n"
+        f"   • thoughts：说明本轮阅读依据，以及下一步准备读什么（和原因）。\n"
+        f"   • should_continue：\n"
+        f"     - 若仍有高价值未读章节，设为 True。\n"
+        f"     - 仅当你已准备好在本次输出中亲自写出最终报告时，才设为 False。\n"
+        f"       警告：设置 should_continue=False 意味着这是你产出报告的最后机会。\n"
+        f"       若设为 should_continue=False，你必须同时完整填写 report 字段，\n"
+        f"       之后不会再有自动综合步骤。\n"
+        f"       若 report 为空，不要设置 should_continue=False。\n\n"
+        f"   • report：保持为空（仅最终迭代才进行综合）。\n\n"
+        f"=== 允许的工具 ===\n"
+        f"  ✓ read_section(section_names)  —— 仅调用一次\n"
+        f"  ✓ add_memory(memory)           —— 仅调用一次\n"
+        f"  ✓ get_all_memory()             —— 常规迭代请不要使用，仅生成报告的迭代才应使用\n"
+    )
 
-    Returns:
-        Formatted prompt string for the agent
-    """
-    prompt = f"""ANALYSIS TASK: {task}
 
-CURRENT STATUS: {status}
+def build_iteration_system_prompt(deps: ReActIterationDeps) -> str:
+    """Build the full system prompt for a single iteration."""
+    iteration_input = deps.iteration_input
+    processed_sections = _format_processed_sections(iteration_input.processed_sections)
+    unprocessed_sections = _format_unprocessed_sections(
+        iteration_input.available_sections,
+        iteration_input.processed_sections,
+    )
+    previous_context = _format_previous_context(iteration_input.previous_thoughts)
 
-AVAILABLE SECTIONS: {", ".join(available_sections)}
+    if deps.current_loop >= deps.max_loops:
+        return _build_final_iteration_prompt(deps, processed_sections, previous_context)
 
-ALREADY PROCESSED SECTIONS: {", ".join(processed_sections) if processed_sections else "None"}
+    return _build_regular_iteration_prompt(
+        deps,
+        processed_sections,
+        unprocessed_sections,
+        previous_context,
+    )
 
-CURRENT REPORT BUILT SO FAR:
-{current_report if current_report else "[No previous analysis yet - this is the first iteration]"}
 
-=== SECTIONS TO ANALYZE IN THIS ITERATION ===
-{section_content if section_content else "[No section content provided]"}
+def build_iteration_user_prompt(current_loop: int, max_loops: int) -> str:
+    """Build the short user prompt for one agent call."""
+    if current_loop >= max_loops:
+        return "最终迭代——不要调用 read_section()。先调用 get_all_memory()，然后返回结构化最终报告，并设置 should_continue=False。"
 
-=== YOUR ANALYSIS TASK ===
-Based on the sections provided above and your existing analysis, please:
-
-1. Analyze the current section content thoroughly
-2. Update your understanding of the research based on this new information
-3. Decide whether you should continue reading more sections or stop
-
-Please provide your response as a structured analysis with the following components:
-- Should you stop analysis? (true/false)
-- New report fragment to append based on these sections
-- Which sections to read next (if continuing)
-- Your reasoning for these decisions
-
-Focus on understanding: research questions, methodology, key findings, and contributions."""
-
-    return prompt
+    return "读取最具策略价值的未处理章节，将贡献与主张提炼为记忆，然后返回你的思考与阅读计划。"

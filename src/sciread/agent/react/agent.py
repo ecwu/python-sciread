@@ -3,8 +3,6 @@
 import asyncio
 import json
 import traceback
-from dataclasses import dataclass
-from dataclasses import field
 from pathlib import Path
 
 from pydantic_ai import Agent
@@ -16,36 +14,17 @@ from ...document_structure import Document
 from ...document_structure.renderers import get_sections_content
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from .models import ReActAnalysisState
+from .models import ReActIterationDeps
 from .models import ReActIterationInput
 from .models import ReActIterationOutput
+from .models import ReActIterationState
+from .prompts import build_iteration_system_prompt
+from .prompts import build_iteration_user_prompt
 
 logger = get_logger(__name__)
 
 console = Console()
-
-
-@dataclass
-class ReActIterationDeps:
-    """Immutable dependencies for a single ReAct iteration."""
-
-    document: Document
-    task: str
-    iteration_input: ReActIterationInput
-    current_loop: int = 1
-    max_loops: int = 8
-    accumulated_memory: str = ""
-    show_progress: bool = True
-
-
-@dataclass
-class ReActIterationState:
-    """Mutable per-iteration state: track tool invocations to enforce single-call rules."""
-
-    read_section_called: bool = False
-    add_memory_called: bool = False
-    sections_read: list[str] = field(default_factory=list)
-    section_content: str = ""
-    memory_text: str = ""
 
 
 def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationState:
@@ -57,7 +36,40 @@ def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationS
     return state
 
 
-# ReAct agent implementation
+def _validate_document_file(document_file: str | Path) -> None:
+    """Validate that the document file exists before processing."""
+    if not Path(document_file).exists():
+        raise FileNotFoundError(f"Document file not found: {document_file}")
+
+
+def _clean_section_names(section_names: list[object]) -> list[str] | None:
+    """Normalize a mixed list into a deduplicated section-name list."""
+    cleaned_names: list[str] = []
+    for name in section_names:
+        if not isinstance(name, str):
+            continue
+
+        normalized_name = name.strip()
+        if normalized_name and normalized_name not in cleaned_names:
+            cleaned_names.append(normalized_name)
+
+    return cleaned_names or None
+
+
+def _get_unprocessed_sections(iteration_input: ReActIterationInput) -> list[str]:
+    """Return section names that have not yet been processed."""
+    return [section for section in iteration_input.available_sections if section not in iteration_input.processed_sections]
+
+
+def _resolve_sections(document: Document, requested_sections: list[str], available_sections: list[str]) -> list[str]:
+    """Resolve requested section names against exact and fuzzy document matches."""
+    resolved_sections: list[str] = []
+    for section in requested_sections:
+        resolved_section = section if section in available_sections else document.get_closest_section_name(section, threshold=0.7)
+        if resolved_section and resolved_section not in resolved_sections:
+            resolved_sections.append(resolved_section)
+
+    return resolved_sections
 
 
 def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
@@ -104,12 +116,7 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
         logger.warning(f"No content found for sections: {section_names}")
         return ""
 
-    content_parts = []
-    for name, content in sections:
-        section_name = name if name != "unknown" else "unknown"
-        content_parts.append(f"=== {section_name.upper()} ===\n{content}")
-
-    combined_content = "\n\n".join(content_parts)
+    combined_content = "\n\n".join(f"=== {name.upper()} ===\n{content}" for name, content in sections)
     logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
@@ -125,7 +132,7 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
         return None
 
     if isinstance(section_names, list):
-        return [name for name in section_names if isinstance(name, str) and name.strip()]
+        return _clean_section_names(section_names)
 
     if isinstance(section_names, str):
         raw = section_names.strip()
@@ -135,7 +142,9 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
         try:
             parsed = json.loads(raw)
             if isinstance(parsed, list):
-                return [name for name in parsed if isinstance(name, str) and name.strip()]
+                return _clean_section_names(parsed)
+            if isinstance(parsed, str):
+                return _clean_section_names([parsed])
         except json.JSONDecodeError:
             # Fallback: treat as a single section name.
             return [raw]
@@ -172,9 +181,7 @@ async def analyze_document_with_react(
     logger.debug(f"Task: {task[:100]}...")
     logger.debug(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
-    # Check if file exists
-    if not Path(document_file).exists():
-        raise FileNotFoundError(f"Document file not found: {document_file}")
+    _validate_document_file(document_file)
 
     # Load and process the document
     document = load_and_process_document(document_file, to_markdown=to_markdown)
@@ -221,100 +228,7 @@ react_iteration_agent = Agent(
 async def react_iteration_system_prompt(
     ctx: RunContext[ReActIterationDeps],
 ) -> str:
-    deps = ctx.deps
-    iteration_input = deps.iteration_input
-    remaining_loops = max(deps.max_loops - deps.current_loop, 0)
-    is_final_iteration = deps.current_loop >= deps.max_loops
-    is_first_iteration = deps.current_loop == 1
-
-    previous_context = f"上一轮思考：\n{iteration_input.previous_thoughts}" if iteration_input.previous_thoughts else ""
-    processed_sections_str = (
-        f"已处理章节：{', '.join(iteration_input.processed_sections)}" if iteration_input.processed_sections else "尚未处理任何章节。"
-    )
-    unprocessed = [s for s in iteration_input.available_sections if s not in iteration_input.processed_sections]
-    unprocessed_str = f"剩余未处理章节：{', '.join(unprocessed)}" if unprocessed else "所有章节都已阅读。"
-
-    # ── FINAL ITERATION: synthesis only, no new reading ──────────────────────
-    if is_final_iteration:
-        return (
-            f"任务：{deps.task}\n\n"
-            f"=== 最终迭代（{deps.current_loop}/{deps.max_loops}）——仅做综合 ===\n\n"
-            f"{processed_sections_str}\n\n"
-            f"{previous_context}\n\n"
-            f"本轮严格规则：\n"
-            f"  ✗ 不要调用 read_section() —— 所有阅读已结束。\n"
-            f"  ✓ 第 1 步：调用 get_all_memory()，获取到目前为止累计的全部发现。\n"
-            f"  ✓ 第 2 步：基于这些发现综合生成最终结构化报告（见下方格式）。\n"
-            f"  ✓ 第 3 步：返回 ReActIterationOutput，并设置 should_continue=False 且填写 report。\n\n"
-            f"=== 最终报告格式 ===\n"
-            f"撰写简洁、聚焦贡献的报告。不要按章节逐段复述。\n"
-            f"请按以下结构输出：\n\n"
-            f"1. **核心研究问题与主张**\n"
-            f"   论文试图填补什么空白？核心论断是什么？\n\n"
-            f"2. **关键贡献**（最重要部分）\n"
-            f"   列出 3-5 条具体且明确的贡献。\n"
-            f"   语言要精确：指出方法、数据集、指标、性能提升等要点。\n\n"
-            f"3. **方法论（概念层）**\n"
-            f"   从架构/算法层描述方法，不展开实现细节。\n\n"
-            f"4. **主要结果与意义**\n"
-            f"   实验显示了什么？关键数字代表什么意义？\n\n"
-            f"5. **局限性与开放问题**\n"
-            f"   论文承认了哪些尚未解决或不在范围内的问题？\n\n"
-            f"语气要求：精确、学术、分析性。避免“论文讨论了……”这类空泛表达，直接陈述结论。"
-        )
-
-    # ── NORMAL ITERATION ──────────────────────────────────────────────────────
-    planning_block = (
-        "=== 首轮迭代：先制定阅读策略 ===\n"
-        "在开始阅读前，先浏览所有可用章节并判断：\n"
-        "  • 哪些章节最能直接揭示论文的主张（CLAIMS）与贡献（CONTRIBUTIONS）？\n"
-        "    （摘要、引言、结论，以及任何“贡献”小节优先级最高。）\n"
-        "  • 哪些章节包含你后续需要的实验证据？\n"
-        "  • 哪些章节对当前任务价值较低（如附录、致谢）？\n"
-        "先读信息密度最高的章节。你可以在一次 read_section() 调用中批量读取多个相关章节。\n"
-        "请在输出的 thoughts 字段中记录你的阅读计划。\n\n"
-        if is_first_iteration
-        else ""
-    )
-
-    return (
-        f"任务：{deps.task}\n\n"
-        f"=== 迭代 {deps.current_loop}/{deps.max_loops} "
-        f"（本轮结束后剩余轮次：{remaining_loops}）===\n\n"
-        f"{planning_block}"
-        f"{processed_sections_str}\n"
-        f"{unprocessed_str}\n\n"
-        f"{previous_context}\n\n"
-        f"=== 本轮规则 ===\n"
-        f"1. 必须且仅能调用一次 read_section()。\n"
-        f"   • 章节选择要有策略，不要只按顺序读下一个。\n"
-        f"   • 优先选择能直接回答：论文主张了什么？创新点是什么？\n"
-        f"   • 可在一次调用中批量读取多个主题相关章节。\n"
-        f"   • 剩余轮次：{remaining_loops}。如果本轮后只剩 1 轮，\n"
-        f"     请聚焦最高价值的未读章节，跳过低优先级内容。\n\n"
-        f"2. 必须且仅能调用一次 add_memory()。\n"
-        f"   • 记录贡献（CONTRIBUTIONS）、主张（CLAIMS）和关键发现（KEY FINDINGS），不要写内容摘要。\n"
-        f"   • 记忆内容请使用要点格式：\n"
-        f"     - [CLAIM] <论文提出的主张>\n"
-        f"     - [CONTRIBUTION] <论文的新颖贡献>\n"
-        f"     - [RESULT] <关键实验结果，尽量包含数字>\n"
-        f"     - [METHOD] <核心技术，仅在架构层面重要时记录>\n"
-        f"   • 不要记录背景、动机或模板化描述。\n\n"
-        f"3. 立即返回 ReActIterationOutput，不要继续调用其他工具。\n"
-        f"   • thoughts：说明本轮阅读依据，以及下一步准备读什么（和原因）。\n"
-        f"   • should_continue：\n"
-        f"     - 若仍有高价值未读章节，设为 True。\n"
-        f"     - 仅当你已准备好在本次输出中亲自写出最终报告时，才设为 False。\n"
-        f"       警告：设置 should_continue=False 意味着这是你产出报告的最后机会。\n"
-        f"       若设为 should_continue=False，你必须同时完整填写 report 字段，\n"
-        f"       之后不会再有自动综合步骤。\n"
-        f"       若 report 为空，不要设置 should_continue=False。\n\n"
-        f"   • report：保持为空（仅最终迭代才进行综合）。\n\n"
-        f"=== 允许的工具 ===\n"
-        f"  ✓ read_section(section_names)  —— 仅调用一次\n"
-        f"  ✓ add_memory(memory)           —— 仅调用一次\n"
-        f"  ✓ get_all_memory()             —— 常规迭代请不要使用，仅生成报告的迭代才应使用\n"
-    )
+    return build_iteration_system_prompt(ctx.deps)
 
 
 @react_iteration_agent.tool
@@ -336,32 +250,20 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     iteration_state.read_section_called = True
 
     available_sections = iteration_input.available_sections
-    processed = iteration_input.processed_sections
-    unprocessed = [s for s in available_sections if s not in processed]
+    processed_sections = iteration_input.processed_sections
+    unprocessed_sections = _get_unprocessed_sections(iteration_input)
 
-    if not unprocessed:
+    if not unprocessed_sections:
         return "提示：所有章节都已处理，没有可读取内容。"
 
-    # Normalize and resolve requested section names
     normalized_section_names = normalize_section_names(section_names)
-    requested_sections = normalized_section_names or [unprocessed[0]]
+    requested_sections = normalized_section_names or [unprocessed_sections[0]]
+    resolved_sections = _resolve_sections(deps.document, requested_sections, available_sections)
 
-    resolved_sections: list[str] = []
-    for section in requested_sections:
-        if section in available_sections and section not in resolved_sections:
-            resolved_sections.append(section)
-            continue
-
-        matched = deps.document.get_closest_section_name(section, threshold=0.7)
-        if matched and matched not in resolved_sections:
-            resolved_sections.append(matched)
-
-    # Filter to only unprocessed sections
-    next_sections = [s for s in resolved_sections if s not in processed]
+    next_sections = [section for section in resolved_sections if section not in processed_sections]
     if not next_sections:
-        return f"提示：请求章节 {resolved_sections} 已处理。当前未处理章节：{unprocessed}"
+        return f"提示：请求章节 {resolved_sections} 已处理。当前未处理章节：{unprocessed_sections}"
 
-    # Fetch content
     section_content = get_section_content(deps.document, next_sections)
     if not section_content.strip():
         return f"警告：在章节 {next_sections} 中未找到内容，请尝试其他章节。"
@@ -434,6 +336,56 @@ class ReActAgent:
 
         self.logger.info(f"Initialized ReActAgent with model: {model}")
 
+    @staticmethod
+    def _build_iteration_deps(
+        document: Document,
+        iteration_input: ReActIterationInput,
+        current_loop: int,
+        max_loops: int,
+        accumulated_memory: str,
+        show_progress: bool,
+    ) -> ReActIterationDeps:
+        """Create the dependency bundle for one iteration."""
+        return ReActIterationDeps(
+            document=document,
+            task=iteration_input.task,
+            iteration_input=iteration_input,
+            current_loop=current_loop,
+            max_loops=max_loops,
+            accumulated_memory=accumulated_memory,
+            show_progress=show_progress,
+        )
+
+    def _fallback_iteration_output(self) -> ReActIterationOutput:
+        """Create a safe fallback output when the model call fails."""
+        return ReActIterationOutput(
+            thoughts="Iteration failed: could not complete analysis.",
+            should_continue=True,
+        )
+
+    def _finalize_iteration_output(
+        self,
+        output: ReActIterationOutput,
+        current_loop: int,
+        max_loops: int,
+        accumulated_memory: str,
+    ) -> ReActIterationOutput:
+        """Force convergence once the maximum loop count is reached."""
+        if current_loop < max_loops or not output.should_continue:
+            return output
+
+        self.logger.info("Final loop reached with should_continue=True; forcing should_continue=False")
+        output.should_continue = False
+        if not output.report.strip() and accumulated_memory.strip():
+            output.report = accumulated_memory.strip()
+
+        return output
+
+    def _log_iteration_exception(self, error: Exception) -> None:
+        """Log iteration failures with traceback context."""
+        self.logger.error(f"Iteration failed: {error}")
+        self.logger.error(f"Traceback: {traceback.format_exc()}")
+
     async def analyze_one_iteration(
         self,
         document: Document,
@@ -458,9 +410,8 @@ class ReActAgent:
         """
         self.logger.debug("Starting single ReAct iteration")
 
-        deps = ReActIterationDeps(
+        deps = self._build_iteration_deps(
             document=document,
-            task=iteration_input.task,
             iteration_input=iteration_input,
             current_loop=current_loop,
             max_loops=max_loops,
@@ -470,39 +421,21 @@ class ReActAgent:
         iteration_state = ReActIterationState()
 
         try:
-            user_message = (
-                "最终迭代——不要调用 read_section()。先调用 get_all_memory()，然后返回结构化最终报告，并设置 should_continue=False。"
-                if deps.current_loop >= deps.max_loops
-                else "读取最具策略价值的未处理章节，将贡献与主张提炼为记忆，然后返回你的思考与阅读计划。"
-            )
             result = await self.agent.run(
-                user_message,
+                build_iteration_user_prompt(current_loop, max_loops),
                 deps=deps,
                 model=self.model,
                 metadata={"iteration_state": iteration_state},
             )
-
             output = result.output if isinstance(result.output, ReActIterationOutput) else None
         except (RuntimeError, ValueError, TypeError) as e:
-            self.logger.error(f"Iteration failed: {e}")
-            self.logger.error(f"Traceback: {traceback.format_exc()}")
+            self._log_iteration_exception(e)
             output = None
 
-        # If agent fails to produce valid output, construct fallback
         if output is None:
-            output = ReActIterationOutput(
-                thoughts="Iteration failed: could not complete analysis.",
-                should_continue=True,
-            )
+            output = self._fallback_iteration_output()
 
-        # Ensure convergence at hard loop limit even if model still asks to continue.
-        if current_loop >= max_loops and output.should_continue:
-            self.logger.info("Final loop reached with should_continue=True; forcing should_continue=False")
-            output.should_continue = False
-            if not output.report.strip() and accumulated_memory.strip():
-                output.report = accumulated_memory.strip()
-
-        return output, iteration_state
+        return self._finalize_iteration_output(output, current_loop, max_loops, accumulated_memory), iteration_state
 
     async def analyze_document(
         self,
@@ -524,90 +457,41 @@ class ReActAgent:
         """
         self.logger.debug(f"Starting ReAct multi-iteration analysis (max_loops={max_loops})")
 
-        available_sections = document.get_section_names()
-        processed_sections: list[str] = []
-        accumulated_memory = ""
-        current_thoughts = ""
-        last_iteration_output: ReActIterationOutput | None = None
-
-        # Initialize with first iteration input
-        iteration_input = ReActIterationInput(
+        analysis_state = ReActAnalysisState(
             task=task,
-            previous_thoughts="",
-            processed_sections=[],
-            available_sections=available_sections,
+            available_sections=document.get_section_names(),
         )
 
-        # Run iterations
         for loop_num in range(1, max_loops + 1):
             self.logger.debug(f"Starting iteration {loop_num}/{max_loops}")
 
-            # Run one iteration
             iteration_output, iteration_state = await self.analyze_one_iteration(
                 document=document,
-                iteration_input=iteration_input,
+                iteration_input=analysis_state.build_iteration_input(),
                 current_loop=loop_num,
                 max_loops=max_loops,
-                accumulated_memory=accumulated_memory,
+                accumulated_memory=analysis_state.accumulated_memory,
                 show_progress=show_progress,
             )
-            last_iteration_output = iteration_output
-
-            # Update tracking
-            for section in iteration_state.sections_read:
-                if section not in processed_sections:
-                    processed_sections.append(section)
-
-            if iteration_state.memory_text:
-                accumulated_memory = (
-                    f"{accumulated_memory}\n\n{iteration_state.memory_text}" if accumulated_memory else iteration_state.memory_text
-                )
-            current_thoughts = iteration_output.thoughts
-
-            remaining_sections = [section for section in available_sections if section not in processed_sections]
+            analysis_state.apply_iteration(iteration_output, iteration_state)
 
             if show_progress:
-                console.print(Markdown(current_thoughts))
+                console.print(Markdown(analysis_state.current_thoughts))
 
-            # Prepare next iteration input
-            iteration_input = ReActIterationInput(
-                task=task,
-                previous_thoughts=current_thoughts,
-                processed_sections=processed_sections,
-                available_sections=available_sections,
-            )
-
-            # Check stopping conditions
             if not iteration_output.should_continue:
                 self.logger.info(f"Agent decided to stop after iteration {loop_num}")
                 if show_progress:
                     print("Agent completed analysis")
                 break
 
-            if not remaining_sections:
+            if not analysis_state.remaining_sections:
                 self.logger.info(f"All sections processed after iteration {loop_num}")
                 if show_progress:
                     print("All available sections have been read")
                 break
 
         self.logger.info(f"Multi-iteration analysis completed after {loop_num} iterations")
-
-        final_thoughts = current_thoughts or "Analysis complete."
-        final_report = (
-            last_iteration_output.report.strip()
-            if last_iteration_output and last_iteration_output.report.strip()
-            else accumulated_memory.strip()
-        )
-        if not final_report:
-            final_report = "No memory content was generated during analysis."
-
-        final_output = ReActIterationOutput(
-            thoughts=final_thoughts,
-            should_continue=False,
-            report=final_report,
-        )
-
-        return final_output
+        return analysis_state.build_final_output()
 
     def __repr__(self) -> str:
         """String representation of the ReActAgent."""
