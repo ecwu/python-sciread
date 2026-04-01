@@ -1,10 +1,6 @@
 """Main Document class for managing document content and chunks."""
 
-import hashlib
-import json
-import re
 from collections.abc import Iterator
-from dataclasses import asdict
 from pathlib import Path
 
 from ..embedding_provider import get_embedding_client
@@ -14,10 +10,18 @@ from ..retrieval.service import build_vector_index as build_document_vector_inde
 from ..retrieval.service import cosine_similarity
 from ..retrieval.service import semantic_search as semantic_search_document
 from ..retrieval.vector_index import VectorIndex
+from .chunking import build_doc_id
+from .chunking import build_retrieval_text
+from .chunking import calculate_file_hash
+from .chunking import enrich_chunks
+from .chunking import set_document_chunks
+from .chunking import to_plain_text
 from .factory import DocumentFactory
 from .models import Chunk
 from .models import DocumentMetadata
 from .models import ProcessingState
+from .persistence import load_document
+from .persistence import save_document
 from .renderers import clean_section_content
 from .renderers import collect_sections as collect_document_sections
 from .renderers import format_for_human
@@ -59,7 +63,7 @@ class Document:
 
         # Calculate file hash if source_path is provided
         if source_path and source_path.exists():
-            self.metadata.file_hash = self._calculate_file_hash(source_path)
+            self.metadata.file_hash = calculate_file_hash(source_path, self.logger)
 
         self.processing_state = processing_state or ProcessingState()
         self._chunks: list[Chunk] = []
@@ -458,16 +462,7 @@ class Document:
 
     def _calculate_file_hash(self, file_path: Path) -> str:
         """Calculate SHA-256 hash of file content."""
-        try:
-            hash_sha256 = hashlib.sha256()
-            with file_path.open("rb") as f:
-                # Read file in chunks to handle large files
-                for chunk in iter(lambda: f.read(4096), b""):
-                    hash_sha256.update(chunk)
-            return hash_sha256.hexdigest()
-        except Exception as e:
-            self.logger.warning(f"Failed to calculate file hash for {file_path}: {e}")
-            return file_path.stem
+        return calculate_file_hash(file_path, self.logger)
 
     def _update_chunks_by_id(self) -> None:
         """Update the _chunks_by_id dictionary to match current chunks."""
@@ -475,86 +470,23 @@ class Document:
 
     def _build_doc_id(self) -> str:
         """Build a stable document ID used by chunk metadata."""
-        return self.metadata.file_hash or (Path(self.metadata.source_path).stem if self.metadata.source_path else "unnamed_document")
+        return build_doc_id(self)
 
     def _enrich_chunks_metadata(self, chunks: list[Chunk]) -> None:
         """Fill normalized chunk metadata fields and maintain linkage."""
-        doc_id = self._build_doc_id()
-
-        for i, chunk in enumerate(chunks):
-            chunk.doc_id = chunk.doc_id or doc_id
-            chunk.para_index = i
-            chunk.position = i
-
-            if not chunk.content_plain or chunk.content_plain == chunk.content:
-                chunk.content_plain = self._to_plain_text(chunk.content)
-
-            if not chunk.display_text:
-                chunk.display_text = chunk.content
-
-            if not chunk.retrieval_text or chunk.retrieval_text == chunk.content or chunk.retrieval_text == chunk.content_plain:
-                chunk.retrieval_text = self._build_retrieval_text(chunk.section_path, chunk.content_plain)
-
-            if chunk.token_count is None:
-                chunk.token_count = len(chunk.content_plain.split())
-
-            if chunk.page_range is not None:
-                if chunk.page_start is None:
-                    chunk.page_start = chunk.page_range[0]
-                if chunk.page_end is None:
-                    chunk.page_end = chunk.page_range[1]
-            elif chunk.page_start is not None and chunk.page_end is not None:
-                chunk.page_range = (chunk.page_start, chunk.page_end)
-
-            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
-                chunk.section_path = [chunk.chunk_name]
-
-            if not chunk.parent_section_id and chunk.section_path:
-                chunk.parent_section_id = chunk.section_path[-1]
-
-            if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
-                chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
-
-            chunk.metadata["section_label"] = " > ".join(chunk.section_path) if chunk.section_path else ""
-
-        for i, chunk in enumerate(chunks):
-            chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
-            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
+        enrich_chunks(self, chunks)
 
     def _build_retrieval_text(self, section_path: list[str], content_plain: str) -> str:
         """Compose retrieval text used by embeddings/rerank flows."""
-        if section_path:
-            section_label = " > ".join(section_path)
-            return f"[Section] {section_label}\n\n{content_plain}"
-        return content_plain
+        return build_retrieval_text(section_path, content_plain)
 
     def _to_plain_text(self, text: str) -> str:
         """Convert markdown-ish text into plain text for lexical retrieval."""
-        plain = text
-        plain = re.sub(r"```.*?```", " ", plain, flags=re.DOTALL)
-        plain = re.sub(r"`([^`]+)`", r"\1", plain)
-        plain = re.sub(r"^#{1,6}\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", plain)
-        plain = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", plain)
-        plain = re.sub(r"\*\*([^*]+)\*\*", r"\1", plain)
-        plain = re.sub(r"__([^_]+)__", r"\1", plain)
-        plain = re.sub(r"\*([^*]+)\*", r"\1", plain)
-        plain = re.sub(r"_([^_]+)_", r"\1", plain)
-        plain = re.sub(r"^\s{0,3}>\s?", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"^\s*[-*+]\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"^\s*\d+\.\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"<[^>]+>", " ", plain)
-        plain = re.sub(r"\s+", " ", plain).strip()
-        return plain
+        return to_plain_text(text)
 
     def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
-        self._enrich_chunks_metadata(chunks)
-        self._chunks = chunks
-        self._update_chunks_by_id()
-        self._split = len(chunks) > 0
-        self.processing_state.update_timestamp("split")
-        self.processing_state.add_note(f"Document split into {len(chunks)} chunks")
+        set_document_chunks(self, chunks)
 
     def build_vector_index(self, persist: bool = False, embedding_client=None) -> None:
         """Builds a semantic vector index from the document's chunks.
@@ -754,103 +686,9 @@ class Document:
 
     def save(self, output_path: Path) -> None:
         """Saves the document's state and its vector index path to a JSON file."""
-        if not output_path.parent.exists():
-            output_path.parent.mkdir(parents=True)
-        self.logger.info(f"Saving document state to {output_path}...")
-
-        try:
-            vector_index_path_str = (
-                str(self.vector_index.persist_path.resolve()) if self.vector_index and self.vector_index.persist_path else None
-            )
-
-            # Convert metadata to dict, handling Path objects and None values
-            metadata_dict = asdict(self.metadata)
-            if metadata_dict.get("source_path"):
-                metadata_dict["source_path"] = str(metadata_dict["source_path"])
-
-            # Convert datetime objects to ISO format strings
-            if metadata_dict.get("created_at"):
-                metadata_dict["created_at"] = metadata_dict["created_at"].isoformat()
-            if metadata_dict.get("modified_at"):
-                metadata_dict["modified_at"] = metadata_dict["modified_at"].isoformat()
-
-            # Convert chunks to dict, excluding the id field since it's init=False
-            chunks_data = []
-            for chunk in self._chunks:
-                chunk_dict = asdict(chunk)
-                # Remove id field since it's not part of __init__ parameters
-                chunk_dict.pop("id", None)
-                chunks_data.append(chunk_dict)
-
-            doc_state = {
-                "metadata": metadata_dict,
-                "text": self._raw_text,
-                "chunks": chunks_data,
-                "vector_index_path": vector_index_path_str,
-                "is_markdown": self._is_markdown,
-            }
-            with output_path.open("w", encoding="utf-8") as f:
-                json.dump(doc_state, f, indent=4)
-            self.logger.info("Document state saved successfully.")
-        except Exception as e:
-            self.logger.error(f"Failed to save document state: {e}")
-            raise RuntimeError(f"Failed to save document state: {e}") from e
+        save_document(self, output_path)
 
     @classmethod
     def load(cls, state_path: Path) -> "Document":
         """Loads a document from a state file, re-linking its vector index."""
-        logger = get_logger(cls.__name__)
-        logger.info(f"Loading document from state file: {state_path}")
-
-        try:
-            with state_path.open(encoding="utf-8") as f:
-                doc_state = json.load(f)
-
-            # Reconstruct metadata with proper Path object and datetime handling
-            metadata_dict = doc_state["metadata"]
-            if metadata_dict.get("source_path"):
-                metadata_dict["source_path"] = Path(metadata_dict["source_path"])
-
-            # Handle datetime parsing
-            from datetime import datetime
-
-            if metadata_dict.get("created_at"):
-                metadata_dict["created_at"] = datetime.fromisoformat(metadata_dict["created_at"])
-            if metadata_dict.get("modified_at"):
-                metadata_dict["modified_at"] = datetime.fromisoformat(metadata_dict["modified_at"])
-
-            metadata = DocumentMetadata(**metadata_dict)
-
-            # Create document instance
-            doc = cls(
-                text=doc_state["text"],
-                metadata=metadata,
-                _is_markdown=doc_state.get("is_markdown", False),
-            )
-
-            # Reconstruct chunks
-            doc._chunks = []
-            for chunk_data in doc_state["chunks"]:
-                chunk = Chunk(**chunk_data)
-                doc._chunks.append(chunk)
-            doc._enrich_chunks_metadata(doc._chunks)
-            doc._update_chunks_by_id()
-
-            # Re-link vector index if available
-            vector_index_path_str = doc_state.get("vector_index_path")
-            if vector_index_path_str:
-                logger.info(f"Re-linking vector index from: {vector_index_path_str}")
-                persist_path = Path(vector_index_path_str)
-                if persist_path.exists():
-                    collection_name = persist_path.stem
-                    doc.vector_index = VectorIndex(collection_name=collection_name, persist_path=persist_path)
-                    logger.info("Vector index re-linked successfully")
-                else:
-                    logger.warning(f"Vector index path does not exist: {persist_path}")
-
-            logger.info("Document loaded successfully.")
-            return doc
-
-        except Exception as e:
-            logger.error(f"Failed to load document from {state_path}: {e}")
-            raise RuntimeError(f"Failed to load document from {state_path}: {e}") from e
+        return load_document(cls, state_path)

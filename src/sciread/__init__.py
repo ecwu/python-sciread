@@ -1,8 +1,8 @@
-from .application import comprehensive_analysis
 from .application import compute
-from .application import discussion_analysis
-from .application import main
+from .application import run_coordinate_analysis
+from .application import run_discussion_analysis
 from .application import run_react_analysis
+from .application import run_simple_analysis
 from .embedding_provider import EmbeddingFactory
 from .embedding_provider import OllamaClient
 from .embedding_provider import SiliconFlowClient
@@ -17,13 +17,13 @@ __all__ = [
     "EmbeddingFactory",
     "OllamaClient",
     "SiliconFlowClient",
-    "comprehensive_analysis",
     "compute",
-    "discussion_analysis",
     "get_embedding_client",
     "get_logger",
     "get_model",
-    "main",
+    "run_coordinate_analysis",
+    "run_discussion_analysis",
     "run_react_analysis",
+    "run_simple_analysis",
     "setup_logging",
 ]

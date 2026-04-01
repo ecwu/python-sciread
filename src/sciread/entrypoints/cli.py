@@ -25,10 +25,10 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
-from ..application import comprehensive_analysis
-from ..application import discussion_analysis
-from ..application import main
+from ..application import run_coordinate_analysis
+from ..application import run_discussion_analysis
 from ..application import run_react_analysis
+from ..application import run_simple_analysis
 from ..platform.logging import logger
 
 logfire.configure()
@@ -207,7 +207,8 @@ MODELS:
         logger.debug(f"Running coordinate mode with file: {args.pdf_file}, model: {args.model}")
 
         try:
-            result = asyncio.run(comprehensive_analysis(args.pdf_file, args.model))
+            result = asyncio.run(run_coordinate_analysis(args.pdf_file, args.model))
+            console.print(Markdown(result.final_report))
             return 0
         except Exception as e:
             logger.error(f"Coordinate analysis failed: {e}")
@@ -240,7 +241,7 @@ MODELS:
         logger.debug(f"Running simple mode with file: {args.document_file}, model: {args.model}")
 
         try:
-            result = asyncio.run(main(args.document_file, args.model))
+            result = asyncio.run(run_simple_analysis(args.document_file, args.model))
             return 0
         except Exception as e:
             logger.error(f"Simple analysis failed: {e}")
@@ -251,7 +252,7 @@ MODELS:
         logger.debug(f"Running discussion mode with file: {args.document_file}, model: {args.model}")
 
         try:
-            overview, result = asyncio.run(discussion_analysis(args.document_file, args.model))
+            overview, result = asyncio.run(run_discussion_analysis(args.document_file, args.model))
             _render_discussion_overview(overview)
 
             markdown_lines = [

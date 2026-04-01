@@ -1,6 +1,5 @@
 """Document builder class for creating and processing documents."""
 
-import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -188,10 +187,6 @@ class DocumentBuilder:
         Returns:
             Finalized document.
         """
-        if doc.is_split and doc.chunks:
-            self._enrich_chunks(doc, doc._chunks)
-            doc._set_chunks(doc._chunks)
-
         if build_vector_index:
             index_client = embedding_client or self.ollama_client
             doc.build_vector_index(persist=persist_index, embedding_client=index_client)
@@ -236,85 +231,10 @@ class DocumentBuilder:
 
         # Split the text
         chunks = active_splitter.split(doc.text)
-        self._enrich_chunks(doc, chunks)
         doc._set_chunks(chunks)
         doc.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
         self.logger.info(f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}")
-
-    def _enrich_chunks(self, doc: "Document", chunks: list) -> None:
-        """Enrich chunks with normalized retrieval metadata and derived texts."""
-        doc_id = self._build_doc_id(doc)
-
-        for i, chunk in enumerate(chunks):
-            chunk.doc_id = chunk.doc_id or doc_id
-            chunk.para_index = i
-            chunk.position = i
-
-            if not chunk.section_path and chunk.chunk_name and chunk.chunk_name != "unknown":
-                chunk.section_path = [chunk.chunk_name]
-
-            if not chunk.content_plain or chunk.content_plain == chunk.content:
-                chunk.content_plain = self._to_plain_text(chunk.content)
-
-            if not chunk.display_text:
-                chunk.display_text = chunk.content
-
-            if not chunk.retrieval_text or chunk.retrieval_text == chunk.content or chunk.retrieval_text == chunk.content_plain:
-                chunk.retrieval_text = self._build_retrieval_text(chunk.section_path, chunk.content_plain)
-
-            if chunk.token_count is None:
-                chunk.token_count = len(chunk.content_plain.split())
-
-            if chunk.page_range is not None:
-                if chunk.page_start is None:
-                    chunk.page_start = chunk.page_range[0]
-                if chunk.page_end is None:
-                    chunk.page_end = chunk.page_range[1]
-            elif chunk.page_start is not None and chunk.page_end is not None:
-                chunk.page_range = (chunk.page_start, chunk.page_end)
-
-            if not chunk.parent_section_id and chunk.section_path:
-                chunk.parent_section_id = chunk.section_path[-1]
-
-            if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
-                chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
-
-            chunk.metadata["section_label"] = " > ".join(chunk.section_path) if chunk.section_path else ""
-
-        for i, chunk in enumerate(chunks):
-            chunk.prev_chunk_id = chunks[i - 1].chunk_id if i > 0 else None
-            chunk.next_chunk_id = chunks[i + 1].chunk_id if i < len(chunks) - 1 else None
-
-    def _build_doc_id(self, doc: "Document") -> str:
-        """Build a stable document ID used by chunk metadata."""
-        return doc.metadata.file_hash or (Path(doc.metadata.source_path).stem if doc.metadata.source_path else "unnamed_document")
-
-    def _build_retrieval_text(self, section_path: list[str], content_plain: str) -> str:
-        """Compose retrieval text used by embeddings/rerank flows."""
-        if section_path:
-            section_label = " > ".join(section_path)
-            return f"[Section] {section_label}\n\n{content_plain}"
-        return content_plain
-
-    def _to_plain_text(self, text: str) -> str:
-        """Convert markdown-ish text into plain text for lexical retrieval."""
-        plain = text
-        plain = re.sub(r"```.*?```", " ", plain, flags=re.DOTALL)
-        plain = re.sub(r"`([^`]+)`", r"\1", plain)
-        plain = re.sub(r"^#{1,6}\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"!\[([^\]]*)\]\([^\)]*\)", r"\1", plain)
-        plain = re.sub(r"\[([^\]]+)\]\([^\)]*\)", r"\1", plain)
-        plain = re.sub(r"\*\*([^*]+)\*\*", r"\1", plain)
-        plain = re.sub(r"__([^_]+)__", r"\1", plain)
-        plain = re.sub(r"\*([^*]+)\*", r"\1", plain)
-        plain = re.sub(r"_([^_]+)_", r"\1", plain)
-        plain = re.sub(r"^\s{0,3}>\s?", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"^\s*[-*+]\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"^\s*\d+\.\s+", "", plain, flags=re.MULTILINE)
-        plain = re.sub(r"<[^>]+>", " ", plain)
-        plain = re.sub(r"\s+", " ", plain).strip()
-        return plain
 
     def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
         """Create appropriate splitter based on document content."""

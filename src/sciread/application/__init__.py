@@ -1,15 +1,15 @@
-"""Application services for sciread use cases."""
+"""Application-layer use cases."""
 
-from .analysis_service import comprehensive_analysis
-from .analysis_service import compute
-from .analysis_service import discussion_analysis
-from .analysis_service import main
-from .analysis_service import run_react_analysis
+from .use_cases import compute
+from .use_cases import run_coordinate_analysis
+from .use_cases import run_discussion_analysis
+from .use_cases import run_react_analysis
+from .use_cases import run_simple_analysis
 
 __all__ = [
-    "comprehensive_analysis",
     "compute",
-    "discussion_analysis",
-    "main",
+    "run_coordinate_analysis",
+    "run_discussion_analysis",
     "run_react_analysis",
+    "run_simple_analysis",
 ]
