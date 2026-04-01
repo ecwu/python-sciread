@@ -8,7 +8,7 @@ from datetime import datetime
 from datetime import timedelta
 from typing import Any
 
-from ...logging_config import get_logger
+from ...platform.logging import get_logger
 from .models import AgentPersonality
 from .task_models import Task
 from .task_models import TaskPriority

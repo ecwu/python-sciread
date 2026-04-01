@@ -4,7 +4,7 @@ from datetime import UTC
 from datetime import datetime
 from typing import Any
 
-from ....logging_config import get_logger
+from ....platform.logging import get_logger
 from ..models import AgentPersonality
 from ..personalities import PersonalityAgent
 from ..personalities import create_personality_agent

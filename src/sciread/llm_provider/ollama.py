@@ -5,7 +5,7 @@ from typing import Any
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.ollama import OllamaProvider as PydanticOllamaProvider
 
-from ..config import get_config
+from ..platform.config import get_config
 
 
 class OllamaProvider:

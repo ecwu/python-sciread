@@ -1,9 +1,9 @@
-"""Text splitting strategies for document chunking."""
+"""Compatibility wrapper for document splitters."""
 
-from .base import BaseSplitter
-from .markdown_splitter import MarkdownSplitter
-from .regex_section_splitter import RegexSectionSplitter
-from .semantic_splitter import SemanticSplitter
+from ...document_structure.splitters import BaseSplitter
+from ...document_structure.splitters import MarkdownSplitter
+from ...document_structure.splitters import RegexSectionSplitter
+from ...document_structure.splitters import SemanticSplitter
 
 __all__ = [
     "BaseSplitter",

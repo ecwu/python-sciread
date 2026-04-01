@@ -15,17 +15,16 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from rich.console import Console
 from rich.markdown import Markdown
 
-from ..document.document import Document
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .error_handling import handle_model_retry
-from .error_handling import safe_agent_execution
-from .models.simple_models import SimpleAnalysisResult
-from .prompts.simple import DEFAULT_SYSTEM_PROMPT
-from .prompts.simple import build_analysis_prompt
-from .text_utils import clean_academic_text
-from .text_utils import remove_references as remove_references_func
-
+from ...document_structure import Document
+from ...llm_provider import get_model
+from ...platform.logging import get_logger
+from ..shared.error_handling import handle_model_retry
+from ..shared.error_handling import safe_agent_execution
+from ..shared.text_utils import clean_academic_text
+from ..shared.text_utils import remove_references as remove_references_func
+from .models import SimpleAnalysisResult
+from .prompts import DEFAULT_SYSTEM_PROMPT
+from .prompts import build_analysis_prompt
 
 console = Console()
 

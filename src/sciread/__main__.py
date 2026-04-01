@@ -9,7 +9,7 @@ Why does this file exist, and why __main__? For more info, read:
 - https://docs.python.org/3/using/cmdline.html#cmdoption-m
 """
 
-from sciread.cli import run
+from sciread.entrypoints.cli import run
 
 if __name__ == "__main__":
     run()

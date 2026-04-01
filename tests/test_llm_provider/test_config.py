@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sciread.config import LLMProviderConfig
-from sciread.config import ScireadConfig
+from sciread.platform.config import LLMProviderConfig
+from sciread.platform.config import ScireadConfig
 
 
 class TestScireadConfig:

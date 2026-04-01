@@ -1,19 +1,15 @@
 from pathlib import Path
 
-from rich.console import Console
-from rich.panel import Panel
-from rich.table import Table
-
-from .agent import CoordinateAgent
-from .agent import DiscussionAgent
-from .agent import SimpleAgent
-from .agent import analyze_document_with_react
-from .agent import remove_references
-from .document import Document
-from .logging_config import get_logger
+from ..agent.coordinate import CoordinateAgent
+from ..agent.discussion import DiscussionAgent
+from ..agent.discussion import DiscussionResult
+from ..agent.react import analyze_document_with_react
+from ..agent.shared import remove_references
+from ..agent.simple import SimpleAgent
+from ..document_structure import Document
+from ..platform.logging import get_logger
 
 logger = get_logger(__name__)
-console = Console()
 
 
 def compute(args):
@@ -210,7 +206,7 @@ async def run_react_analysis(
         raise
 
 
-async def discussion_analysis(document_file_path: str, model: str = "deepseek-chat"):
+async def discussion_analysis(document_file_path: str, model: str = "deepseek-chat") -> tuple[dict[str, object], DiscussionResult]:
     """Discussion-based document analysis using multi-agent personality system.
 
     This function uses the DiscussionAgent with multiple personality-driven agents
@@ -249,38 +245,12 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     section_names = doc.get_section_names()
     logger.debug(f"Discovered {len(section_names)} sections: {section_names}")
 
-    # Display document information to user
-    console.print()
-    console.print(Panel.fit("Document Analysis - Discussion Mode", border_style="cyan"))
-
-    overview_table = Table(title="Document Overview", show_header=False)
-    overview_table.add_column("Field", style="cyan", no_wrap=True)
-    overview_table.add_column("Value", style="white")
-    overview_table.add_row("Document", doc.metadata.title or "Untitled")
-    overview_table.add_row("Total Content", f"{len(doc.text)} characters")
-    overview_table.add_row("Chunks", str(len(doc.chunks)))
-
-    if section_names:
-        overview_table.add_row("Sections", f"{len(section_names)} main sections identified")
-    else:
-        overview_table.add_row("Sections", "No named sections found (continuous text analysis)")
-
-    console.print(overview_table)
-
-    if section_names:
-        sections_table = Table(title="Available Sections for Analysis (Top 10)", show_lines=True)
-        sections_table.add_column("#", style="green", justify="right", no_wrap=True)
-        sections_table.add_column("Section", style="yellow")
-
-        for i, section_name in enumerate(section_names[:10], 1):
-            sections_table.add_row(str(i), section_name.title())
-
-        if len(section_names) > 10:
-            sections_table.caption = f"... and {len(section_names) - 10} more sections"
-
-        console.print(sections_table)
-
-    console.print()
+    overview = {
+        "document_title": doc.metadata.title or "Untitled",
+        "total_content_chars": len(doc.text),
+        "chunk_count": len(doc.chunks),
+        "section_names": section_names,
+    }
 
     # Check if document was loaded successfully
     if not doc.text.strip():
@@ -289,7 +259,7 @@ async def discussion_analysis(document_file_path: str, model: str = "deepseek-ch
     # Run discussion-based analysis
     try:
         result = await discussion_agent.analyze_document(doc)
-        return result
+        return overview, result
 
     except Exception as e:
         logger.error(f"Discussion-based analysis failed: {e}")

@@ -56,7 +56,7 @@ dev = [
 ]
 
 [project.scripts]
-sciread = "sciread.cli:run"
+sciread = "sciread.entrypoints.cli:run"
 
 [project.urls]
 "Sources" = "https://gitea.ecwu.xyz/ecwu/python-sciread"

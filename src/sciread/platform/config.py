@@ -198,10 +198,8 @@ class ScireadConfig(BaseSettings):
         """Get configuration for a specific splitter."""
         if splitter_name == "regex_section":
             return self.document_splitters.regex_section
-        elif splitter_name == "topic_flow":
-            return self.document_splitters.topic_flow
         else:
-            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section, topic_flow")
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section")
 
     def get_default_splitter_config(self):
         """Get configuration for the default splitter."""

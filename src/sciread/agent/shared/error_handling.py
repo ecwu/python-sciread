@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic_ai import ModelRetry
 
-from ..logging_config import get_logger
+from ...platform.logging import get_logger
 
 logger = get_logger(__name__)
 

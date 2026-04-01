@@ -5,15 +5,14 @@ academic documents through a structured approach with loaders, splitters,
 and document management.
 """
 
-# Import embedding clients from embedding_provider module
+from ..document_ingestion import MineruClient
+from ..document_structure import Chunk
+from ..document_structure import Document
+from ..document_structure import DocumentBuilder
+from ..document_structure import DocumentFactory
+from ..document_structure.splitters import SemanticSplitter
 from ..embedding_provider import OllamaClient
 from ..embedding_provider import SiliconFlowClient
-from .document import Document
-from .document_builder import DocumentBuilder
-from .external_clients import MineruClient
-from .factory import DocumentFactory
-from .models import Chunk
-from .splitters.semantic_splitter import SemanticSplitter
 
 __all__ = [
     "Chunk",

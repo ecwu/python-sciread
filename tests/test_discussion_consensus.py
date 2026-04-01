@@ -4,7 +4,7 @@ from sciread.agent.discussion.consensus import ConsensusBuilder
 from sciread.agent.discussion.models import AgentInsight
 from sciread.agent.discussion.models import AgentPersonality
 from sciread.agent.discussion.models import ConsensusPoint
-from sciread.logging_config import get_logger
+from sciread.platform.logging import get_logger
 
 
 def _make_builder() -> ConsensusBuilder:

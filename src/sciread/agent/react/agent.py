@@ -12,12 +12,12 @@ from pydantic_ai import RunContext
 from rich.console import Console
 from rich.markdown import Markdown
 
-from ..document import Document
-from ..document.document_renderers import get_sections_content
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .models.react_models import ReActIterationInput
-from .models.react_models import ReActIterationOutput
+from ...document_structure import Document
+from ...document_structure.renderers import get_sections_content
+from ...llm_provider import get_model
+from ...platform.logging import get_logger
+from .models import ReActIterationInput
+from .models import ReActIterationOutput
 
 logger = get_logger(__name__)
 

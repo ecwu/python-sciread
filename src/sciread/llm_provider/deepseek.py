@@ -6,7 +6,7 @@ from typing import ClassVar
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.deepseek import DeepSeekProvider as PydanticDeepSeekProvider
 
-from ..config import get_config
+from ..platform.config import get_config
 
 
 class DeepSeekProvider:

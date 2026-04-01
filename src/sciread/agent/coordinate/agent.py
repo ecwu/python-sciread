@@ -27,36 +27,35 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.table import Table
 
-from ..document.document import Document
-from ..document.models import Chunk
-from ..llm_provider import get_model
-from ..logging_config import get_logger
-from .models.coordinate_models import AnalysisPlan
-from .models.coordinate_models import ComprehensiveAnalysisResult
-from .models.coordinate_models import ExperimentResult
-from .models.coordinate_models import FutureDirectionsResult
-from .models.coordinate_models import MetadataExtractionResult
-from .models.coordinate_models import MethodologyResult
-from .models.coordinate_models import PreviousMethodsResult
-from .models.coordinate_models import ResearchQuestionsResult
-from .prompts.coordinate import CONTROLLER_INSTRUCTIONS
-from .prompts.coordinate import EXPERIMENTS_SYSTEM_PROMPT
-from .prompts.coordinate import FUTURE_DIRECTIONS_SYSTEM_PROMPT
-from .prompts.coordinate import METADATA_EXTRACTION_SYSTEM_PROMPT
-from .prompts.coordinate import METHODOLOGY_SYSTEM_PROMPT
-from .prompts.coordinate import PREVIOUS_METHODS_SYSTEM_PROMPT
-from .prompts.coordinate import RESEARCH_QUESTIONS_SYSTEM_PROMPT
-from .prompts.coordinate import SYNTHESIS_SYSTEM_PROMPT
-from .prompts.coordinate import build_analysis_planning_prompt
-from .prompts.coordinate import build_experiments_analysis_prompt
-from .prompts.coordinate import build_future_directions_analysis_prompt
-from .prompts.coordinate import build_generic_analysis_prompt
-from .prompts.coordinate import build_metadata_analysis_prompt
-from .prompts.coordinate import build_methodology_analysis_prompt
-from .prompts.coordinate import build_previous_methods_analysis_prompt
-from .prompts.coordinate import build_report_synthesis_prompt
-from .prompts.coordinate import build_research_questions_analysis_prompt
-
+from ...document_structure import Chunk
+from ...document_structure import Document
+from ...llm_provider import get_model
+from ...platform.logging import get_logger
+from .models import AnalysisPlan
+from .models import ComprehensiveAnalysisResult
+from .models import ExperimentResult
+from .models import FutureDirectionsResult
+from .models import MetadataExtractionResult
+from .models import MethodologyResult
+from .models import PreviousMethodsResult
+from .models import ResearchQuestionsResult
+from .prompts import CONTROLLER_INSTRUCTIONS
+from .prompts import EXPERIMENTS_SYSTEM_PROMPT
+from .prompts import FUTURE_DIRECTIONS_SYSTEM_PROMPT
+from .prompts import METADATA_EXTRACTION_SYSTEM_PROMPT
+from .prompts import METHODOLOGY_SYSTEM_PROMPT
+from .prompts import PREVIOUS_METHODS_SYSTEM_PROMPT
+from .prompts import RESEARCH_QUESTIONS_SYSTEM_PROMPT
+from .prompts import SYNTHESIS_SYSTEM_PROMPT
+from .prompts import build_analysis_planning_prompt
+from .prompts import build_experiments_analysis_prompt
+from .prompts import build_future_directions_analysis_prompt
+from .prompts import build_generic_analysis_prompt
+from .prompts import build_metadata_analysis_prompt
+from .prompts import build_methodology_analysis_prompt
+from .prompts import build_previous_methods_analysis_prompt
+from .prompts import build_report_synthesis_prompt
+from .prompts import build_research_questions_analysis_prompt
 
 console = Console()
 

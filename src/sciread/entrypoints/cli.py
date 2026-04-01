@@ -22,16 +22,57 @@ import sys
 import logfire
 from rich.console import Console
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
 
-from .core import comprehensive_analysis
-from .core import discussion_analysis
-from .core import main
-from .core import run_react_analysis
-from .logging_config import logger
+from ..application import comprehensive_analysis
+from ..application import discussion_analysis
+from ..application import main
+from ..application import run_react_analysis
+from ..platform.logging import logger
 
 logfire.configure()
 logfire.instrument_pydantic_ai()
 console = Console()
+
+
+def _render_discussion_overview(overview: dict[str, object]) -> None:
+    """Render discussion mode document overview."""
+    section_names = overview["section_names"]
+    if not isinstance(section_names, list):
+        section_names = []
+
+    console.print()
+    console.print(Panel.fit("Document Analysis - Discussion Mode", border_style="cyan"))
+
+    overview_table = Table(title="Document Overview", show_header=False)
+    overview_table.add_column("Field", style="cyan", no_wrap=True)
+    overview_table.add_column("Value", style="white")
+    overview_table.add_row("Document", str(overview["document_title"]))
+    overview_table.add_row("Total Content", f"{overview['total_content_chars']} characters")
+    overview_table.add_row("Chunks", str(overview["chunk_count"]))
+
+    if section_names:
+        overview_table.add_row("Sections", f"{len(section_names)} main sections identified")
+    else:
+        overview_table.add_row("Sections", "No named sections found (continuous text analysis)")
+
+    console.print(overview_table)
+
+    if section_names:
+        sections_table = Table(title="Available Sections for Analysis (Top 10)", show_lines=True)
+        sections_table.add_column("#", style="green", justify="right", no_wrap=True)
+        sections_table.add_column("Section", style="yellow")
+
+        for i, section_name in enumerate(section_names[:10], 1):
+            sections_table.add_row(str(i), str(section_name).title())
+
+        if len(section_names) > 10:
+            sections_table.caption = f"... and {len(section_names) - 10} more sections"
+
+        console.print(sections_table)
+
+    console.print()
 
 
 def run(argv=sys.argv):
@@ -210,7 +251,8 @@ MODELS:
         logger.debug(f"Running discussion mode with file: {args.document_file}, model: {args.model}")
 
         try:
-            result = asyncio.run(discussion_analysis(args.document_file, args.model))
+            overview, result = asyncio.run(discussion_analysis(args.document_file, args.model))
+            _render_discussion_overview(overview)
 
             markdown_lines = [
                 "# Discussion-Based Analysis Result",

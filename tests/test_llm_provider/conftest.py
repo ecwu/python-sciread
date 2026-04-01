@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sciread.config import ScireadConfig
+from sciread.platform.config import ScireadConfig
 
 
 @pytest.fixture

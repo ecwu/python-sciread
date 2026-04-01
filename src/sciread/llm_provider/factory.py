@@ -5,7 +5,7 @@ from typing import ClassVar
 
 from pydantic_ai.models.openai import OpenAIChatModel
 
-from ..config import get_config
+from ..platform.config import get_config
 from .deepseek import DeepSeekProvider
 from .ollama import OllamaProvider
 from .volcengine import VolcengineProvider

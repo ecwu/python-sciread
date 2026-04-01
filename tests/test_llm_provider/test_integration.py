@@ -3,9 +3,9 @@
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-from sciread.config import ScireadConfig
 from sciread.llm_provider import ModelFactory
 from sciread.llm_provider import get_model
+from sciread.platform.config import ScireadConfig
 
 
 class TestIntegration:

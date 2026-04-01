@@ -29,7 +29,7 @@ def test_format_question_log_entry_includes_content(mock_get_model, mock_agent):
     entry = agent._format_question_log_entry(question)
 
     assert "Q-CE-01" in entry
-    assert "Critical Evaluator -> Innovative Insighter" in entry
+    assert "批判性评估者 -> 创新洞察者" in entry
     assert "challenge" in entry
     assert "What evidence shows the agent swarm result is not just prompt tuning?" in entry
 
@@ -61,7 +61,7 @@ def test_format_response_log_entry_includes_stance_and_question_content(mock_get
     entry = agent._format_response_log_entry(response, question)
 
     assert "Q-II-02" in entry
-    assert "Practical Applicator -> Innovative Insighter" in entry
+    assert "实践应用者 -> 创新洞察者" in entry
     assert "clarify" in entry
     assert "Q: How would this hold up under deployment latency constraints?" in entry
     assert "A: The paper only partially addresses latency" in entry
@@ -126,4 +126,4 @@ def test_apply_revised_insights_updates_exact_target_insight(mock_get_model, moc
     assert target_insight.content.startswith("Deployment feasibility depends on latency-sensitive orchestration overhead")
     assert target_insight.confidence == 0.86
     assert untouched_insight.content == "Separate operational insight."
-    assert any(note.startswith("Revised after Q-II-02: Original deployment insight.") for note in target_insight.supporting_evidence)
+    assert any(note.startswith("在 Q-II-02 之后修订：Original deployment insight.") for note in target_insight.supporting_evidence)

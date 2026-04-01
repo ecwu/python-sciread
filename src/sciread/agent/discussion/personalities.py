@@ -7,10 +7,10 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 
-from ...document import Document
-from ...document.document_renderers import get_sections_content
+from ...document_structure import Document
+from ...document_structure.renderers import get_sections_content
 from ...llm_provider import get_model
-from ...logging_config import get_logger
+from ...platform.logging import get_logger
 from .models import AGENT_ABBREVIATIONS
 from .models import AgentInsight
 from .models import AgentPersonality

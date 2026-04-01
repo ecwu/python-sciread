@@ -6,7 +6,7 @@ from typing import ClassVar
 
 import requests
 
-from ..logging_config import get_logger
+from ..platform.logging import get_logger
 from .base import BaseEmbeddingProvider
 
 

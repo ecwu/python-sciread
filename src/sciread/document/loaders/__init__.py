@@ -1,9 +1,9 @@
-"""Text extraction loaders for various document formats."""
+"""Compatibility wrapper for document loaders."""
 
-from .base import BaseLoader
-from .base import LoadResult
-from .pdf_loader import PdfLoader
-from .txt_loader import TxtLoader
+from ...document_ingestion.loaders import BaseLoader
+from ...document_ingestion.loaders import LoadResult
+from ...document_ingestion.loaders import PdfLoader
+from ...document_ingestion.loaders import TxtLoader
 
 __all__ = [
     "BaseLoader",

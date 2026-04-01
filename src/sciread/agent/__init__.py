@@ -41,7 +41,15 @@ Example Usage:
     discussion_result = await discussion_agent.analyze_document(doc)
 """
 
-from .coordinate_agent import CoordinateAgent
+from .coordinate import AnalysisPlan
+from .coordinate import ComprehensiveAnalysisResult
+from .coordinate import CoordinateAgent
+from .coordinate import ExperimentResult
+from .coordinate import FutureDirectionsResult
+from .coordinate import MetadataExtractionResult
+from .coordinate import MethodologyResult
+from .coordinate import PreviousMethodsResult
+from .coordinate import ResearchQuestionsResult
 from .discussion import AgentInsight
 from .discussion import AgentPersonality
 from .discussion import ConsensusBuilder
@@ -61,28 +69,14 @@ from .discussion import TaskResult
 from .discussion import TaskStatus
 from .discussion import TaskType
 from .discussion import create_personality_agent
-
-# CoordinateAgent models - now imported from models folder
-from .models.coordinate_models import AnalysisPlan
-from .models.coordinate_models import ComprehensiveAnalysisResult
-from .models.coordinate_models import ExperimentResult
-from .models.coordinate_models import FutureDirectionsResult
-from .models.coordinate_models import MetadataExtractionResult
-from .models.coordinate_models import MethodologyResult
-from .models.coordinate_models import PreviousMethodsResult
-from .models.coordinate_models import ResearchQuestionsResult
-from .models.react_models import ReActIterationOutput
-
-# SimpleAgent models - now imported from models folder
-from .models.simple_models import SimpleAnalysisResult
-
-# ReActAgent and utility functions
-from .react_agent import ReActAgent
-from .react_agent import analyze_document_with_react
-from .react_agent import analyze_document_with_react_sync
-from .react_agent import load_and_process_document
-from .simple_agent import SimpleAgent
-from .text_utils import remove_references
+from .react import ReActAgent
+from .react import ReActIterationOutput
+from .react import analyze_document_with_react
+from .react import analyze_document_with_react_sync
+from .react import load_and_process_document
+from .shared import remove_references
+from .simple import SimpleAgent
+from .simple import SimpleAnalysisResult
 
 __all__ = [
     "AgentInsight",
