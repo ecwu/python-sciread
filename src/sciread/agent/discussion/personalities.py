@@ -912,6 +912,7 @@ Recommendations: [Any suggestions for next steps]
                 to_agent=target_agent,
                 content=question_text,
                 target_insight=getattr(target_insight, "insight_id", None) or target_insight.content[:50],
+                target_insight_id=getattr(target_insight, "insight_id", None),
                 question_type=question_type if question_type else "clarification",
                 priority=min(max(priority, 0.0), 1.0) or 0.5,
                 requires_response=True,

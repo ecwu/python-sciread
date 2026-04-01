@@ -4,6 +4,7 @@ import asyncio
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+from typing import Any
 
 from pydantic_ai import Agent
 from rich.console import Console
@@ -426,12 +427,86 @@ class DiscussionAgent:
 
                 # Also add to discussion state
                 self.discussion_state.responses.extend(task.result.responses)
+                self._apply_revised_insights(task.result.responses)
 
                 personality = task.assigned_to
                 if isinstance(personality, str):
                     personality = AgentPersonality(personality)
                 if personality:
                     self._log_response_batch(personality, task.result.responses)
+
+    def _apply_revised_insights(self, responses: list) -> None:
+        """Persist revised insight text back into the tracked insight collections."""
+        if not responses:
+            return
+
+        question_map = {question.question_id: question for question in self.all_questions}
+
+        for response in responses:
+            revised_text = (getattr(response, "revised_insight", None) or "").strip()
+            if not revised_text:
+                continue
+
+            question = question_map.get(response.question_id)
+            if not question:
+                logger.warning(f"Skipping revised insight for unknown question {response.question_id}")
+                continue
+
+            target_insight = self._find_insight_for_question(question)
+            if not target_insight:
+                logger.warning(f"Could not resolve target insight for question {response.question_id}")
+                continue
+
+            self._update_insight_from_response(target_insight, revised_text, response)
+
+    def _find_insight_for_question(self, question) -> Any | None:
+        """Find the exact insight referenced by a question."""
+        target_id = getattr(question, "target_insight_id", None)
+        if target_id:
+            for insights in self.agent_insights.values():
+                for insight in insights:
+                    if getattr(insight, "insight_id", None) == target_id:
+                        return insight
+
+            for insight in self.discussion_state.insights:
+                if getattr(insight, "insight_id", None) == target_id:
+                    return insight
+
+        target_key = getattr(question, "target_insight", "") or ""
+        if not target_key:
+            return None
+
+        for insights in self.agent_insights.values():
+            for insight in insights:
+                if getattr(insight, "insight_id", None) == target_key:
+                    return insight
+                if insight.content == target_key or insight.content[:50] == target_key:
+                    return insight
+
+        for insight in self.discussion_state.insights:
+            if getattr(insight, "insight_id", None) == target_key:
+                return insight
+            if insight.content == target_key or insight.content[:50] == target_key:
+                return insight
+
+        return None
+
+    def _update_insight_from_response(self, insight, revised_text: str, response) -> None:
+        """Update an existing insight with revised content from a response."""
+        if revised_text == insight.content:
+            return
+
+        previous_content = insight.content
+        insight.content = revised_text
+        insight.confidence = max(float(getattr(insight, "confidence", 0.0)), float(getattr(response, "confidence", 0.0)))
+
+        supporting_evidence = list(getattr(insight, "supporting_evidence", []))
+        revision_note = f"Revised after {response.question_id}: {previous_content}"
+        if revision_note not in supporting_evidence:
+            supporting_evidence.append(revision_note)
+            insight.supporting_evidence = supporting_evidence
+
+        logger.debug(f"Updated insight {getattr(insight, 'insight_id', 'unknown')} from response {response.response_id}")
 
     def _build_role_qa_context(self, personality: AgentPersonality) -> str:
         """Build per-agent Q&A summary for context."""
@@ -614,9 +689,14 @@ class DiscussionAgent:
 
     def _get_prior_qa_for_insight(self, insight) -> list[dict]:
         """Build Q&A thread for a specific insight by matching questions and responses."""
+        insight_id = getattr(insight, "insight_id", None)
         insight_snippet = insight.content[:50]
 
-        related_questions = [q for q in self.all_questions if q.target_insight == insight_snippet]
+        related_questions = [
+            q
+            for q in self.all_questions
+            if getattr(q, "target_insight_id", None) == insight_id or q.target_insight == insight_snippet or q.target_insight == insight_id
+        ]
 
         qa_pairs = []
         for q in related_questions:
