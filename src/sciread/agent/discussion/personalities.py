@@ -192,7 +192,7 @@ Type: [clarification/challenge/extension/none]
             questions_text = ""
             for q in questions:
                 from_name = self._display_name(q.from_agent)
-                questions_text += f'\n[{q.question_id}] 来自 {from_name}，针对洞见“{q.target_insight}”：\n'
+                questions_text += f"\n[{q.question_id}] 来自 {from_name}，针对洞见“{q.target_insight}”：\n"
                 questions_text += f'  "{q.content}"\n'
 
             insights_text = "\n".join([f"- [{i.insight_id}] {i.content}" for i in my_insights])
