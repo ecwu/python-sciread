@@ -53,6 +53,40 @@ class TestPdfLoader:
         loader = PdfLoader(to_markdown=True)
         assert loader.to_markdown is True
 
+    def test_load_pdf_with_mineru_markdown_success(self, sample_pdf_file):
+        """Test markdown extraction through Mineru."""
+        mineru_client = Mock()
+        mineru_client.extract_markdown.return_value = "# Markdown Title\n\nConverted content."
+        loader = PdfLoader(to_markdown=True, mineru_client=mineru_client)
+
+        result = loader.load(sample_pdf_file)
+
+        assert result.success
+        assert result.text == "# Markdown Title\n\nConverted content."
+        assert result.extraction_info["extraction_method"] == "mineru_markdown"
+        mineru_client.extract_markdown.assert_called_once_with(sample_pdf_file)
+
+    def test_load_pdf_with_mineru_runtime_error_falls_back(self, sample_pdf_file):
+        """Test Mineru failures fall back to local PDF extraction."""
+        mineru_client = Mock()
+        mineru_client.extract_markdown.side_effect = RuntimeError("Mineru unavailable")
+        loader = PdfLoader(to_markdown=True, mineru_client=mineru_client)
+
+        with patch.object(
+            loader,
+            "_fallback_extraction",
+            return_value=("Fallback text content", {"title": "Fallback Title", "author": "Fallback Author", "page_count": 2}),
+        ):
+            result = loader.load(sample_pdf_file)
+
+        assert result.success
+        assert result.text == "Fallback text content"
+        assert result.metadata.title == "Fallback Title"
+        assert result.metadata.author == "Fallback Author"
+        assert result.metadata.page_count == 2
+        assert result.extraction_info["extraction_method"] == "fallback"
+        assert "Mineru extraction failed" in result.warnings[0]
+
     @patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader")
     def test_load_pdf_with_pypdf_success(self, mock_pdf_reader, loader, sample_pdf_file):
         """Test successful PDF loading with pypdf."""
