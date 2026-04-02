@@ -16,13 +16,13 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
+from ...document.document_renderers import SHORT_SECTION_THRESHOLD
+from ...document.document_renderers import get_section_length_map
+from ...document.document_renderers import get_sections_content
+from ...document.document_renderers import is_likely_heading_only
 from ...document_structure import Document
-from ...document_structure.renderers import get_sections_content
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
-from ..section_selection import SHORT_SECTION_THRESHOLD
-from ..section_selection import get_section_length_map
-from ..section_selection import is_likely_heading_only
 from .models import ReActAnalysisState
 from .models import ReActIterationDeps
 from .models import ReActIterationInput

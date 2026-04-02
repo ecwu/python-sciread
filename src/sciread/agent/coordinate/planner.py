@@ -8,11 +8,11 @@ from pydantic_ai import Agent
 from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 
+from ...document.document_renderers import choose_best_section_match
+from ...document.document_renderers import format_section_choices
+from ...document.document_renderers import get_section_length_map
+from ...document.document_renderers import is_likely_heading_only
 from ...document_structure import Document
-from ..section_selection import choose_best_section_match
-from ..section_selection import format_section_choices
-from ..section_selection import get_section_length_map
-from ..section_selection import is_likely_heading_only
 from .models import AnalysisPlan
 from .prompts import CONTROLLER_INSTRUCTIONS
 from .prompts import build_analysis_planning_prompt
