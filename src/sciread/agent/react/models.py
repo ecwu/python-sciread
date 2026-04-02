@@ -6,7 +6,7 @@ from dataclasses import field
 from pydantic import BaseModel
 from pydantic import Field
 
-from ...document_structure import Document
+from ...document import Document
 
 
 class ReActIterationInput(BaseModel):

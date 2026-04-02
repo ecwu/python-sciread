@@ -5,10 +5,10 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 from typing import TYPE_CHECKING
 
-from ..retrieval.service import cosine_similarity
+from sciread.document.retrieval.service import cosine_similarity
 
 if TYPE_CHECKING:
-    from .document import Document
+    from sciread.document.document import Document
 
 
 def match_section_pattern(search_name: str, normalized_names: list[str], original_names: list[str]) -> str | None:

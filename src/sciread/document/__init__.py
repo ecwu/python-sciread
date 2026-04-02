@@ -1,13 +1,13 @@
-"""Public compatibility facade for sciread's document APIs."""
+"""Document APIs, loaders, splitters, and retrieval helpers."""
 
-from ..document_ingestion import MineruClient
-from ..document_structure import Chunk
-from ..document_structure import Document
-from ..document_structure import DocumentBuilder
-from ..document_structure import DocumentFactory
-from ..document_structure.splitters import SemanticSplitter
 from ..embedding_provider import OllamaClient
 from ..embedding_provider import SiliconFlowClient
+from .document import Document
+from .document_builder import DocumentBuilder
+from .factory import DocumentFactory
+from .ingestion.external_clients import MineruClient
+from .models import Chunk
+from .structure.splitters import SemanticSplitter
 
 __all__ = [
     "Chunk",

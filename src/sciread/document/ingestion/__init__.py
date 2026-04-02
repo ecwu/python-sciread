@@ -1,4 +1,4 @@
-"""Document ingestion interfaces and file loaders."""
+"""Document ingestion clients and loaders."""
 
 from .external_clients import MineruClient
 from .loaders import BaseLoader

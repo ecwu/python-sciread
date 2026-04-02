@@ -8,13 +8,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..platform.logging import get_logger
-from ..retrieval.vector_index import VectorIndex
-from .models import Chunk
-from .models import DocumentMetadata
+from sciread.document.models import Chunk
+from sciread.document.models import DocumentMetadata
+from sciread.document.retrieval.vector_index import VectorIndex
+from sciread.platform.logging import get_logger
 
 if TYPE_CHECKING:
-    from .document import Document
+    from sciread.document.document import Document
 
 
 def save_document(document: Document, output_path: Path) -> None:

@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from sciread.document.models import Chunk
-from sciread.document.vector_index import VectorIndex
+from sciread.document.retrieval.vector_index import VectorIndex
 
 
 class TestVectorIndex:

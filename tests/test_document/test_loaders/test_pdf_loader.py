@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sciread.document.loaders.pdf_loader import PdfLoader
+from sciread.document.ingestion.loaders.pdf_loader import PdfLoader
 
 
 class TestPdfLoader:
@@ -53,7 +53,7 @@ class TestPdfLoader:
         loader = PdfLoader(to_markdown=True)
         assert loader.to_markdown is True
 
-    @patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader")
+    @patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader")
     def test_load_pdf_with_pypdf_success(self, mock_pdf_reader, loader, sample_pdf_file):
         """Test successful PDF loading with pypdf."""
         # Mock pypdf reader
@@ -79,8 +79,8 @@ class TestPdfLoader:
         assert result.extraction_info["extraction_method"] == "pypdf"
         assert result.extraction_info["character_count"] > 0
 
-    @patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader")
-    @patch("sciread.document.loaders.pdf_loader.pdfplumber.open")
+    @patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader")
+    @patch("sciread.document.ingestion.loaders.pdf_loader.pdfplumber.open")
     def test_load_pdf_fallback_to_pdfplumber(self, mock_pdfplumber, mock_pdf_reader, loader, sample_pdf_file):
         """Test PDF loading fallback to pdfplumber when pypdf extraction is poor."""
         # Mock pypdf to return short text
@@ -105,7 +105,7 @@ class TestPdfLoader:
         assert "Much longer content from pdfplumber extraction." in result.text
         assert result.extraction_info["extraction_method"] == "pdfplumber"
 
-    @patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader")
+    @patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader")
     def test_load_pdf_extraction_failure(self, mock_pdf_reader, loader, sample_pdf_file):
         """Test PDF loading when extraction fails completely."""
         # Mock pypdf to return empty text
@@ -117,7 +117,7 @@ class TestPdfLoader:
         mock_reader.pages = [mock_page]
         mock_pdf_reader.return_value = mock_reader
 
-        with patch("sciread.document.loaders.pdf_loader.pdfplumber.open") as mock_pdfplumber:
+        with patch("sciread.document.ingestion.loaders.pdf_loader.pdfplumber.open") as mock_pdfplumber:
             # Mock pdfplumber to also return empty text
             mock_pdf = Mock()
             mock_page_plumber = Mock()
@@ -131,7 +131,7 @@ class TestPdfLoader:
         assert len(result.errors) > 0
         assert "No text could be extracted from PDF" in result.errors[0]
 
-    @patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader")
+    @patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader")
     def test_load_pdf_page_extraction_error(self, mock_pdf_reader, loader, sample_pdf_file):
         """Test PDF loading when a page fails to extract."""
         # Mock pypdf with one failing page
@@ -161,7 +161,7 @@ class TestPdfLoader:
         pdf_file = temp_dir / "quality_issues.pdf"
         pdf_file.write_bytes(b"fake pdf content")
 
-        with patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader") as mock_pdf_reader:
+        with patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader") as mock_pdf_reader:
             # Mock text with quality issues
             mock_reader = Mock()
             mock_reader.metadata = None
@@ -183,7 +183,7 @@ class TestPdfLoader:
 
     def test_metadata_creation(self, loader, sample_pdf_file):
         """Test metadata creation from PDF file."""
-        with patch("sciread.document.loaders.pdf_loader.pypdf.PdfReader") as mock_pdf_reader:
+        with patch("sciread.document.ingestion.loaders.pdf_loader.pypdf.PdfReader") as mock_pdf_reader:
             # Mock PDF with metadata
             mock_reader = Mock()
             mock_reader.metadata = Mock()

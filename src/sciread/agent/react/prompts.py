@@ -1,6 +1,6 @@
 """Prompt builders for the ReAct analysis loop."""
 
-from ...document.document_renderers import format_section_choices
+from ...document.structure.renderers import format_section_choices
 from .models import ReActIterationDeps
 
 

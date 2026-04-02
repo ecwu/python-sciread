@@ -6,11 +6,11 @@ from pathlib import Path
 import pdfplumber
 import pypdf
 
-from ...platform.config import get_config
-from ...platform.logging import get_logger
-from ..external_clients import MineruClient
-from .base import BaseLoader
-from .base import LoadResult
+from sciread.document.ingestion.external_clients import MineruClient
+from sciread.document.ingestion.loaders.base import BaseLoader
+from sciread.document.ingestion.loaders.base import LoadResult
+from sciread.platform.config import get_config
+from sciread.platform.logging import get_logger
 
 
 class PdfLoader(BaseLoader):

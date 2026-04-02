@@ -10,8 +10,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from loguru import Logger
 
-    from .document import Document
-    from .models import Chunk
+    from sciread.document.document import Document
+    from sciread.document.models import Chunk
 
 
 def calculate_file_hash(file_path: Path, logger: Logger) -> str:

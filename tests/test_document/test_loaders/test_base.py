@@ -1,7 +1,7 @@
 """Tests for base loader functionality."""
 
-from sciread.document.loaders.base import BaseLoader
-from sciread.document.loaders.base import LoadResult
+from sciread.document.ingestion.loaders.base import BaseLoader
+from sciread.document.ingestion.loaders.base import LoadResult
 from sciread.document.models import DocumentMetadata
 
 

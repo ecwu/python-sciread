@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from sciread.document.loaders.txt_loader import TxtLoader
+from sciread.document.ingestion.loaders.txt_loader import TxtLoader
 
 
 class TestTxtLoader:

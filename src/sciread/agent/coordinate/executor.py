@@ -11,7 +11,7 @@ from pydantic_ai import Agent
 from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 
-from ...document_structure import Document
+from ...document import Document
 from .models import AnalysisPlan
 from .planner import build_expert_content
 from .runtime import ANALYSIS_TASKS

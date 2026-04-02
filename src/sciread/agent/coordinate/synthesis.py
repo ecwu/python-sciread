@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic_ai import Agent
 
-from ...document_structure import Document
+from ...document import Document
 from .models import AnalysisPlan
 from .models import ComprehensiveAnalysisResult
 from .planner import extract_abstract

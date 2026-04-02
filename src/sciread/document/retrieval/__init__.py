@@ -1,4 +1,4 @@
-"""Retrieval services and vector indexing."""
+"""Document retrieval services and vector indexing."""
 
 from .service import build_vector_index
 from .service import cosine_similarity

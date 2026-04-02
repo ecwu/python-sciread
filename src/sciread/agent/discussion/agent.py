@@ -11,7 +11,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 from rich.table import Table
 
-from ...document_structure import Document
+from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from .models import AgentPersonality

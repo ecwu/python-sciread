@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ...document_structure import Document
+from ...document import Document
 
 
 def ensure_file_exists(document_file_path: str) -> Path:

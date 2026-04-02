@@ -7,7 +7,7 @@ from dataclasses import field
 from pathlib import Path
 from typing import Any
 
-from ...document_structure.models import DocumentMetadata
+from sciread.document.models import DocumentMetadata
 
 
 @dataclass

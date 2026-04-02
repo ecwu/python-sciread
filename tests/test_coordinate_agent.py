@@ -13,10 +13,10 @@ from sciread.agent.coordinate.synthesis import build_comprehensive_result
 from sciread.agent.coordinate.synthesis import build_execution_summary
 from sciread.agent.coordinate.synthesis import validate_pdf_document
 from sciread.document import Document
-from sciread.document.document_renderers import format_section_choices
-from sciread.document.document_renderers import get_section_length_map
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
+from sciread.document.structure.renderers import format_section_choices
+from sciread.document.structure.renderers import get_section_length_map
 from sciread.platform.logging import get_logger
 
 

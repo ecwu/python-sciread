@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic_ai import Agent
 
-from ...document_structure import Document
+from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from .models import AgentInsight

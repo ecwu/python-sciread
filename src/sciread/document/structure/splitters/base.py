@@ -3,7 +3,7 @@
 from abc import ABC
 from abc import abstractmethod
 
-from ..models import Chunk
+from sciread.document.models import Chunk
 
 
 class BaseSplitter(ABC):

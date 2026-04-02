@@ -7,12 +7,12 @@ from typing import Any
 from pydantic_ai import Agent
 from pydantic_ai.messages import ModelMessage
 
-from ...document.document_renderers import choose_best_section_match
-from ...document.document_renderers import format_section_choices
-from ...document.document_renderers import get_section_length_map
-from ...document.document_renderers import get_sections_content
-from ...document.document_renderers import is_likely_heading_only
-from ...document_structure import Document
+from ...document import Document
+from ...document.structure.renderers import choose_best_section_match
+from ...document.structure.renderers import format_section_choices
+from ...document.structure.renderers import get_section_length_map
+from ...document.structure.renderers import get_sections_content
+from ...document.structure.renderers import is_likely_heading_only
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from .models import AGENT_ABBREVIATIONS

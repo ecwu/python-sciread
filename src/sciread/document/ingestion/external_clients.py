@@ -8,7 +8,8 @@ from pathlib import Path
 
 import requests
 
-from ..platform.logging import get_logger
+from sciread.platform.logging import get_logger
+
 from .mineru_cache import MineruCacheManager
 
 

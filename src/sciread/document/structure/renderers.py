@@ -6,8 +6,8 @@ import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .document import Document
-    from .models import Chunk
+    from sciread.document.document import Document
+    from sciread.document.models import Chunk
 
 
 SHORT_SECTION_THRESHOLD = 80

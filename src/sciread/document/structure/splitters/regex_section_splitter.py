@@ -4,7 +4,8 @@ import re
 import uuid
 from re import Pattern
 
-from ..models import Chunk
+from sciread.document.models import Chunk
+
 from .base import BaseSplitter
 
 

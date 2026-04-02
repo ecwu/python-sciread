@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from ..embedding_provider import get_embedding_client
-from ..platform.config import get_config
-from .vector_index import VectorIndex
+from sciread.document.retrieval.vector_index import VectorIndex
+from sciread.embedding_provider import get_embedding_client
+from sciread.platform.config import get_config
 
 if TYPE_CHECKING:
-    from ..document_structure.document import Document
-    from ..document_structure.models import Chunk
+    from sciread.document.document import Document
+    from sciread.document.models import Chunk
 
 
 def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:

@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from sciread.document import DocumentBuilder
-from sciread.document.loaders.base import LoadResult
+from sciread.document.ingestion.loaders.base import LoadResult
 from sciread.document.models import DocumentMetadata
 
 
@@ -23,7 +23,7 @@ class TestDocumentBuilder:
         pdf_file = temp_dir / "sample.pdf"
         pdf_file.write_bytes(b"%PDF-1.4\n%%EOF")
 
-        with patch("sciread.document_structure.builder.PdfLoader.load") as mock_load:
+        with patch("sciread.document.document_builder.PdfLoader.load") as mock_load:
             mock_load.return_value = LoadResult(
                 text="PDF body",
                 metadata=DocumentMetadata(source_path=pdf_file, file_type="pdf"),

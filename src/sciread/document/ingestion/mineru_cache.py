@@ -6,7 +6,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..platform.logging import get_logger
+from sciread.platform.logging import get_logger
 
 
 @dataclass

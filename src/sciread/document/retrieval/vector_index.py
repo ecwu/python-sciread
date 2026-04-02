@@ -5,7 +5,7 @@ from typing import Any
 
 import chromadb
 
-from ..document_structure.models import Chunk
+from sciread.document.models import Chunk
 
 
 class VectorIndex:

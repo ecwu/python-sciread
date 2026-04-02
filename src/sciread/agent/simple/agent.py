@@ -17,7 +17,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from rich.console import Console
 from rich.markdown import Markdown
 
-from ...document_structure import Document
+from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ..shared.error_handling import handle_model_retry

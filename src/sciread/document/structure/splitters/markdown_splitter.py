@@ -3,7 +3,8 @@
 import re
 import uuid
 
-from ..models import Chunk
+from sciread.document.models import Chunk
+
 from .base import BaseSplitter
 
 

@@ -3,7 +3,7 @@
 import pytest
 
 from sciread.document import Document
-from sciread.document.splitters.regex_section_splitter import RegexSectionSplitter
+from sciread.document.structure.splitters.regex_section_splitter import RegexSectionSplitter
 
 
 class TestRegexSectionSplitter:

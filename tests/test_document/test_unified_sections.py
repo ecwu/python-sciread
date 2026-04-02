@@ -3,9 +3,9 @@
 import pytest
 
 from sciread.document import Document
-from sciread.document.document_renderers import get_sections_content
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
+from sciread.document.structure.renderers import get_sections_content
 
 
 class TestUnifiedSectionHandling:
