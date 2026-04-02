@@ -1,7 +1,9 @@
 """Tests for TXT loader."""
 
 from pathlib import Path
+from unittest.mock import Mock
 
+import chardet
 import pytest
 
 from sciread.document.ingestion.loaders.txt_loader import TxtLoader
@@ -121,3 +123,61 @@ class TestTxtLoader:
         assert result.metadata.file_type == "txt"
         assert result.metadata.file_size > 0
         assert result.metadata.modified_at is not None
+
+    def test_detect_encoding_falls_back_when_detected_encoding_is_invalid(self, loader, temp_dir, monkeypatch):
+        """Invalid detected encodings should fall back to a decodable default."""
+        text_file = temp_dir / "latin1.txt"
+        text_file.write_bytes("café".encode("latin-1"))
+
+        monkeypatch.setattr(chardet, "detect", lambda _raw_data: {"encoding": "definitely-not-real"})
+
+        encoding = loader._detect_encoding(text_file)
+
+        assert encoding == "latin-1"
+
+    def test_detect_encoding_returns_utf8_when_file_is_empty(self, loader, temp_dir):
+        """Empty files should default to UTF-8."""
+        text_file = temp_dir / "empty.txt"
+        text_file.write_bytes(b"")
+
+        assert loader._detect_encoding(text_file) == "utf-8"
+
+    def test_detect_encoding_returns_utf8_when_open_fails(self, loader, temp_dir, monkeypatch):
+        """Unexpected detection failures should safely default to UTF-8."""
+        file_path = temp_dir / "unreadable.txt"
+        open_mock = Mock(side_effect=OSError("boom"))
+        monkeypatch.setattr(Path, "open", open_mock)
+
+        assert loader._detect_encoding(file_path) == "utf-8"
+
+    def test_load_reports_unicode_decode_errors(self, loader, temp_dir, monkeypatch):
+        """Unicode decode failures during file read should become loader errors."""
+        text_file = temp_dir / "broken.txt"
+        text_file.write_text("placeholder")
+        monkeypatch.setattr(loader, "_detect_encoding", lambda _file_path: "utf-8")
+
+        def fake_open(self, *args, **kwargs):
+            raise UnicodeDecodeError("utf-8", b"\xff", 0, 1, "bad byte")
+
+        monkeypatch.setattr(Path, "open", fake_open)
+
+        result = loader.load(text_file)
+
+        assert not result.success
+        assert result.errors == ["Failed to decode file: 'utf-8' codec can't decode byte 0xff in position 0: bad byte"]
+
+    def test_load_reports_unexpected_errors(self, loader, temp_dir, monkeypatch):
+        """Non-IO unexpected exceptions should still be captured in the result."""
+        text_file = temp_dir / "broken.txt"
+        text_file.write_text("placeholder")
+        monkeypatch.setattr(loader, "_detect_encoding", lambda _file_path: "utf-8")
+
+        def fake_open(self, *args, **kwargs):
+            raise RuntimeError("unexpected boom")
+
+        monkeypatch.setattr(Path, "open", fake_open)
+
+        result = loader.load(text_file)
+
+        assert not result.success
+        assert result.errors == ["Unexpected error loading file: unexpected boom"]
