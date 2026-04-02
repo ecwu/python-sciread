@@ -29,8 +29,14 @@ class ReActIterationOutput(BaseModel):
     """Output of a single ReAct analysis iteration (one tool call + thoughts)."""
 
     thoughts: str = Field(description="Agent's reasoning, observations, and decisions for the next action")
-    should_continue: bool = Field(default=True, description="Whether analysis should continue to the next iteration")
-    report: str = Field(default="", description="Final report text. Usually empty in normal iterations; populated when finishing analysis.")
+    should_continue: bool = Field(
+        default=True,
+        description="Whether analysis should continue to the next iteration",
+    )
+    report: str = Field(
+        default="",
+        description="Final report text. Usually empty in normal iterations; populated when finishing analysis.",
+    )
 
 
 @dataclass
@@ -41,7 +47,7 @@ class ReActIterationDeps:
     task: str
     iteration_input: ReActIterationInput
     current_loop: int = 1
-    max_loops: int = 8
+    max_loops: int = 5
     accumulated_memory: str = ""
     show_progress: bool = True
 
@@ -87,7 +93,11 @@ class ReActAnalysisState:
             available_section_lengths=self.available_section_lengths.copy(),
         )
 
-    def apply_iteration(self, iteration_output: ReActIterationOutput, iteration_state: ReActIterationState) -> None:
+    def apply_iteration(
+        self,
+        iteration_output: ReActIterationOutput,
+        iteration_state: ReActIterationState,
+    ) -> None:
         """Merge one iteration's output into the session state."""
         self.last_iteration_output = iteration_output
         self.current_thoughts = iteration_output.thoughts

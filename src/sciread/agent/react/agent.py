@@ -33,6 +33,7 @@ logger = get_logger(__name__)
 
 console = Console()
 
+
 def _get_sections(document: Document, section_names: list[str]) -> list[tuple[str, str]]:
     """Get clean text for the requested section names."""
     if not section_names:
@@ -61,7 +62,12 @@ def _render_iteration_header(current_loop: int, max_loops: int, processed_count:
 
 def _render_sections_read(section_entries: list[tuple[str, str]]) -> None:
     """Render the sections read during the current tool call."""
-    console.print(build_sections_table("Read Sections", [(section_name, len(content.strip())) for section_name, content in section_entries]))
+    console.print(
+        build_sections_table(
+            "Read Sections",
+            [(section_name, len(content.strip())) for section_name, content in section_entries],
+        )
+    )
 
 
 def _render_iteration_thoughts(
@@ -223,7 +229,7 @@ async def analyze_file_with_react(
     file_path: str,
     task: str,
     model: str = "deepseek-chat",
-    max_loops: int = 8,
+    max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
 ) -> ReActIterationOutput:
@@ -257,7 +263,12 @@ async def analyze_file_with_react(
     section_count = len(get_section_names()) if callable(get_section_names) else 0
     chunk_count = len(getattr(document, "chunks", []))
     console.print()
-    console.print(build_mode_banner("ReAct Analysis", subtitle="Iterative section reading with structured progress"))
+    console.print(
+        build_mode_banner(
+            "ReAct Analysis",
+            subtitle="Iterative section reading with structured progress",
+        )
+    )
     console.print(
         build_key_value_table(
             "Analysis Overview",
@@ -285,7 +296,7 @@ def analyze_file_with_react_sync(
     file_path: str,
     task: str,
     model: str = "deepseek-chat",
-    max_loops: int = 8,
+    max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
 ) -> ReActIterationOutput:
@@ -495,7 +506,7 @@ class ReActAgent:
         document: Document,
         iteration_input: ReActIterationInput,
         current_loop: int = 1,
-        max_loops: int = 8,
+        max_loops: int = 5,
         accumulated_memory: str = "",
         show_progress: bool = True,
     ) -> tuple[ReActIterationOutput, ReActIterationState]:
@@ -539,13 +550,16 @@ class ReActAgent:
         if output is None:
             output = self._fallback_iteration_output()
 
-        return self._finalize_iteration_output(output, current_loop, max_loops, accumulated_memory), iteration_state
+        return (
+            self._finalize_iteration_output(output, current_loop, max_loops, accumulated_memory),
+            iteration_state,
+        )
 
     async def run_analysis(
         self,
         document: Document,
         task: str,
-        max_loops: int = 8,
+        max_loops: int = 5,
         show_progress: bool = True,
     ) -> ReActIterationOutput:
         """Run the multi-iteration ReAct analysis over a prepared document.
@@ -606,7 +620,11 @@ class ReActAgent:
             if not analysis_state.remaining_sections:
                 self.logger.info(f"All sections processed after iteration {loop_num}")
                 if show_progress:
-                    _render_progress_message("Analysis Status", "All available sections have been read", "yellow")
+                    _render_progress_message(
+                        "Analysis Status",
+                        "All available sections have been read",
+                        "yellow",
+                    )
                 break
 
         self.logger.info(f"Multi-iteration analysis completed after {loop_num} iterations")

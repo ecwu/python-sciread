@@ -12,7 +12,7 @@ async def run_react_analysis(
     document_file: str,
     task: str,
     model: str = "deepseek-chat",
-    max_loops: int = 8,
+    max_loops: int = 5,
     show_progress: bool = True,
 ):
     """Run ReAct analysis on a document."""
