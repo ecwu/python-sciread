@@ -423,6 +423,8 @@ def build_report_synthesis_prompt(
         )
     else:
         for agent_name, result_data in sub_agent_results.items():
+            if not isinstance(result_data, dict) or "success" not in result_data:
+                continue
             if result_data.get("success", False):
                 result = result_data["result"]
                 prompt_parts.extend([f"{agent_name.upper()} 分析：", str(result), ""])

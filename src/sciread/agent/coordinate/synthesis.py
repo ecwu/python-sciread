@@ -6,7 +6,6 @@ import asyncio
 from typing import Any
 
 from pydantic_ai import Agent
-from pydantic_ai import RunContext
 
 from ...document_structure import Document
 from .models import AnalysisPlan
@@ -14,6 +13,8 @@ from .models import ComprehensiveAnalysisResult
 from .planner import extract_abstract
 from .prompts import SYNTHESIS_SYSTEM_PROMPT
 from .prompts import build_report_synthesis_prompt
+from .runtime import ANALYSIS_TASKS
+from .runtime import INTERNAL_SECTIONS_KEY
 
 
 def validate_pdf_document(document: Document) -> None:
@@ -28,18 +29,27 @@ def validate_pdf_document(document: Document) -> None:
 
 def build_execution_summary(sub_agent_results: dict[str, Any]) -> dict[str, Any]:
     """Build a compact execution summary from expert results."""
+    agent_results = get_agent_results(sub_agent_results)
+
     return {
-        "total_agents_executed": len(sub_agent_results) - 1,
-        "successful_agents": len(
-            [result for name, result in sub_agent_results.items() if name != "_sections_analyzed" and result.get("success", False)]
-        ),
-        "failed_agents": len(
-            [result for name, result in sub_agent_results.items() if name != "_sections_analyzed" and not result.get("success", False)]
-        ),
-        "agent_results": {
-            name: {"success": data.get("success", False)} for name, data in sub_agent_results.items() if name != "_sections_analyzed"
-        },
+        "total_agents_executed": len(agent_results),
+        "successful_agents": sum(1 for result in agent_results.values() if result.get("success", False)),
+        "failed_agents": sum(1 for result in agent_results.values() if not result.get("success", False)),
+        "agent_results": {name: {"success": data.get("success", False)} for name, data in agent_results.items()},
     }
+
+
+def get_agent_results(sub_agent_results: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return only actual agent results, excluding internal bookkeeping."""
+    return {name: data for name, data in sub_agent_results.items() if name != INTERNAL_SECTIONS_KEY and isinstance(data, dict)}
+
+
+def get_successful_result(sub_agent_results: dict[str, Any], analysis_type: str) -> Any:
+    """Return a successful expert result or None."""
+    result_data = sub_agent_results.get(analysis_type, {})
+    if result_data.get("success"):
+        return result_data.get("result")
+    return None
 
 
 def build_comprehensive_result(
@@ -49,36 +59,15 @@ def build_comprehensive_result(
     total_execution_time: float,
 ) -> ComprehensiveAnalysisResult:
     """Assemble the final coordinate-agent response model."""
+    result_fields = {task.output_field: get_successful_result(sub_agent_results, task.analysis_type) for task in ANALYSIS_TASKS}
+
     return ComprehensiveAnalysisResult(
         analysis_plan=analysis_plan,
-        metadata_result=sub_agent_results.get("metadata", {}).get("result")
-        if sub_agent_results.get("metadata", {}).get("success")
-        else None,
-        previous_methods_result=(
-            sub_agent_results.get("previous_methods", {}).get("result")
-            if sub_agent_results.get("previous_methods", {}).get("success")
-            else None
-        ),
-        research_questions_result=(
-            sub_agent_results.get("research_questions", {}).get("result")
-            if sub_agent_results.get("research_questions", {}).get("success")
-            else None
-        ),
-        methodology_result=sub_agent_results.get("methodology", {}).get("result")
-        if sub_agent_results.get("methodology", {}).get("success")
-        else None,
-        experiment_result=sub_agent_results.get("experiments", {}).get("result")
-        if sub_agent_results.get("experiments", {}).get("success")
-        else None,
-        future_directions_result=(
-            sub_agent_results.get("future_directions", {}).get("result")
-            if sub_agent_results.get("future_directions", {}).get("success")
-            else None
-        ),
+        **result_fields,
         execution_summary=build_execution_summary(sub_agent_results),
         final_report=final_report,
         total_execution_time=total_execution_time,
-        sections_analyzed=sub_agent_results.get("_sections_analyzed", {}),
+        sections_analyzed=sub_agent_results.get(INTERNAL_SECTIONS_KEY, {}),
     )
 
 
@@ -95,30 +84,25 @@ async def synthesize_report(
     if not isinstance(sub_agent_results, dict):
         raise TypeError(f"Expected dict for sub_agent_results, got {type(sub_agent_results)}")
 
+    agent_results = get_agent_results(sub_agent_results)
     paper_title = document.metadata.title or "Unknown Paper"
-    if paper_title == "Unknown Paper" and sub_agent_results.get("metadata", {}).get("success"):
-        metadata_result = sub_agent_results["metadata"]["result"]
+    metadata_result = get_successful_result(sub_agent_results, "metadata")
+    if paper_title == "Unknown Paper" and metadata_result is not None:
         if getattr(metadata_result, "title", None):
             paper_title = metadata_result.title
 
-    successful_analyses = [
-        name for name, result in sub_agent_results.items() if name != "_sections_analyzed" and result.get("success", False)
-    ]
+    successful_analyses = [name for name, result in agent_results.items() if result.get("success", False)]
     if not successful_analyses:
         logger.error("No successful analyses available for synthesis")
         return "No successful analyses available for report synthesis. Please try again with different settings."
 
     synthesis_agent = Agent(model=model, deps_type=dict, system_prompt=SYNTHESIS_SYSTEM_PROMPT, retries=max_retries)
 
-    @synthesis_agent.system_prompt
-    async def synthesis_system_prompt(ctx: RunContext[dict]) -> str:
-        return SYNTHESIS_SYSTEM_PROMPT
-
     prompt = build_report_synthesis_prompt(
         paper_title=paper_title,
         source_path=str(document.source_path) if document.source_path else "text document",
         abstract=extract_abstract(document, logger),
-        sub_agent_results=sub_agent_results,
+        sub_agent_results=agent_results,
     )
 
     try:

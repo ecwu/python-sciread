@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 
 from sciread.agent.coordinate.models import AnalysisPlan
+from sciread.agent.coordinate.models import PreviousMethodsResult
 from sciread.agent.coordinate.planner import extract_abstract
 from sciread.agent.coordinate.planner import select_sections_for_expert
+from sciread.agent.coordinate.synthesis import build_comprehensive_result
 from sciread.agent.coordinate.synthesis import build_execution_summary
 from sciread.agent.coordinate.synthesis import validate_pdf_document
 from sciread.document import Document
@@ -69,6 +71,38 @@ def test_build_execution_summary_counts_successes_and_failures():
     assert summary["total_agents_executed"] == 2
     assert summary["successful_agents"] == 1
     assert summary["failed_agents"] == 1
+
+
+def test_build_comprehensive_result_maps_results_by_agent_name():
+    """Comprehensive result fields should map from stable agent names."""
+    plan = AnalysisPlan(
+        analyze_metadata=False,
+        analyze_previous_methods=True,
+        analyze_research_questions=False,
+        analyze_methodology=False,
+        analyze_experiments=False,
+        analyze_future_directions=False,
+        previous_methods_sections=["introduction"],
+        research_questions_sections=[],
+        methodology_sections=[],
+        experiments_sections=[],
+        future_directions_sections=[],
+        reasoning="focused",
+    )
+    previous_methods = PreviousMethodsResult(related_work=["Prior System"])
+
+    result = build_comprehensive_result(
+        analysis_plan=plan,
+        sub_agent_results={
+            "previous_methods": {"success": True, "result": previous_methods},
+            "_sections_analyzed": {"previous_methods": ["introduction"]},
+        },
+        final_report="report",
+        total_execution_time=1.23,
+    )
+
+    assert result.previous_methods_result == previous_methods
+    assert result.sections_analyzed == {"previous_methods": ["introduction"]}
 
 
 def test_analysis_plan_model_still_accepts_empty_section_lists():

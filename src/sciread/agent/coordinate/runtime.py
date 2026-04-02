@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from dataclasses import field
 from typing import Any
+
+from pydantic import BaseModel
 
 from .models import AnalysisPlan
 from .models import ExperimentResult
@@ -32,9 +35,6 @@ class CoordinateDeps:
     """Dependencies for controller-side planning."""
 
     document: Any
-    custom_plan: AnalysisPlan | None = None
-    max_retries: int = 3
-    timeout: float = 300.0
 
 
 @dataclass
@@ -44,46 +44,58 @@ class ExpertAgentDeps:
     document: Any
     analysis_type: str
     sections_to_analyze: list[str] = field(default_factory=list)
-    analysis_plan: AnalysisPlan | None = None
 
 
-EXPERT_AGENT_CONFIG = {
-    "metadata": {
-        "system_prompt": METADATA_EXTRACTION_SYSTEM_PROMPT,
-        "output_type": MetadataExtractionResult,
-        "timeout": 60.0,
-        "prompt_builder": build_metadata_analysis_prompt,
-    },
-    "previous_methods": {
-        "system_prompt": PREVIOUS_METHODS_SYSTEM_PROMPT,
-        "output_type": PreviousMethodsResult,
-        "timeout": 120.0,
-        "prompt_builder": build_previous_methods_analysis_prompt,
-    },
-    "research_questions": {
-        "system_prompt": RESEARCH_QUESTIONS_SYSTEM_PROMPT,
-        "output_type": ResearchQuestionsResult,
-        "timeout": 120.0,
-        "prompt_builder": build_research_questions_analysis_prompt,
-    },
-    "methodology": {
-        "system_prompt": METHODOLOGY_SYSTEM_PROMPT,
-        "output_type": MethodologyResult,
-        "timeout": 120.0,
-        "prompt_builder": build_methodology_analysis_prompt,
-    },
-    "experiments": {
-        "system_prompt": EXPERIMENTS_SYSTEM_PROMPT,
-        "output_type": ExperimentResult,
-        "timeout": 120.0,
-        "prompt_builder": build_experiments_analysis_prompt,
-    },
-    "future_directions": {
-        "system_prompt": FUTURE_DIRECTIONS_SYSTEM_PROMPT,
-        "output_type": FutureDirectionsResult,
-        "timeout": 120.0,
-        "prompt_builder": build_future_directions_analysis_prompt,
-    },
+@dataclass(frozen=True)
+class ExpertAgentConfig:
+    """Static configuration for one expert agent."""
+
+    system_prompt: str
+    output_type: type[BaseModel]
+    prompt_builder: Callable[[str], str]
+
+
+@dataclass(frozen=True)
+class AnalysisTask:
+    """Metadata for one coordinate-agent task."""
+
+    plan_field: str
+    analysis_type: str
+    output_field: str
+    sections_field: str | None = None
+
+
+EXPERT_AGENT_CONFIG: dict[str, ExpertAgentConfig] = {
+    "metadata": ExpertAgentConfig(
+        system_prompt=METADATA_EXTRACTION_SYSTEM_PROMPT,
+        output_type=MetadataExtractionResult,
+        prompt_builder=build_metadata_analysis_prompt,
+    ),
+    "previous_methods": ExpertAgentConfig(
+        system_prompt=PREVIOUS_METHODS_SYSTEM_PROMPT,
+        output_type=PreviousMethodsResult,
+        prompt_builder=build_previous_methods_analysis_prompt,
+    ),
+    "research_questions": ExpertAgentConfig(
+        system_prompt=RESEARCH_QUESTIONS_SYSTEM_PROMPT,
+        output_type=ResearchQuestionsResult,
+        prompt_builder=build_research_questions_analysis_prompt,
+    ),
+    "methodology": ExpertAgentConfig(
+        system_prompt=METHODOLOGY_SYSTEM_PROMPT,
+        output_type=MethodologyResult,
+        prompt_builder=build_methodology_analysis_prompt,
+    ),
+    "experiments": ExpertAgentConfig(
+        system_prompt=EXPERIMENTS_SYSTEM_PROMPT,
+        output_type=ExperimentResult,
+        prompt_builder=build_experiments_analysis_prompt,
+    ),
+    "future_directions": ExpertAgentConfig(
+        system_prompt=FUTURE_DIRECTIONS_SYSTEM_PROMPT,
+        output_type=FutureDirectionsResult,
+        prompt_builder=build_future_directions_analysis_prompt,
+    ),
 }
 
 
@@ -109,14 +121,41 @@ EXPERT_SECTION_PREFERENCES = {
 }
 
 
-ANALYSIS_TASKS = [
-    ("analyze_metadata", "metadata", "metadata", None),
-    ("analyze_previous_methods", "previous_methods", "previous_methods_sections", "previous_methods_sections"),
-    ("analyze_research_questions", "research_questions", "research_questions_sections", "research_questions_sections"),
-    ("analyze_methodology", "methodology", "methodology_sections", "methodology_sections"),
-    ("analyze_experiments", "experiments", "experiments_sections", "experiments_sections"),
-    ("analyze_future_directions", "future_directions", "future_directions_sections", "future_directions_sections"),
-]
+ANALYSIS_TASKS: tuple[AnalysisTask, ...] = (
+    AnalysisTask(plan_field="analyze_metadata", analysis_type="metadata", output_field="metadata_result"),
+    AnalysisTask(
+        plan_field="analyze_previous_methods",
+        analysis_type="previous_methods",
+        output_field="previous_methods_result",
+        sections_field="previous_methods_sections",
+    ),
+    AnalysisTask(
+        plan_field="analyze_research_questions",
+        analysis_type="research_questions",
+        output_field="research_questions_result",
+        sections_field="research_questions_sections",
+    ),
+    AnalysisTask(
+        plan_field="analyze_methodology",
+        analysis_type="methodology",
+        output_field="methodology_result",
+        sections_field="methodology_sections",
+    ),
+    AnalysisTask(
+        plan_field="analyze_experiments",
+        analysis_type="experiments",
+        output_field="experiment_result",
+        sections_field="experiments_sections",
+    ),
+    AnalysisTask(
+        plan_field="analyze_future_directions",
+        analysis_type="future_directions",
+        output_field="future_directions_result",
+        sections_field="future_directions_sections",
+    ),
+)
+
+INTERNAL_SECTIONS_KEY = "_sections_analyzed"
 
 
 def default_analysis_plan(reasoning: str) -> AnalysisPlan:

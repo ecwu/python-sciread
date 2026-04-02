@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable
 from typing import Any
 
 from pydantic import BaseModel
@@ -15,6 +16,7 @@ from .models import AnalysisPlan
 from .planner import build_expert_content
 from .runtime import ANALYSIS_TASKS
 from .runtime import EXPERT_AGENT_CONFIG
+from .runtime import INTERNAL_SECTIONS_KEY
 from .runtime import ExpertAgentDeps
 
 
@@ -27,7 +29,8 @@ def create_expert_agent(model, max_retries: int, analysis_type: str, logger) -> 
     agent = Agent(
         model=model,
         deps_type=ExpertAgentDeps,
-        output_type=config["output_type"],
+        output_type=config.output_type,
+        system_prompt=config.system_prompt,
         retries=max_retries,
     )
 
@@ -44,7 +47,7 @@ def create_expert_agent(model, max_retries: int, analysis_type: str, logger) -> 
             )
             if not content.strip():
                 raise ModelRetry(f"No content found for {deps.analysis_type} analysis. Please check document sections and try again.")
-            return config["prompt_builder"](content)
+            return config.prompt_builder(content)
         except Exception as exc:
             logger.warning(f"Expert content assembly failed for {deps.analysis_type}: {exc}")
             raise ModelRetry(f"Unable to assemble content for {deps.analysis_type}.") from exc
@@ -67,6 +70,25 @@ async def safe_execute_agent(coro, agent_name: str, logger):
         raise
 
 
+def resolve_sections_to_analyze(
+    document: Document,
+    analysis_plan: AnalysisPlan,
+    task,
+    logger,
+) -> list[str]:
+    """Resolve the section names passed to a given expert."""
+    if task.sections_field is None:
+        return [f"First {min(3, len(document.chunks))} chunks"]
+
+    selected_sections = deduplicate_sections(getattr(analysis_plan, task.sections_field))
+    if selected_sections:
+        logger.debug(f"{task.analysis_type} agent using specific sections: {selected_sections}")
+        return selected_sections
+
+    logger.warning(f"{task.analysis_type} agent: No sections specified, using 'All sections' fallback.")
+    return ["All sections"]
+
+
 async def execute_sub_agents(
     document: Document,
     analysis_plan: AnalysisPlan,
@@ -78,33 +100,24 @@ async def execute_sub_agents(
     start_time = asyncio.get_event_loop().time()
 
     results: dict[str, Any] = {}
-    tasks = []
+    tasks: list[tuple[str, Awaitable[BaseModel]]] = []
     sections_analyzed: dict[str, list[str]] = {}
 
-    for plan_field, agent_key, result_key, sections_field in ANALYSIS_TASKS:
-        if not getattr(analysis_plan, plan_field):
+    for task in ANALYSIS_TASKS:
+        if not getattr(analysis_plan, task.plan_field):
             continue
 
-        if agent_key == "metadata":
-            sections_analyzed[result_key] = [f"First {min(3, len(document.chunks))} chunks"]
-        else:
-            sections = getattr(analysis_plan, sections_field)
-            if sections:
-                sections_analyzed[result_key] = deduplicate_sections(sections)
-                logger.debug(f"{agent_key} agent using specific sections: {sections_analyzed[result_key]}")
-            else:
-                sections_analyzed[result_key] = ["All sections"]
-                logger.warning(f"{agent_key} agent: No sections specified, using 'All sections' fallback.")
+        sections_to_analyze = resolve_sections_to_analyze(document, analysis_plan, task, logger)
+        sections_analyzed[task.analysis_type] = sections_to_analyze
 
-        agent = create_expert_agent(model, max_retries, agent_key, logger)
+        agent = create_expert_agent(model, max_retries, task.analysis_type, logger)
         deps = ExpertAgentDeps(
             document=document,
-            analysis_type=agent_key,
-            sections_to_analyze=sections_analyzed[result_key],
-            analysis_plan=analysis_plan,
+            analysis_type=task.analysis_type,
+            sections_to_analyze=sections_to_analyze,
         )
-        task = asyncio.create_task(safe_execute_agent(agent.run("请执行专家分析", deps=deps), agent_key, logger))
-        tasks.append((result_key, task))
+        agent_task = asyncio.create_task(safe_execute_agent(agent.run("请执行专家分析", deps=deps), task.analysis_type, logger))
+        tasks.append((task.analysis_type, agent_task))
 
     if not tasks:
         logger.warning("No agents selected for execution")
@@ -123,5 +136,5 @@ async def execute_sub_agents(
     execution_time = asyncio.get_event_loop().time() - start_time
     logger.debug(f"Sub-agent execution completed in {execution_time:.2f} seconds")
 
-    results["_sections_analyzed"] = sections_analyzed
+    results[INTERNAL_SECTIONS_KEY] = sections_analyzed
     return results
