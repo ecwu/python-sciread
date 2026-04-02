@@ -4,8 +4,10 @@ This module provides the main SimpleAgent class that can analyze academic papers
 using pydantic-ai framework and the existing LLM provider infrastructure.
 """
 
+import asyncio
 from dataclasses import dataclass
 from dataclasses import field
+from pathlib import Path
 from typing import Any
 
 from pydantic_ai import Agent
@@ -39,6 +41,70 @@ class SimpleAnalysisDeps:
     remove_references: bool = True
     clean_text: bool = True
     additional_context: dict[str, Any] = field(default_factory=dict)
+
+
+def _validate_document_file(file_path: str | Path) -> None:
+    """Validate that the document file exists before processing."""
+    if not Path(file_path).exists():
+        raise FileNotFoundError(f"Document file not found: {file_path}")
+
+
+def load_document_for_simple_analysis(file_path: str | Path, to_markdown: bool = False) -> Document:
+    """Load a document for simple-agent analysis."""
+    return Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
+
+
+async def analyze_file_with_simple(
+    file_path: str,
+    task_prompt: str,
+    model: str = "deepseek-chat",
+    include_metadata: bool = True,
+    remove_references: bool = True,
+    clean_text: bool = True,
+    to_markdown: bool = False,
+    **kwargs: Any,
+) -> str:
+    """Analyze a file with the simple agent."""
+    logger = get_logger(__name__)
+    logger.debug(f"Starting simple analysis for file: {file_path}")
+
+    _validate_document_file(file_path)
+    document = load_document_for_simple_analysis(file_path, to_markdown=to_markdown)
+    agent = SimpleAgent(model=model)
+
+    return await agent.run_analysis(
+        document=document,
+        task_prompt=task_prompt,
+        include_metadata=include_metadata,
+        remove_references=remove_references,
+        clean_text=clean_text,
+        **kwargs,
+    )
+
+
+def analyze_file_with_simple_sync(
+    file_path: str,
+    task_prompt: str,
+    model: str = "deepseek-chat",
+    include_metadata: bool = True,
+    remove_references: bool = True,
+    clean_text: bool = True,
+    to_markdown: bool = False,
+    **kwargs: Any,
+) -> str:
+    """Synchronous wrapper for simple file analysis."""
+    return asyncio.run(
+        analyze_file_with_simple(
+            file_path=file_path,
+            task_prompt=task_prompt,
+            model=model,
+            include_metadata=include_metadata,
+            remove_references=remove_references,
+            clean_text=clean_text,
+            to_markdown=to_markdown,
+            **kwargs,
+        )
+    )
 
 
 def _build_simple_content(
@@ -154,7 +220,7 @@ class SimpleAgent:
 
         self.logger.debug("SimpleAgent initialized successfully")
 
-    async def analyze(
+    async def run_analysis(
         self,
         document: Document,
         task_prompt: str,
@@ -163,7 +229,7 @@ class SimpleAgent:
         clean_text: bool = True,
         **kwargs: Any,
     ) -> str:
-        """Analyze a document and generate a report.
+        """Run analysis on a document and generate a report.
 
         Args:
             document: Document object to analyze
@@ -202,7 +268,7 @@ class SimpleAgent:
             self.logger.error(f"Document analysis failed: {e}")
             raise
 
-    async def analyze_structured(
+    async def run_structured_analysis(
         self,
         document: Document,
         task_prompt: str,
@@ -211,7 +277,7 @@ class SimpleAgent:
         clean_text: bool = True,
         **kwargs: Any,
     ) -> SimpleAnalysisResult:
-        """Analyze a document and return structured results using native output types.
+        """Run analysis on a document and return structured results.
 
         Args:
             document: Document object to analyze

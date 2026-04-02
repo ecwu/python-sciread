@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-from ...agent.shared import remove_references
 from ...agent.simple import DEFAULT_TASK_PROMPT
-from ...agent.simple import SimpleAgent
+from ...agent.simple import analyze_file_with_simple
 from ...platform.logging import get_logger
-from .common import load_document
 
 logger = get_logger(__name__)
 
@@ -15,22 +13,11 @@ async def run_simple_analysis(document_file_path: str, model: str = "deepseek/de
     """Run the single-agent paper analysis workflow."""
     logger.debug(f"Starting simple analysis with document file: {document_file_path}")
 
-    agent = SimpleAgent(model, max_retries=3, timeout=300.0)
-    document = load_document(document_file_path, to_markdown=False)
-
-    logger.debug(f"Document loaded successfully: {len(document.text)} characters")
-    logger.debug(f"Document split into {len(document.chunks)} chunks")
-
-    if not document.text.strip():
-        raise ValueError("Failed to load document: no text content extracted")
-
-    cleaned_text = remove_references(document.text)
-    logger.debug(f"Text after reference removal: {len(cleaned_text)} characters")
-
     try:
-        return await agent.analyze(
-            document=document,
+        return await analyze_file_with_simple(
+            file_path=document_file_path,
             task_prompt=DEFAULT_TASK_PROMPT,
+            model=model,
             remove_references=True,
             clean_text=True,
         )

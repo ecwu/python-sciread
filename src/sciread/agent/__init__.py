@@ -29,7 +29,7 @@ Example Usage:
     doc = Document.from_file("paper.pdf", to_markdown=True)
 
     # Generate analysis report with simple agent
-    result = await agent.analyze(doc, "Summarize this paper")
+    result = await agent.run_analysis(doc, "Summarize this paper")
 
     # Generate comprehensive analysis with multi-agent system
     comprehensive_result = await coordinate_agent.analyze(doc)
@@ -77,6 +77,9 @@ from .react import load_and_process_document
 from .shared import remove_references
 from .simple import SimpleAgent
 from .simple import SimpleAnalysisResult
+from .simple import analyze_file_with_simple
+from .simple import analyze_file_with_simple_sync
+from .simple import load_document_for_simple_analysis
 
 __all__ = [
     "AgentInsight",
@@ -112,8 +115,11 @@ __all__ = [
     "TaskType",
     "analyze_file_with_react",
     "analyze_file_with_react_sync",
+    "analyze_file_with_simple",
+    "analyze_file_with_simple_sync",
     "create_personality_agent",
     "load_and_process_document",
+    "load_document_for_simple_analysis",
     "remove_references",
 ]
 
