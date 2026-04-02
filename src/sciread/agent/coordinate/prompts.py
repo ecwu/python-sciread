@@ -295,7 +295,7 @@ def build_future_directions_analysis_prompt(content: str) -> str:
 # ============================================================================
 
 
-def build_analysis_planning_prompt(abstract: str, section_names: list[str]) -> str:
+def build_analysis_planning_prompt(abstract: str, available_sections_text: str) -> str:
     """Build prompt for analysis planning."""
     return f"""请基于以下摘要和可用章节，为该学术论文制定最优分析计划。
 
@@ -303,15 +303,21 @@ def build_analysis_planning_prompt(abstract: str, section_names: list[str]) -> s
 {abstract}
 
 文档中的可用章节：
-{section_names}
+{available_sections_text}
 
 重要要求：对每种分析类型，你都必须认真审视章节名并推断其可能内容，然后选择所有能为该分析提供有效信息的相关章节。
+
+补充说明：
+- 每个章节后的 `chars` 表示该 section 的正文长度。
+- 如果长度很短，且标注了“可能仅标题”，通常说明该层级只有标题或过渡句，真正内容可能在其下一级子章节。
+- 在输出各分析类型的 section 列表时，只填写章节名本身，不要附加 `chars` 或注释。
 
 章节选择思考流程：
 1. 对每个章节名先问：“这个章节可能包含什么内容？”
 2. 对每种分析类型再问：“哪些章节的内容会对该分析有实质帮助？”
 3. 纳入所有有用章节，排除不能提供有效信息的章节
-4. 若章节名不明确，请基于学术论文常见结构做最佳判断
+4. 若遇到短 section，请优先寻找语义更具体、正文更长的相邻子章节
+5. 若章节名不明确，请基于学术论文常见结构做最佳判断
 
 分析类型与选章策略：
 

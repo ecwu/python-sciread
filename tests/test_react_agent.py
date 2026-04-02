@@ -1,8 +1,15 @@
 """Tests for the ReAct agent helpers and state management."""
 
+from types import SimpleNamespace
+
+import pytest
+
 from sciread.agent.react import analyze_file_with_react
 from sciread.agent.react import analyze_file_with_react_sync
+from sciread.agent.react.agent import add_memory
+from sciread.agent.react.agent import get_all_memory
 from sciread.agent.react.agent import normalize_section_names
+from sciread.agent.react.agent import read_section
 from sciread.agent.react.models import ReActAnalysisState
 from sciread.agent.react.models import ReActIterationDeps
 from sciread.agent.react.models import ReActIterationInput
@@ -30,6 +37,7 @@ def test_build_iteration_system_prompt_switches_to_final_iteration() -> None:
                 previous_thoughts="",
                 processed_sections=[],
                 available_sections=["Abstract", "Methods"],
+                available_section_lengths={"Abstract": 320, "Methods": 24},
             ),
             current_loop=1,
             max_loops=3,
@@ -44,6 +52,7 @@ def test_build_iteration_system_prompt_switches_to_final_iteration() -> None:
                 previous_thoughts="Need to synthesize findings.",
                 processed_sections=["Abstract"],
                 available_sections=["Abstract", "Methods"],
+                available_section_lengths={"Abstract": 320, "Methods": 24},
             ),
             current_loop=3,
             max_loops=3,
@@ -51,8 +60,9 @@ def test_build_iteration_system_prompt_switches_to_final_iteration() -> None:
     )
 
     assert "=== 首轮迭代：先制定阅读策略 ===" in regular_prompt
-    assert "可按需要调用 read_section()" in regular_prompt
-    assert "仅能调用一次" not in regular_prompt
+    assert "本轮至多调用一次 read_section()" in regular_prompt
+    assert "- Abstract | 320 chars" in regular_prompt
+    assert "- Methods | 24 chars | 可能仅标题" in regular_prompt
     assert "=== 最终迭代（3/3）——仅做综合 ===" in final_prompt
     assert "不要调用 read_section()" in final_prompt
 
@@ -86,13 +96,132 @@ def test_react_analysis_state_accumulates_sections_memory_and_report() -> None:
     assert analysis_state.build_final_output().report == "Structured final report."
 
 
-def test_react_iteration_state_can_accumulate_multiple_memory_fragments() -> None:
-    """Iteration state should allow repeated memory writes without extra guards."""
-    iteration_state = ReActIterationState(memory_text="- [CLAIM] First finding.")
+@pytest.mark.asyncio
+async def test_react_tools_guard_against_repeated_calls(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Each non-final iteration should allow at most one read and one memory write."""
 
-    iteration_state.memory_text = f"{iteration_state.memory_text}\n\n- [RESULT] Second finding.".strip()
+    class DummyDocument:
+        def get_closest_section_name(self, section: str, threshold: float = 0.7) -> str | None:
+            return section
 
-    assert iteration_state.memory_text == "- [CLAIM] First finding.\n\n- [RESULT] Second finding."
+    monkeypatch.setattr(
+        "sciread.agent.react.agent._get_sections",
+        lambda document, section_names: [(name, f"{name} content") for name in section_names],
+    )
+
+    deps = ReActIterationDeps(
+        document=DummyDocument(),
+        task="Summarize the paper",
+        iteration_input=ReActIterationInput(
+            task="Summarize the paper",
+            previous_thoughts="",
+            processed_sections=[],
+            available_sections=["Abstract", "Methods"],
+        ),
+        current_loop=1,
+        max_loops=3,
+        show_progress=False,
+    )
+    iteration_state = ReActIterationState()
+    ctx = SimpleNamespace(deps=deps, metadata={"iteration_state": iteration_state})
+
+    first_read = await read_section(ctx, ["Abstract"])
+    second_read = await read_section(ctx, ["Methods"])
+    first_memory = await add_memory(ctx, "- [CLAIM] Main finding.")
+    second_memory = await add_memory(ctx, "- [RESULT] Another finding.")
+
+    assert "章节内容（读取自：Abstract）" in first_read
+    assert "本轮已调用过 read_section()" in second_read
+    assert first_memory == "记忆已记录"
+    assert "本轮已调用过 add_memory()" in second_memory
+    assert iteration_state.memory_text == "- [CLAIM] Main finding."
+
+
+@pytest.mark.asyncio
+async def test_read_section_warns_when_selected_section_is_too_short(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Short sections should be flagged as likely heading-only content."""
+
+    class DummyDocument:
+        def get_closest_section_name(self, section: str, threshold: float = 0.7) -> str | None:
+            return section
+
+    monkeypatch.setattr(
+        "sciread.agent.react.agent._get_sections",
+        lambda document, section_names: [(name, "3.1 Proposed Method") for name in section_names],
+    )
+
+    deps = ReActIterationDeps(
+        document=DummyDocument(),
+        task="Summarize the paper",
+        iteration_input=ReActIterationInput(
+            task="Summarize the paper",
+            previous_thoughts="",
+            processed_sections=[],
+            available_sections=["3. Method"],
+            available_section_lengths={"3. Method": 19},
+        ),
+        current_loop=1,
+        max_loops=3,
+        show_progress=False,
+    )
+    iteration_state = ReActIterationState()
+    ctx = SimpleNamespace(deps=deps, metadata={"iteration_state": iteration_state})
+
+    read_result = await read_section(ctx, ["3. Method"])
+
+    assert "可能只有标题或过渡句" in read_result
+    assert "3. Method (19 chars)" in read_result
+    assert "章节内容（读取自：3. Method）" in read_result
+
+
+@pytest.mark.asyncio
+async def test_react_tools_enforce_call_order_and_final_memory_access() -> None:
+    """Memory retrieval should be final-only, and memory writes require a read first."""
+    regular_deps = ReActIterationDeps(
+        document=None,
+        task="Summarize the paper",
+        iteration_input=ReActIterationInput(
+            task="Summarize the paper",
+            previous_thoughts="",
+            processed_sections=[],
+            available_sections=["Abstract"],
+        ),
+        current_loop=1,
+        max_loops=3,
+        accumulated_memory="- [CLAIM] Prior finding.",
+        show_progress=False,
+    )
+    regular_state = ReActIterationState()
+    regular_ctx = SimpleNamespace(deps=regular_deps, metadata={"iteration_state": regular_state})
+
+    add_before_read = await add_memory(regular_ctx, "- [CLAIM] Main finding.")
+    get_memory_too_early = await get_all_memory(regular_ctx)
+
+    assert "请先读取章节" in add_before_read
+    assert "仅允许在最终迭代调用" in get_memory_too_early
+
+    final_deps = ReActIterationDeps(
+        document=None,
+        task="Summarize the paper",
+        iteration_input=ReActIterationInput(
+            task="Summarize the paper",
+            previous_thoughts="Ready to synthesize.",
+            processed_sections=["Abstract"],
+            available_sections=["Abstract"],
+        ),
+        current_loop=3,
+        max_loops=3,
+        accumulated_memory="- [CLAIM] Prior finding.",
+        show_progress=False,
+    )
+    final_state = ReActIterationState()
+    final_ctx = SimpleNamespace(deps=final_deps, metadata={"iteration_state": final_state})
+
+    first_get_memory = await get_all_memory(final_ctx)
+    second_get_memory = await get_all_memory(final_ctx)
+
+    assert "完整累计记忆" in first_get_memory
+    assert "本轮已调用过 get_all_memory()" in second_get_memory
 
 
 def test_react_public_api_uses_clarified_names() -> None:

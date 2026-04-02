@@ -11,6 +11,10 @@ from ...document_structure import Document
 from ...document_structure.renderers import get_sections_content
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ..section_selection import choose_best_section_match
+from ..section_selection import format_section_choices
+from ..section_selection import get_section_length_map
+from ..section_selection import is_likely_heading_only
 from .models import AGENT_ABBREVIATIONS
 from .models import AgentInsight
 from .models import AgentPersonality
@@ -79,7 +83,13 @@ class PersonalityAgent:
 
             # Step 1: Let agent select which sections to read based on personality
             section_names = document.get_section_names()
-            selected_sections = await self._select_sections_to_read(document.metadata.title or "未命名论文", abstract_text, section_names)
+            section_lengths = get_section_length_map(document, section_names)
+            selected_sections = await self._select_sections_to_read(
+                document.metadata.title or "未命名论文",
+                abstract_text,
+                section_names,
+                section_lengths,
+            )
 
             self.logger.debug(f"{self.personality.value} selected sections: {selected_sections}")
 
@@ -317,7 +327,13 @@ Confidence: [0.0-1.0]
 
         return responses
 
-    async def _select_sections_to_read(self, title: str, abstract: str, available_sections: list[str]) -> list[str]:
+    async def _select_sections_to_read(
+        self,
+        title: str,
+        abstract: str,
+        available_sections: list[str],
+        section_lengths: dict[str, int],
+    ) -> list[str]:
         """Select which sections to read based on personality and paper overview."""
         try:
             prompt = f"""
@@ -326,8 +342,8 @@ Confidence: [0.0-1.0]
 **论文标题：** {title}
 **摘要：** {abstract}
 
-**可选章节：**
-{chr(10).join(f"{i + 1}. {section}" for i, section in enumerate(available_sections))}
+**可选章节（格式：章节名 | 正文长度）：**
+{format_section_choices(available_sections, section_lengths, numbered=True)}
 
 **你的任务：**
 请依据你的分析重点，从中选择 3-5 个最相关的章节：
@@ -336,7 +352,12 @@ Confidence: [0.0-1.0]
 - 实践应用者：重点关注应用、实验、真实世界影响
 - 理论整合者：重点关注理论框架、相关工作、结论
 
+补充规则：
+- 每个章节后的 `chars` 表示该 section 的正文长度。
+- 若某个章节标注“可能仅标题”，通常说明它可能只有标题或过渡句，真正内容在更下一级子章节。
+
 请只返回你要阅读的章节名，每行一个，并且必须与上方列表中的章节名完全一致。
+不要附加 `chars`、编号或注释。
 请选择那些最有助于你从自身视角产出高价值洞见的章节。
 """
 
@@ -350,6 +371,11 @@ Confidence: [0.0-1.0]
                 line = line.strip().strip("-").strip("*").strip()
                 # Remove numbering if present
                 line = line.split(".", 1)[-1].strip() if "." in line else line
+                # Remove appended metadata such as "| 120 chars" or "(120 chars)"
+                if "|" in line:
+                    line = line.split("|", 1)[0].strip()
+                if " (" in line and line.endswith(")"):
+                    line = line.rsplit(" (", 1)[0].strip()
 
                 # Match against available sections (case-insensitive, flexible matching)
                 for section in available_sections:
@@ -360,15 +386,15 @@ Confidence: [0.0-1.0]
 
             # Fallback: if no sections selected or too few, use defaults based on personality
             if len(selected) < 2:
-                selected = self._get_default_sections(available_sections)
+                selected = self._get_default_sections(available_sections, section_lengths)
 
             return selected[:5]  # Limit to 5 sections max
 
         except Exception as e:
             self.logger.error(f"Error selecting sections for {self.personality.value}: {e}")
-            return self._get_default_sections(available_sections)
+            return self._get_default_sections(available_sections, section_lengths)
 
-    def _get_default_sections(self, available_sections: list[str]) -> list[str]:
+    def _get_default_sections(self, available_sections: list[str], section_lengths: dict[str, int]) -> list[str]:
         """Get default sections based on personality if selection fails."""
         try:
             # Use unified section matching for better results
@@ -387,6 +413,8 @@ Confidence: [0.0-1.0]
             if self.personality == AgentPersonality.CRITICAL_EVALUATOR:
                 targets = [
                     "methodology",
+                    "method",
+                    "approach",
                     "experiments",
                     "results",
                     "evaluation",
@@ -418,19 +446,15 @@ Confidence: [0.0-1.0]
 
             # Use pattern matching to find sections
             for target in targets:
-                for section in available_sections:
-                    if section not in defaults:
-                        section_lower = section.lower()
-                        target_lower = target.lower()
-                        if (
-                            target_lower in section_lower
-                            or section_lower in target_lower
-                            or any(word in section_lower for word in target_lower.split())
-                        ):
-                            defaults.append(section)
-                            break
+                section = choose_best_section_match(target, available_sections, section_lengths)
+                if section and section not in defaults:
+                    defaults.append(section)
 
-            return defaults[:5] if defaults else available_sections[:3]
+            if defaults:
+                return defaults[:5]
+
+            non_short_sections = [section for section in available_sections if not is_likely_heading_only(section_lengths.get(section, 0))]
+            return non_short_sections[:3] if non_short_sections else available_sections[:3]
 
         except Exception as e:
             self.logger.warning(f"Enhanced section matching failed, using fallback approach: {e}")
@@ -464,7 +488,11 @@ Confidence: [0.0-1.0]
                     if section not in defaults:
                         defaults.append(section)
 
-            return defaults[:5] if defaults else available_sections[:3]
+            if defaults:
+                return defaults[:5]
+
+            non_short_sections = [section for section in available_sections if not is_likely_heading_only(section_lengths.get(section, 0))]
+            return non_short_sections[:3] if non_short_sections else available_sections[:3]
 
     def _get_section_content(self, document: Document, section_names: list[str]) -> dict[str, str]:
         """Get the actual content of selected sections using unified section handling."""
@@ -482,7 +510,7 @@ Confidence: [0.0-1.0]
         available = document.get_section_names()
         missing = [s for s in section_names if s not in content_dict]
         if missing:
-            fallback_names = self._get_default_sections(available)
+            fallback_names = self._get_default_sections(available, get_section_length_map(document, available))
             fallback_sections = get_sections_content(
                 document,
                 section_names=fallback_names,

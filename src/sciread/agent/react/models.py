@@ -19,6 +19,10 @@ class ReActIterationInput(BaseModel):
         description="Section names already read in previous iterations",
     )
     available_sections: list[str] = Field(description="All available section names in the document")
+    available_section_lengths: dict[str, int] = Field(
+        default_factory=dict,
+        description="Character length of clean text for each available section",
+    )
 
 
 class ReActIterationOutput(BaseModel):
@@ -48,6 +52,7 @@ class ReActIterationState:
 
     sections_read: list[str] = field(default_factory=list)
     memory_text: str = ""
+    all_memory_read: bool = False
 
 
 @dataclass
@@ -56,6 +61,7 @@ class ReActAnalysisState:
 
     task: str
     available_sections: list[str]
+    available_section_lengths: dict[str, int] = field(default_factory=dict)
     processed_sections: list[str] = field(default_factory=list)
     accumulated_memory_fragments: list[str] = field(default_factory=list)
     current_thoughts: str = ""
@@ -78,6 +84,7 @@ class ReActAnalysisState:
             previous_thoughts=self.current_thoughts,
             processed_sections=self.processed_sections.copy(),
             available_sections=self.available_sections,
+            available_section_lengths=self.available_section_lengths.copy(),
         )
 
     def apply_iteration(self, iteration_output: ReActIterationOutput, iteration_state: ReActIterationState) -> None:

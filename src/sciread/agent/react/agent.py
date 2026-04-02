@@ -4,16 +4,25 @@ import asyncio
 import json
 import traceback
 from pathlib import Path
+from textwrap import shorten
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
+from rich import box
 from rich.console import Console
+from rich.console import Group
 from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from ...document_structure import Document
 from ...document_structure.renderers import get_sections_content
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ..section_selection import SHORT_SECTION_THRESHOLD
+from ..section_selection import get_section_length_map
+from ..section_selection import is_likely_heading_only
 from .models import ReActAnalysisState
 from .models import ReActIterationDeps
 from .models import ReActIterationInput
@@ -25,6 +34,119 @@ from .prompts import build_iteration_user_prompt
 logger = get_logger(__name__)
 
 console = Console()
+
+SECTION_PREVIEW_LENGTH = 180
+
+
+def _build_section_preview(content: str, max_length: int = SECTION_PREVIEW_LENGTH) -> str:
+    """Collapse section content into a single-line preview for terminal display."""
+    normalized_content = " ".join(content.split())
+    if not normalized_content:
+        return "No visible content"
+    return shorten(normalized_content, width=max_length, placeholder="...")
+
+
+def _get_sections(document: Document, section_names: list[str]) -> list[tuple[str, str]]:
+    """Get clean text for the requested section names."""
+    if not section_names:
+        return []
+
+    return get_sections_content(
+        document,
+        section_names=section_names,
+        clean_text=True,
+    )
+
+
+def _render_iteration_header(current_loop: int, max_loops: int, processed_count: int, remaining_count: int) -> None:
+    """Render a consistent iteration header."""
+    header = Text.assemble(
+        ("ReAct Iteration ", "bold cyan"),
+        (f"{current_loop}/{max_loops}", "bold white"),
+    )
+    summary = Text.assemble(
+        ("Processed ", "dim"),
+        (str(processed_count), "bold green"),
+        ("  Remaining ", "dim"),
+        (str(remaining_count), "bold yellow"),
+    )
+
+    console.print(
+        Panel(
+            Group(header, summary),
+            border_style="cyan",
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+    )
+
+
+def _render_sections_read(section_entries: list[tuple[str, str]]) -> None:
+    """Render the sections read during the current tool call."""
+    table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold magenta")
+    table.add_column("Section", style="bold cyan", ratio=2)
+    table.add_column("Preview", style="white", ratio=6)
+    table.add_column("Chars", style="green", justify="right", width=8)
+
+    for section_name, content in section_entries:
+        table.add_row(section_name, _build_section_preview(content), str(len(content.strip())))
+
+    console.print(
+        Panel(
+            table,
+            title="Read Sections",
+            title_align="left",
+            border_style="magenta",
+            box=box.ROUNDED,
+        )
+    )
+
+
+def _render_iteration_thoughts(
+    thoughts: str,
+    current_loop: int,
+    max_loops: int,
+    should_continue: bool,
+    processed_count: int,
+    remaining_count: int,
+) -> None:
+    """Render the agent thoughts for one iteration."""
+    status_text = "Continue" if should_continue else "Complete"
+    status_style = "bold yellow" if should_continue else "bold green"
+    subtitle = Text.assemble(
+        ("Status ", "dim"),
+        (status_text, status_style),
+        ("  Processed ", "dim"),
+        (str(processed_count), "bold green"),
+        ("  Remaining ", "dim"),
+        (str(remaining_count), "bold yellow"),
+    )
+
+    console.print(
+        Panel(
+            Markdown(thoughts or "No thoughts returned."),
+            title=f"Thoughts {current_loop}/{max_loops}",
+            subtitle=subtitle,
+            subtitle_align="left",
+            border_style="blue",
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+    )
+
+
+def _render_progress_message(title: str, message: str, border_style: str) -> None:
+    """Render a compact progress message."""
+    console.print(
+        Panel(
+            Text(message, style="bold"),
+            title=title,
+            title_align="left",
+            border_style=border_style,
+            box=box.ROUNDED,
+            padding=(0, 1),
+        )
+    )
 
 
 def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationState:
@@ -102,11 +224,7 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
     if not section_names:
         return ""
 
-    sections = get_sections_content(
-        document,
-        section_names=section_names,
-        clean_text=True,
-    )
+    sections = _get_sections(document, section_names)
     if not sections:
         logger.warning(f"No content found for sections: {section_names}")
         return ""
@@ -115,6 +233,21 @@ def get_section_content(document: Document, section_names: list[str]) -> str:
     logger.debug(f"Retrieved content for sections {section_names}: {len(combined_content)} characters")
 
     return combined_content
+
+
+def _build_short_section_warning(section_entries: list[tuple[str, str]]) -> str:
+    """Create a warning when selected sections are likely heading-only placeholders."""
+    short_sections = [
+        f"{name} ({len(content.strip())} chars)"
+        for name, content in section_entries
+        if is_likely_heading_only(len(content.strip()), SHORT_SECTION_THRESHOLD)
+    ]
+    if not short_sections:
+        return ""
+
+    return (
+        f"提示：以下章节正文很短，可能只有标题或过渡句，信息密度较低：{', '.join(short_sections)}。下一轮优先选择更长、信息更密集的子章节。"
+    )
 
 
 def normalize_section_names(section_names: list[str] | str | None) -> list[str] | None:
@@ -237,6 +370,15 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     iteration_input = deps.iteration_input
     available_sections = iteration_input.available_sections
 
+    if iteration_state.sections_read:
+        return (
+            f"提示：本轮已调用过 read_section()，已读取章节：{', '.join(iteration_state.sections_read)}。"
+            "请改为调用 add_memory() 记录发现，然后返回 ReActIterationOutput 结束本轮。"
+        )
+
+    if iteration_state.memory_text.strip():
+        return "提示：本轮已调用过 add_memory()。请直接返回 ReActIterationOutput 结束本轮，不要再次读取章节。"
+
     if not available_sections:
         return "提示：所有章节都已处理，没有可读取内容。"
 
@@ -248,16 +390,27 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
     if not next_sections:
         return f"提示：未能匹配到请求章节。可用章节：{available_sections}"
 
-    section_content = get_section_content(deps.document, next_sections)
+    section_entries = _get_sections(deps.document, next_sections)
+    if not section_entries:
+        return f"警告：在章节 {next_sections} 中未找到内容，请尝试其他章节。"
+
+    section_content = "\n\n".join(f"=== {name.upper()} ===\n{content}" for name, content in section_entries)
     if not section_content.strip():
         return f"警告：在章节 {next_sections} 中未找到内容，请尝试其他章节。"
 
     iteration_state.sections_read.extend(next_sections)
 
     if deps.show_progress:
-        print(f"\n[Iteration] Read sections: {', '.join(next_sections)}")
+        _render_sections_read(section_entries)
 
-    return f"章节内容（读取自：{', '.join(next_sections)}）：\n\n{section_content}\n\n现在请调用 add_memory() 记录提取到的发现。"
+    short_section_warning = _build_short_section_warning(section_entries)
+    warning_block = f"{short_section_warning}\n\n" if short_section_warning else ""
+
+    return (
+        f"{warning_block}"
+        f"章节内容（读取自：{', '.join(next_sections)}）：\n\n{section_content}\n\n"
+        "现在请调用 add_memory() 记录提取到的发现。"
+    )
 
 
 @react_iteration_agent.tool
@@ -269,11 +422,17 @@ async def add_memory(ctx: RunContext[ReActIterationDeps], memory: str) -> str:
     """
     iteration_state = _get_iteration_state(ctx)
 
+    if not iteration_state.sections_read:
+        return "提示：本轮还没有调用 read_section()。请先读取章节，再记录记忆。"
+
+    if iteration_state.memory_text.strip():
+        return "提示：本轮已调用过 add_memory()。请直接返回 ReActIterationOutput 结束本轮。"
+
     fragment = memory.strip()
     if not fragment:
         return "警告：记忆文本为空。"
 
-    iteration_state.memory_text = f"{iteration_state.memory_text}\n\n{fragment}".strip() if iteration_state.memory_text else fragment
+    iteration_state.memory_text = fragment
 
     return "记忆已记录"
 
@@ -286,6 +445,15 @@ async def get_all_memory(ctx: RunContext[ReActIterationDeps]) -> str:
     Returns the full synthesized memory built up across all iterations.
     """
     deps = ctx.deps
+    iteration_state = _get_iteration_state(ctx)
+
+    if deps.current_loop < deps.max_loops:
+        return "提示：get_all_memory() 仅允许在最终迭代调用。当前请继续本轮阅读或结束本轮。"
+
+    if iteration_state.all_memory_read:
+        return "提示：本轮已调用过 get_all_memory()。请直接返回最终 ReActIterationOutput。"
+
+    iteration_state.all_memory_read = True
 
     if not deps.accumulated_memory.strip():
         return "提示：目前还没有来自前几轮的累计记忆。"
@@ -437,10 +605,18 @@ class ReActAgent:
         analysis_state = ReActAnalysisState(
             task=task,
             available_sections=document.get_section_names(),
+            available_section_lengths=get_section_length_map(document, document.get_section_names()),
         )
 
         for loop_num in range(1, max_loops + 1):
             self.logger.debug(f"Starting iteration {loop_num}/{max_loops}")
+            if show_progress:
+                _render_iteration_header(
+                    current_loop=loop_num,
+                    max_loops=max_loops,
+                    processed_count=len(analysis_state.processed_sections),
+                    remaining_count=len(analysis_state.remaining_sections),
+                )
 
             iteration_output, iteration_state = await self.run_iteration(
                 document=document,
@@ -453,18 +629,25 @@ class ReActAgent:
             analysis_state.apply_iteration(iteration_output, iteration_state)
 
             if show_progress:
-                console.print(Markdown(analysis_state.current_thoughts))
+                _render_iteration_thoughts(
+                    thoughts=analysis_state.current_thoughts,
+                    current_loop=loop_num,
+                    max_loops=max_loops,
+                    should_continue=iteration_output.should_continue,
+                    processed_count=len(analysis_state.processed_sections),
+                    remaining_count=len(analysis_state.remaining_sections),
+                )
 
             if not iteration_output.should_continue:
                 self.logger.info(f"Agent decided to stop after iteration {loop_num}")
                 if show_progress:
-                    print("Agent completed analysis")
+                    _render_progress_message("Analysis Status", "Agent completed analysis", "green")
                 break
 
             if not analysis_state.remaining_sections:
                 self.logger.info(f"All sections processed after iteration {loop_num}")
                 if show_progress:
-                    print("All available sections have been read")
+                    _render_progress_message("Analysis Status", "All available sections have been read", "yellow")
                 break
 
         self.logger.info(f"Multi-iteration analysis completed after {loop_num} iterations")

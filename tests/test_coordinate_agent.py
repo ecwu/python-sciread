@@ -8,9 +8,12 @@ from sciread.agent.coordinate.models import AnalysisPlan
 from sciread.agent.coordinate.models import PreviousMethodsResult
 from sciread.agent.coordinate.planner import extract_abstract
 from sciread.agent.coordinate.planner import select_sections_for_expert
+from sciread.agent.coordinate.prompts import build_analysis_planning_prompt
 from sciread.agent.coordinate.synthesis import build_comprehensive_result
 from sciread.agent.coordinate.synthesis import build_execution_summary
 from sciread.agent.coordinate.synthesis import validate_pdf_document
+from sciread.agent.section_selection import format_section_choices
+from sciread.agent.section_selection import get_section_length_map
 from sciread.document import Document
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
@@ -36,6 +39,24 @@ def sample_pdf_document() -> Document:
     return document
 
 
+@pytest.fixture
+def hierarchical_section_document() -> Document:
+    """Create a document where a top-level heading has little content."""
+    document = Document(
+        source_path=Path("paper.pdf"),
+        text="Method\nHeading only\n\nProposed Method\nActual content",
+        metadata=DocumentMetadata(title="Hierarchical Paper", source_path=Path("paper.pdf")),
+    )
+    document._set_chunks(
+        [
+            Chunk(content="Short bridge.", chunk_name="3. Method"),
+            Chunk(content="Detailed proposed method with architecture and training details.", chunk_name="3.1 Proposed Method"),
+            Chunk(content="Extensive quantitative evaluation with baselines and ablations.", chunk_name="4. Experiments"),
+        ]
+    )
+    return document
+
+
 def test_extract_abstract_prefers_abstract_section(sample_pdf_document: Document):
     """Abstract extraction should prefer the named abstract section."""
     abstract = extract_abstract(sample_pdf_document, get_logger(__name__))
@@ -48,6 +69,27 @@ def test_select_sections_for_expert_uses_fuzzy_matching(sample_pdf_document: Doc
     sections = select_sections_for_expert(sample_pdf_document, "methodology", None)
 
     assert sections == ["methodology"]
+
+
+def test_select_sections_for_expert_prefers_longer_non_heading_section(hierarchical_section_document: Document):
+    """Planner should avoid choosing a heading-only parent section when a richer child section exists."""
+    sections = select_sections_for_expert(hierarchical_section_document, "methodology", None)
+
+    assert "3.1 Proposed Method" in sections
+    assert "3. Method" not in sections
+
+
+def test_build_analysis_planning_prompt_includes_section_lengths_and_short_section_warning(hierarchical_section_document: Document):
+    """Planning prompt should expose section lengths so the controller can avoid heading-only sections."""
+    section_names = hierarchical_section_document.get_section_names()
+    section_lengths = get_section_length_map(hierarchical_section_document, section_names)
+    sections_text = format_section_choices(section_names, section_lengths)
+
+    prompt = build_analysis_planning_prompt("Paper abstract", sections_text)
+
+    assert "3. Method |" in prompt
+    assert "可能仅标题" in prompt
+    assert "只填写章节名本身" in prompt
 
 
 def test_validate_pdf_document_rejects_non_pdf():

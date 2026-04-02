@@ -1,5 +1,6 @@
 """Prompt builders for the ReAct analysis loop."""
 
+from ..section_selection import format_section_choices
 from .models import ReActIterationDeps
 
 
@@ -13,10 +14,17 @@ def _format_processed_sections(processed_sections: list[str]) -> str:
     return f"已处理章节：{', '.join(processed_sections)}" if processed_sections else "尚未处理任何章节。"
 
 
-def _format_unprocessed_sections(available_sections: list[str], processed_sections: list[str]) -> str:
-    """Format remaining section names."""
+def _format_unprocessed_sections(
+    available_sections: list[str],
+    processed_sections: list[str],
+    available_section_lengths: dict[str, int],
+) -> str:
+    """Format remaining section names with clean-text lengths."""
     remaining_sections = [section for section in available_sections if section not in processed_sections]
-    return f"剩余未处理章节：{', '.join(remaining_sections)}" if remaining_sections else "所有章节都已阅读。"
+    if not remaining_sections:
+        return "所有章节都已阅读。"
+
+    return "剩余未处理章节（含正文长度）:\n" + format_section_choices(remaining_sections, available_section_lengths)
 
 
 def _build_final_iteration_prompt(deps: ReActIterationDeps, processed_sections: str, previous_context: str) -> str:
@@ -66,7 +74,8 @@ def _build_regular_iteration_prompt(
             "    （摘要、引言、结论，以及任何“贡献”小节优先级最高。）\n"
             "  • 哪些章节包含你后续需要的实验证据？\n"
             "  • 哪些章节对当前任务价值较低（如附录、致谢）？\n"
-            "先读信息密度最高的章节。你可以按需要多次调用 read_section() 读取相关章节。\n"
+            "  • 优先看正文长度更长的 section；如果长度很短，往往只有标题或过渡句，应优先寻找其下一级子章节。\n"
+            "先读信息密度最高的章节。本轮只能调用一次 read_section()，但可以一次读取多个相关章节。\n"
             "请在输出的 thoughts 字段中记录你的阅读计划。\n\n"
         )
 
@@ -78,13 +87,14 @@ def _build_regular_iteration_prompt(
         f"{unprocessed_sections}\n\n"
         f"{previous_context}\n\n"
         f"=== 本轮规则 ===\n"
-        f"1. 可按需要调用 read_section()。\n"
+        f"1. 本轮至多调用一次 read_section()。\n"
         f"   • 章节选择要有策略，不要只按顺序读下一个。\n"
         f"   • 优先选择能直接回答：论文主张了什么？创新点是什么？\n"
-        f"   • 可以一次读取多个主题相关章节，也可以重复读取你需要再次核对的章节。\n"
+        f"   • 可用章节后的 chars 表示该 section 的正文长度；若长度很短，通常说明它只有标题，没有实际内容。\n"
+        f"   • 可以一次读取多个主题相关章节，但不要重复读取章节。\n"
         f"   • 剩余轮次：{remaining_loops}。如果本轮后只剩 1 轮，\n"
         f"     请聚焦最高价值的未读章节，跳过低优先级内容。\n\n"
-        f"2. 可按需要调用 add_memory()。\n"
+        f"2. 若已完成阅读，本轮至多调用一次 add_memory()。\n"
         f"   • 记录贡献（CONTRIBUTIONS）、主张（CLAIMS）和关键发现（KEY FINDINGS），不要写内容摘要。\n"
         f"   • 记忆内容请使用要点格式：\n"
         f"     - [CLAIM] <论文提出的主张>\n"
@@ -92,7 +102,7 @@ def _build_regular_iteration_prompt(
         f"     - [RESULT] <关键实验结果，尽量包含数字>\n"
         f"     - [METHOD] <核心技术，仅在架构层面重要时记录>\n"
         f"   • 不要记录背景、动机或模板化描述。\n\n"
-        f"3. 立即返回 ReActIterationOutput，不要继续调用其他工具。\n"
+        f"3. 完成工具调用后，立即返回 ReActIterationOutput，不要继续调用其他工具。\n"
         f"   • thoughts：说明本轮阅读依据，以及下一步准备读什么（和原因）。\n"
         f"   • should_continue：\n"
         f"     - 若仍有高价值未读章节，设为 True。\n"
@@ -103,8 +113,8 @@ def _build_regular_iteration_prompt(
         f"       若 report 为空，不要设置 should_continue=False。\n\n"
         f"   • report：保持为空（仅最终迭代才进行综合）。\n\n"
         f"=== 允许的工具 ===\n"
-        f"  ✓ read_section(section_names)  —— 按需要调用\n"
-        f"  ✓ add_memory(memory)           —— 按需要调用\n"
+        f"  ✓ read_section(section_names)  —— 本轮最多一次\n"
+        f"  ✓ add_memory(memory)           —— 本轮最多一次\n"
         f"  ✓ get_all_memory()             —— 仅在生成最终报告时使用\n"
     )
 
@@ -116,6 +126,7 @@ def build_iteration_system_prompt(deps: ReActIterationDeps) -> str:
     unprocessed_sections = _format_unprocessed_sections(
         iteration_input.available_sections,
         iteration_input.processed_sections,
+        iteration_input.available_section_lengths,
     )
     previous_context = _format_previous_context(iteration_input.previous_thoughts)
 

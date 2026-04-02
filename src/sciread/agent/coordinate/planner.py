@@ -9,6 +9,10 @@ from pydantic_ai import ModelRetry
 from pydantic_ai import RunContext
 
 from ...document_structure import Document
+from ..section_selection import choose_best_section_match
+from ..section_selection import format_section_choices
+from ..section_selection import get_section_length_map
+from ..section_selection import is_likely_heading_only
 from .models import AnalysisPlan
 from .prompts import CONTROLLER_INSTRUCTIONS
 from .prompts import build_analysis_planning_prompt
@@ -19,6 +23,9 @@ from .runtime import default_analysis_plan
 
 def select_sections_for_expert(document: Document, analysis_type: str, planned_sections: list[str] | None) -> list[str]:
     """Choose the best-matching sections for a given expert."""
+    available_sections = document.get_section_names()
+    section_lengths = get_section_length_map(document, available_sections)
+
     if planned_sections:
         targets = planned_sections
     elif analysis_type in EXPERT_SECTION_PREFERENCES:
@@ -29,11 +36,21 @@ def select_sections_for_expert(document: Document, analysis_type: str, planned_s
     matched: list[str] = []
     for target in targets:
         match = document.get_closest_section_name(target, threshold=0.7)
+        if match and is_likely_heading_only(section_lengths.get(match, 0)):
+            preferred_match = choose_best_section_match(target, available_sections, section_lengths)
+            if preferred_match:
+                match = preferred_match
+
+        if not match:
+            match = choose_best_section_match(target, available_sections, section_lengths)
+
         if match and match not in matched:
             matched.append(match)
 
     if not matched:
-        matched = document.get_section_names()[:3]
+        matched = [section for section in available_sections if not is_likely_heading_only(section_lengths.get(section, 0))][:3]
+    if not matched:
+        matched = available_sections[:3]
 
     return matched
 
@@ -110,7 +127,9 @@ def create_planning_agent(model, max_retries: int, logger) -> Agent[CoordinateDe
                 "Please ensure the document is properly processed and contains readable text."
             )
 
-        planning_prompt = build_analysis_planning_prompt(abstract, section_names)
+        section_lengths = get_section_length_map(deps.document, section_names)
+        available_sections_text = format_section_choices(section_names, section_lengths)
+        planning_prompt = build_analysis_planning_prompt(abstract, available_sections_text)
         return f"{CONTROLLER_INSTRUCTIONS}\n\n{planning_prompt}"
 
     return planning_agent
@@ -131,7 +150,9 @@ async def plan_analysis(
         logger.warning("Empty abstract provided, using default comprehensive analysis plan")
         return default_analysis_plan("No abstract available, using comprehensive analysis plan with all sections")
 
-    prompt = build_analysis_planning_prompt(abstract, section_names)
+    section_lengths = get_section_length_map(document, section_names)
+    available_sections_text = format_section_choices(section_names, section_lengths)
+    prompt = build_analysis_planning_prompt(abstract, available_sections_text)
 
     try:
         logger.debug(f"Calling controller agent with prompt length: {len(prompt)} chars")
