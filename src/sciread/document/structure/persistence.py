@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from sciread.document.document_builder import DocumentBuilder
 from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
 from sciread.document.retrieval.vector_index import VectorIndex
@@ -38,7 +39,7 @@ def save_document(document: Document, output_path: Path) -> None:
             metadata_dict["modified_at"] = metadata_dict["modified_at"].isoformat()
 
         chunks_data = []
-        for chunk in document._chunks:
+        for chunk in document.chunks:
             chunk_dict = asdict(chunk)
             chunk_dict.pop("id", None)
             chunks_data.append(chunk_dict)
@@ -77,13 +78,15 @@ def load_document(document_cls: type[Document], state_path: Path) -> Document:
         if metadata_dict.get("modified_at"):
             metadata_dict["modified_at"] = datetime.fromisoformat(metadata_dict["modified_at"])
 
-        document = document_cls(
+        builder = DocumentBuilder()
+        document = builder.hydrate(
+            document_cls,
+            source_path=metadata_dict.get("source_path"),
             text=state["text"],
             metadata=DocumentMetadata(**metadata_dict),
-            _is_markdown=state.get("is_markdown", False),
+            is_markdown=state.get("is_markdown", False),
+            chunks=[Chunk(**chunk_data) for chunk_data in state["chunks"]],
         )
-
-        document._set_chunks([Chunk(**chunk_data) for chunk_data in state["chunks"]])
 
         vector_index_path = state.get("vector_index_path")
         if vector_index_path:

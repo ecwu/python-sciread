@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from sciread.document.retrieval.vector_index import VectorIndex
+from sciread.document.state import get_chunk_map
+from sciread.document.state import get_runtime_embedding_client
+from sciread.document.state import set_runtime_embedding_client
 from sciread.embedding_provider import get_embedding_client
 from sciread.platform.config import get_config
 
@@ -38,11 +41,12 @@ def build_vector_index(
     vector_index_cls=VectorIndex,
 ) -> None:
     """Build a semantic vector index from document chunks."""
-    if not document._chunks:
+    chunks = document.chunks
+    if not chunks:
         document.logger.warning("No chunks to index. Please split the document first.")
         return
 
-    document.logger.info(f"Building vector index from {len(document._chunks)} chunks...")
+    document.logger.info(f"Building vector index from {len(chunks)} chunks...")
 
     try:
         vector_config = None
@@ -54,14 +58,14 @@ def build_vector_index(
                 cache_embeddings=vector_config.cache_embeddings,
             )
 
-        document._embedding_client = embedding_client
+        set_runtime_embedding_client(document, embedding_client)
 
         batch_size = 10
         if hasattr(embedding_client, "embedding_batch_size"):
             batch_size = embedding_client.embedding_batch_size
 
         embeddings = embedding_client.get_embeddings(
-            [c.retrieval_text or c.content for c in document._chunks],
+            [chunk.retrieval_text or chunk.content for chunk in chunks],
             batch_size=batch_size,
         )
 
@@ -79,7 +83,7 @@ def build_vector_index(
             collection_name=collection_name,
             persist_path=persist_path,
         )
-        document.vector_index.add_chunks(document._chunks, embeddings)
+        document.vector_index.add_chunks(chunks, embeddings)
         document.logger.info("Vector index built successfully.")
 
     except Exception as e:
@@ -100,40 +104,40 @@ def semantic_search(
         document.logger.warning("Vector index not found. Please run `build_vector_index()` first.")
         return []
 
-    if not document._chunks_by_id:
-        document._update_chunks_by_id()
-
     document.logger.info(f"Performing semantic search for: '{query}'")
 
     try:
-        if hasattr(document, "_embedding_client") and document._embedding_client is not None:
-            embedding_client = document._embedding_client
+        embedding_client = get_runtime_embedding_client(document)
+        if embedding_client is not None:
+            active_embedding_client = embedding_client
         else:
             config = get_config_fn()
             vector_config = config.vector_store
-            embedding_client = get_embedding_client_fn(
+            active_embedding_client = get_embedding_client_fn(
                 vector_config.embedding_model,
                 cache_embeddings=vector_config.cache_embeddings,
             )
+            set_runtime_embedding_client(document, active_embedding_client)
 
-        query_embedding = embedding_client.get_embedding(query)
+        query_embedding = active_embedding_client.get_embedding(query)
         if not query_embedding:
             document.logger.error("Failed to get embedding for query")
             return []
 
         search_results = document.vector_index.search(query_embedding, top_k=top_k)
+        chunk_map = get_chunk_map(document)
 
         if return_scores:
             results_with_scores = []
             for res in search_results:
-                if res["id"] in document._chunks_by_id:
-                    chunk = document._chunks_by_id[res["id"]]
+                if res["id"] in chunk_map:
+                    chunk = chunk_map[res["id"]]
                     similarity = res["similarity"]
                     results_with_scores.append((chunk, similarity))
             document.logger.info(f"Found {len(results_with_scores)} matching chunks")
             return results_with_scores
 
-        found_chunks = [document._chunks_by_id[res["id"]] for res in search_results if res["id"] in document._chunks_by_id]
+        found_chunks = [chunk_map[res["id"]] for res in search_results if res["id"] in chunk_map]
         document.logger.info(f"Found {len(found_chunks)} matching chunks")
         return found_chunks
 

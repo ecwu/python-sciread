@@ -14,11 +14,25 @@ from .retrieval.service import build_vector_index as build_document_vector_index
 from .retrieval.service import cosine_similarity
 from .retrieval.service import semantic_search as semantic_search_document
 from .retrieval.vector_index import VectorIndex
+from .state import attach_document_chunks
+from .state import get_chunk_by_id as get_document_chunk_by_id
+from .state import get_chunks as get_document_chunks
+from .state import get_chunks_by_section as get_document_chunks_by_section
+from .state import get_full_text as get_document_full_text
+from .state import get_neighbor_chunks as get_document_neighbor_chunks
+from .state import get_section_names as get_document_section_names
+from .state import get_section_parts as get_document_section_parts
+from .state import get_sections_by_name as get_document_sections_by_name
+from .state import initialize_document
+from .state import mark_all_processed as mark_document_all_processed
+from .state import mark_all_unprocessed as mark_document_all_unprocessed
+from .state import mark_chunks_processed as mark_document_chunks_processed
+from .state import next_unprocessed_chunk
+from .state import update_chunk_index
 from .structure.chunking import build_doc_id
 from .structure.chunking import build_retrieval_text
 from .structure.chunking import calculate_file_hash
 from .structure.chunking import enrich_chunks
-from .structure.chunking import set_document_chunks
 from .structure.chunking import to_plain_text
 from .structure.persistence import load_document
 from .structure.persistence import save_document
@@ -57,20 +71,14 @@ class Document:
             _is_markdown: Internal flag to track if content is markdown-converted.
         """
         self.logger = get_logger(__name__)
-        self.source_path = source_path
-        self._raw_text = text or ""
-        self.metadata = metadata or DocumentMetadata(source_path=source_path)
-
-        # Calculate file hash if source_path is provided
-        if source_path and source_path.exists():
-            self.metadata.file_hash = calculate_file_hash(source_path, self.logger)
-
-        self.processing_state = processing_state or ProcessingState()
-        self._chunks: list[Chunk] = []
-        self._chunks_by_id: dict[str, Chunk] = {}
-        self._split = False
-        self._is_markdown = _is_markdown
-        self.vector_index: VectorIndex | None = None
+        initialize_document(
+            self,
+            source_path=source_path,
+            text=text,
+            metadata=metadata,
+            processing_state=processing_state,
+            is_markdown=_is_markdown,
+        )
 
     @classmethod
     def from_file(
@@ -146,6 +154,16 @@ class Document:
         """Check if document content is markdown-converted."""
         return self._is_markdown
 
+    @property
+    def vector_index(self) -> VectorIndex | None:
+        """Return the runtime vector index."""
+        return self._runtime.vector_index
+
+    @vector_index.setter
+    def vector_index(self, value: VectorIndex | None) -> None:
+        """Store the runtime vector index."""
+        self._runtime.vector_index = value
+
     def get_chunks(
         self,
         processed: bool | None = None,
@@ -186,33 +204,15 @@ class Document:
             # Get first 5 chunks with high confidence
             doc.get_chunks(confidence_threshold=0.8, limit=5)
         """
-        chunks = self._chunks
-
-        # Filter by processing status
-        if processed is not None:
-            chunks = [chunk for chunk in chunks if chunk.processed == processed]
-
-        # Filter by chunk name
-        if chunk_name is not None:
-            chunks = [chunk for chunk in chunks if chunk.chunk_name == chunk_name]
-
-        # Filter by confidence threshold
-        if confidence_threshold is not None:
-            chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
-
-        # Filter by minimum length
-        if min_length is not None:
-            chunks = [chunk for chunk in chunks if len(chunk.content) >= min_length]
-
-        # Exclude specific chunk types
-        if exclude_types:
-            chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
-
-        # Apply limit
-        if limit is not None:
-            chunks = chunks[:limit]
-
-        return chunks
+        return get_document_chunks(
+            self,
+            processed=processed,
+            chunk_name=chunk_name,
+            limit=limit,
+            confidence_threshold=confidence_threshold,
+            min_length=min_length,
+            exclude_types=exclude_types,
+        )
 
     def get_unprocessed_chunks(self, limit: int | None = None) -> list[Chunk]:
         """Get unprocessed chunks. Convenience method for get_chunks(processed=False)."""
@@ -246,9 +246,7 @@ class Document:
         Returns:
             Matching chunk if found, otherwise None.
         """
-        if not self._chunks_by_id or len(self._chunks_by_id) != len(self._chunks):
-            self._update_chunks_by_id()
-        return self._chunks_by_id.get(chunk_id)
+        return get_document_chunk_by_id(self, chunk_id)
 
     def get_chunks_by_section(
         self,
@@ -265,40 +263,15 @@ class Document:
         Returns:
             Chunks that belong to the requested section.
         """
-        normalized_target = " > ".join(part.strip().lower() for part in section.split(">") if part.strip())
-        if not normalized_target:
-            return []
-
-        matching_chunks: list[Chunk] = []
-        for chunk in self._chunks:
-            section_parts = self._get_section_parts(chunk)
-
-            if not section_parts:
-                continue
-
-            normalized_parts = [part.lower() for part in section_parts]
-            normalized_path = " > ".join(normalized_parts)
-
-            if include_subsections:
-                if (
-                    normalized_path == normalized_target
-                    or normalized_path.startswith(f"{normalized_target} >")
-                    or normalized_target in normalized_parts
-                ):
-                    matching_chunks.append(chunk)
-            elif normalized_path == normalized_target:
-                matching_chunks.append(chunk)
-
-        return matching_chunks
+        return get_document_chunks_by_section(
+            self,
+            section,
+            include_subsections=include_subsections,
+        )
 
     def _get_section_parts(self, chunk: Chunk) -> list[str]:
         """Get normalized section path parts for a chunk."""
-        section_parts = [part.strip() for part in chunk.section_path if part.strip()]
-        if section_parts:
-            return section_parts
-        if chunk.chunk_name and chunk.chunk_name != "unknown":
-            return [chunk.chunk_name]
-        return []
+        return get_document_section_parts(chunk)
 
     def get_neighbor_chunks(
         self,
@@ -319,26 +292,13 @@ class Document:
             Neighboring chunks in document order. Returns an empty list when
             chunk_id is not found.
         """
-        if before < 0 or after < 0:
-            raise ValueError("before and after must be >= 0")
-
-        center_index = None
-        for i, chunk in enumerate(self._chunks):
-            if chunk.chunk_id == chunk_id:
-                center_index = i
-                break
-
-        if center_index is None:
-            return []
-
-        start = max(0, center_index - before)
-        end = min(len(self._chunks), center_index + after + 1)
-        neighbors = self._chunks[start:end]
-
-        if include_self:
-            return neighbors
-
-        return [chunk for chunk in neighbors if chunk.chunk_id != chunk_id]
+        return get_document_neighbor_chunks(
+            self,
+            chunk_id,
+            before=before,
+            after=after,
+            include_self=include_self,
+        )
 
     def mark_chunks_processed(
         self,
@@ -359,45 +319,28 @@ class Document:
         Returns:
             Number of chunks marked as processed.
         """
-        chunks_to_mark = self.get_chunks(
-            processed=False,
+        return mark_document_chunks_processed(
+            self,
             confidence_threshold=confidence_threshold,
             min_length=min_length,
             exclude_types=exclude_types,
         )
 
-        # Mark chunks as processed
-        for chunk in chunks_to_mark:
-            chunk.mark_processed()
-
-        if chunks_to_mark:
-            self.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
-            self.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
-
-        return len(chunks_to_mark)
-
     def next_unprocessed(self) -> Chunk | None:
         """Get the next unprocessed chunk."""
-        unprocessed = self.get_unprocessed_chunks(limit=1)
-        return unprocessed[0] if unprocessed else None
+        return next_unprocessed_chunk(self)
 
     def mark_all_processed(self) -> None:
         """Mark all chunks as processed."""
-        for chunk in self._chunks:
-            chunk.mark_processed()
-        self.processing_state.update_timestamp("processed")
-        self.processing_state.add_note("All chunks marked as processed")
+        mark_document_all_processed(self)
 
     def mark_all_unprocessed(self) -> None:
         """Mark all chunks as unprocessed."""
-        for chunk in self._chunks:
-            chunk.mark_unprocessed()
+        mark_document_all_unprocessed(self)
 
     def get_full_text(self, separator: str = "\n\n") -> str:
         """Get the full text by joining all chunks with separator."""
-        if not self._chunks:
-            return self._raw_text
-        return separator.join(chunk.content for chunk in self._chunks)
+        return get_document_full_text(self, separator=separator)
 
     def get_section_names(self) -> list[str]:
         """Return ordered list of section names from all chunks.
@@ -408,19 +351,7 @@ class Document:
         Returns:
             List of section names in document order.
         """
-        section_names = []
-        for chunk in self._chunks:
-            if chunk.chunk_name and chunk.chunk_name != "unknown":
-                section_name = chunk.chunk_name
-                if section_name not in section_names:  # Avoid duplicates
-                    section_names.append(section_name)
-            elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
-                # For chunks without explicit section names, use a generic name based on splitter type
-                splitter_type = chunk.metadata["splitter"]
-                generic_name = f"untitled_{splitter_type}"
-                if generic_name not in section_names:
-                    section_names.append(generic_name)
-        return section_names
+        return get_document_section_names(self)
 
     def get_sections_by_name(self, section_names: list[str]) -> list[Chunk]:
         """Get chunks matching specific section names.
@@ -431,11 +362,7 @@ class Document:
         Returns:
             List of chunks matching the specified section names.
         """
-        matching_chunks = []
-        for chunk in self._chunks:
-            if chunk.chunk_name in section_names:
-                matching_chunks.append(chunk)
-        return matching_chunks
+        return get_document_sections_by_name(self, section_names)
 
     def _resolve_section_names(
         self,
@@ -483,7 +410,7 @@ class Document:
 
     def _update_chunks_by_id(self) -> None:
         """Update the _chunks_by_id dictionary to match current chunks."""
-        self._chunks_by_id = {chunk.id: chunk for chunk in self._chunks}
+        update_chunk_index(self)
 
     def _build_doc_id(self) -> str:
         """Build a stable document ID used by chunk metadata."""
@@ -503,7 +430,7 @@ class Document:
 
     def _set_chunks(self, chunks: list[Chunk]) -> None:
         """Set chunks and update the _chunks_by_id dictionary."""
-        set_document_chunks(self, chunks)
+        attach_document_chunks(self, chunks)
 
     def build_vector_index(self, persist: bool = False, embedding_client=None) -> None:
         """Builds a semantic vector index from the document's chunks.

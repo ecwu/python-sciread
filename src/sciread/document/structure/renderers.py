@@ -71,12 +71,13 @@ def collect_sections(
 ) -> list[dict]:
     """Collect section data (name, content, chunks, stats) in document order."""
     names = resolve_section_names(document, section_names, max_sections)
-    if not names or not document._chunks:
+    chunks = document.chunks
+    if not names or not chunks:
         return []
 
     allowed_names = set(names)
     grouped_chunks: dict[str, list[Chunk]] = {}
-    for chunk in document._chunks:
+    for chunk in chunks:
         chunk_name = chunk.chunk_name
         if chunk_name in allowed_names:
             grouped_chunks.setdefault(chunk_name, []).append(chunk)
@@ -318,7 +319,7 @@ def get_section_overview(document: Document, include_stats: bool = True, include
             "document_title": document.metadata.title or "Untitled",
             "total_sections": 0,
             "sections": [],
-            "total_chunks": len(document._chunks),
+            "total_chunks": len(document),
             "document_type": "markdown" if document.is_markdown else "text",
         }
 

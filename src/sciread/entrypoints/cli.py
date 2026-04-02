@@ -42,11 +42,26 @@ console = Console()
 
 COORDINATE_PLAN_SPECS = (
     ("metadata", "Metadata", "analyze_metadata", None),
-    ("previous_methods", "Previous Methods", "analyze_previous_methods", "previous_methods_sections"),
-    ("research_questions", "Research Questions", "analyze_research_questions", "research_questions_sections"),
+    (
+        "previous_methods",
+        "Previous Methods",
+        "analyze_previous_methods",
+        "previous_methods_sections",
+    ),
+    (
+        "research_questions",
+        "Research Questions",
+        "analyze_research_questions",
+        "research_questions_sections",
+    ),
     ("methodology", "Methodology", "analyze_methodology", "methodology_sections"),
     ("experiments", "Experiments", "analyze_experiments", "experiments_sections"),
-    ("future_directions", "Future Directions", "analyze_future_directions", "future_directions_sections"),
+    (
+        "future_directions",
+        "Future Directions",
+        "analyze_future_directions",
+        "future_directions_sections",
+    ),
 )
 
 
@@ -57,7 +72,12 @@ def _render_discussion_overview(overview: dict[str, object]) -> None:
         section_names = []
 
     console.print()
-    console.print(build_mode_banner("Discussion Analysis", subtitle="Multi-agent discussion with normalized progress output"))
+    console.print(
+        build_mode_banner(
+            "Discussion Analysis",
+            subtitle="Multi-agent discussion with normalized progress output",
+        )
+    )
     overview_rows = [
         ("Document", str(overview["document_title"])),
         ("Total Content", f"{overview['total_content_chars']} characters"),
@@ -76,7 +96,7 @@ def _render_discussion_overview(overview: dict[str, object]) -> None:
             build_sections_table(
                 "Available Sections for Analysis",
                 [str(section_name).title() for section_name in section_names[:10]],
-                caption=f"... and {len(section_names) - 10} more sections" if len(section_names) > 10 else None,
+                caption=(f"... and {len(section_names) - 10} more sections" if len(section_names) > 10 else None),
             )
         )
 
@@ -114,7 +134,12 @@ def _render_coordinate_plan(result: ComprehensiveAnalysisResult, target_console:
     plan = result.analysis_plan
 
     active_console.print()
-    active_console.print(build_mode_banner("Coordinate Analysis Plan", subtitle="Planned sub-agent coverage and final synthesis"))
+    active_console.print(
+        build_mode_banner(
+            "Coordinate Analysis Plan",
+            subtitle="Planned sub-agent coverage and final synthesis",
+        )
+    )
 
     if plan.reasoning:
         active_console.print(build_markdown_panel("Planner Reasoning", plan.reasoning, border_style="blue"))
@@ -239,7 +264,7 @@ MODELS:
     react_parser.add_argument(
         "--max-loops",
         type=int,
-        default=8,
+        default=5,
         metavar="N",
         help="Maximum number of analysis iterations (default: 8)",
     )

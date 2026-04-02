@@ -6,6 +6,7 @@ from difflib import SequenceMatcher
 from typing import TYPE_CHECKING
 
 from sciread.document.retrieval.service import cosine_similarity
+from sciread.document.state import get_runtime_embedding_client
 
 if TYPE_CHECKING:
     from sciread.document.document import Document
@@ -158,12 +159,13 @@ def get_closest_section_name(
         if pattern_match:
             return pattern_match
 
-        if use_embedding and hasattr(document, "_embedding_client"):
+        embedding_client = get_runtime_embedding_client(document)
+        if use_embedding and embedding_client is not None:
             try:
-                target_embedding = document._embedding_client.get_embedding(search_name)
+                target_embedding = embedding_client.get_embedding(search_name)
                 if target_embedding:
                     for i, name in enumerate(normalized_names):
-                        name_embedding = document._embedding_client.get_embedding(name)
+                        name_embedding = embedding_client.get_embedding(name)
                         if name_embedding:
                             similarity = cosine_similarity(target_embedding, name_embedding)
                             if similarity > best_score and similarity >= threshold:

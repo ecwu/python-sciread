@@ -13,7 +13,10 @@ from .ingestion.external_clients import MineruClient
 from .ingestion.loaders import BaseLoader
 from .ingestion.loaders import PdfLoader
 from .ingestion.loaders import TxtLoader
+from .models import Chunk
 from .models import DocumentMetadata
+from .models import ProcessingState
+from .state import prepare_source_metadata
 from .structure.splitters import BaseSplitter
 from .structure.splitters import MarkdownSplitter
 from .structure.splitters import SemanticSplitter
@@ -83,19 +86,17 @@ class DocumentBuilder:
         if not load_result.success:
             raise RuntimeError(f"Failed to load document: {load_result.errors}")
 
-        # Create document with loaded content
-        doc = Document(
+        doc = self._create_document(
+            Document,
             source_path=path,
             text=load_result.text,
             metadata=load_result.metadata,
-            _is_markdown=to_markdown,
+            is_markdown=to_markdown,
         )
+        self._prepare_document(doc, source_path=path)
 
-        # Update processing state
-        doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note(f"Document loaded using {loader.loader_name}")
+        self._record_load(doc, f"Document loaded using {loader.loader_name}")
 
-        # Add any warnings to processing state
         for warning in load_result.warnings:
             doc.processing_state.add_note(f"Warning: {warning}")
             self.logger.warning(f"Document loading warning: {warning}")
@@ -144,16 +145,15 @@ class DocumentBuilder:
 
         self.logger.debug(f"Creating document from text ({len(text)} characters)")
 
-        doc = Document(
+        doc = self._create_document(
+            Document,
             source_path=None,
             text=text,
             metadata=metadata or DocumentMetadata(source_path=None),
-            _is_markdown=is_markdown,
+            is_markdown=is_markdown,
         )
-
-        # Update processing state
-        doc.processing_state.update_timestamp("loaded")
-        doc.processing_state.add_note("Document created from text")
+        self._prepare_document(doc)
+        self._record_load(doc, "Document created from text")
 
         # Auto-split if requested
         if auto_split:
@@ -194,6 +194,33 @@ class DocumentBuilder:
 
         return doc
 
+    def hydrate(
+        self,
+        document_cls: type["Document"],
+        *,
+        text: str,
+        metadata: DocumentMetadata | None = None,
+        source_path: Path | None = None,
+        processing_state: ProcessingState | None = None,
+        is_markdown: bool = False,
+        chunks: list[Chunk] | None = None,
+    ) -> "Document":
+        """Rebuild a document instance using the same normalization path as fresh loads."""
+        doc = self._create_document(
+            document_cls,
+            source_path=source_path,
+            text=text,
+            metadata=metadata,
+            processing_state=processing_state,
+            is_markdown=is_markdown,
+        )
+        self._prepare_document(doc, source_path=source_path)
+
+        if chunks is not None:
+            doc._set_chunks(chunks)
+
+        return doc
+
     def _create_default_loader(self, file_path: Path, to_markdown: bool) -> BaseLoader:
         """Create appropriate loader based on file extension."""
         suffix = file_path.suffix.lower()
@@ -231,6 +258,34 @@ class DocumentBuilder:
         doc.processing_state.add_note(f"Document split using {active_splitter.splitter_name}")
 
         self.logger.info(f"Document split into {len(chunks)} chunks using {active_splitter.splitter_name}")
+
+    def _create_document(
+        self,
+        document_cls: type["Document"],
+        *,
+        source_path: Path | None = None,
+        text: str | None = None,
+        metadata: DocumentMetadata | None = None,
+        processing_state: ProcessingState | None = None,
+        is_markdown: bool = False,
+    ) -> "Document":
+        """Construct a document without source-path side effects."""
+        return document_cls(
+            source_path=source_path,
+            text=text,
+            metadata=metadata,
+            processing_state=processing_state,
+            _is_markdown=is_markdown,
+        )
+
+    def _prepare_document(self, doc: "Document", source_path: Path | None = None) -> None:
+        """Apply source-derived metadata through the builder path."""
+        prepare_source_metadata(doc, source_path=source_path)
+
+    def _record_load(self, doc: "Document", note: str) -> None:
+        """Record a document load event."""
+        doc.processing_state.update_timestamp("loaded")
+        doc.processing_state.add_note(note)
 
     def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
         """Create appropriate splitter based on document content."""
