@@ -10,7 +10,7 @@ from .llm_provider import get_model
 from .platform.logging import get_logger
 from .platform.logging import setup_logging
 
-__version__ = "0.0.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "EmbeddingFactory",

@@ -15,7 +15,7 @@ project = "sciread"
 year = "2025"
 author = "Zhenghao Wu"
 copyright = f"{year}, {author}"
-version = release = "0.0.0"
+version = release = "1.0.0"
 
 pygments_style = "trac"
 templates_path = ["."]
