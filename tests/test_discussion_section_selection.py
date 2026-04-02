@@ -42,6 +42,24 @@ def test_discussion_default_sections_prefer_richer_child_sections() -> None:
     assert "3. Method" not in selected
 
 
+def test_parse_insights_uses_selected_sections_as_related_sections() -> None:
+    """Parsed insights should preserve the sections the personality agent actually chose to read."""
+    agent = _make_personality_agent(AgentPersonality.THEORETICAL_INTEGRATOR)
+
+    class DummyDocument:
+        def get_section_names(self) -> list[str]:
+            return ["Abstract", "Introduction", "Conclusion"]
+
+    insights = agent._parse_insights_response(
+        "Insight: The method improves reasoning consistency.\nImportance: 0.82\nConfidence: 0.77\nEvidence: Supported by the evaluation section.",
+        DummyDocument(),
+        ["3.1 Proposed Method", "4. Experiments"],
+    )
+
+    assert len(insights) == 1
+    assert insights[0].related_sections == ["3.1 Proposed Method", "4. Experiments"]
+
+
 @pytest.mark.asyncio
 async def test_discussion_section_selector_accepts_model_output_with_length_annotations() -> None:
     """Section parsing should tolerate model outputs that copy the prompt annotations."""

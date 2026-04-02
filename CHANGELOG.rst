@@ -2,7 +2,7 @@
 Changelog
 =========
 
-0.0.0 (2025-10-04)
-------------------
+1.0.0 (2026-04-02)
 
-* First release on PyPI.
+- Initial release of the project.
+

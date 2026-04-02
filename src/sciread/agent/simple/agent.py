@@ -15,11 +15,13 @@ from pydantic_ai import RunContext
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from rich.console import Console
-from rich.markdown import Markdown
 
 from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...platform.rich_output import build_key_value_table
+from ...platform.rich_output import build_markdown_panel
+from ...platform.rich_output import build_mode_banner
 from ..shared.error_handling import handle_model_retry
 from ..shared.error_handling import safe_agent_execution
 from ..shared.text_utils import clean_academic_text
@@ -70,6 +72,25 @@ async def analyze_file_with_simple(
 
     _validate_document_file(file_path)
     document = load_document_for_simple_analysis(file_path, to_markdown=to_markdown)
+    metadata = getattr(document, "metadata", None)
+    document_title = getattr(metadata, "title", None) or getattr(document, "source_path", None) or file_path
+    get_section_names = getattr(document, "get_section_names", None)
+    section_count = len(get_section_names()) if callable(get_section_names) else 0
+    chunk_count = len(getattr(document, "chunks", []))
+    console.print()
+    console.print(build_mode_banner("Simple Analysis", subtitle="Single-agent full-document analysis"))
+    console.print(
+        build_key_value_table(
+            "Analysis Overview",
+            [
+                ("Document", str(document_title)),
+                ("Sections", str(section_count)),
+                ("Chunks", str(chunk_count)),
+                ("Include Metadata", "Yes" if include_metadata else "No"),
+                ("Remove References", "Yes" if remove_references else "No"),
+            ],
+        )
+    )
     agent = SimpleAgent(model=model)
 
     return await agent.run_analysis(
@@ -261,7 +282,8 @@ class SimpleAgent:
                 timeout=self.timeout,
                 operation_name="document analysis",
             )
-            console.print(Markdown(result.output))
+            console.print()
+            console.print(build_markdown_panel("Final Report", result.output, border_style="green"))
             return result.output
 
         except Exception as e:
@@ -345,7 +367,8 @@ class SimpleAgent:
                 timeout=self.timeout,
                 operation_name="structured document analysis",
             )
-            console.print(Markdown(result.output.report))
+            console.print()
+            console.print(build_markdown_panel("Final Report", result.output.report, border_style="green"))
             return result.output
 
         except Exception as e:

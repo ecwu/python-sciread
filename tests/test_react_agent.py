@@ -3,9 +3,11 @@
 from types import SimpleNamespace
 
 import pytest
+from rich.console import Console
 
 from sciread.agent.react import analyze_file_with_react
 from sciread.agent.react import analyze_file_with_react_sync
+from sciread.agent.react.agent import _render_sections_read
 from sciread.agent.react.agent import add_memory
 from sciread.agent.react.agent import get_all_memory
 from sciread.agent.react.agent import normalize_section_names
@@ -228,3 +230,24 @@ def test_react_public_api_uses_clarified_names() -> None:
     """The public API should expose file-oriented entrypoints and analysis-oriented methods."""
     assert analyze_file_with_react.__name__ == "analyze_file_with_react"
     assert analyze_file_with_react_sync.__name__ == "analyze_file_with_react_sync"
+
+
+def test_render_sections_read_shows_names_and_lengths_without_body_preview(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Progress output should show which sections were read, but not echo the section body."""
+    test_console = Console(record=True, width=120)
+    monkeypatch.setattr("sciread.agent.react.agent.console", test_console)
+
+    _render_sections_read(
+        [
+            ("Methods", "Detailed architecture description with equations."),
+            ("Results", "Ablations and numerical comparisons."),
+        ]
+    )
+
+    rendered = test_console.export_text()
+    assert "Read Sections" in rendered
+    assert "Methods" in rendered
+    assert "Results" in rendered
+    assert "Chars" in rendered
+    assert "Detailed architecture description with equations." not in rendered
+    assert "Ablations and numerical comparisons." not in rendered

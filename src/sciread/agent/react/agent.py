@@ -4,17 +4,10 @@ import asyncio
 import json
 import traceback
 from pathlib import Path
-from textwrap import shorten
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
-from rich import box
 from rich.console import Console
-from rich.console import Group
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.table import Table
-from rich.text import Text
 
 from ...document import Document
 from ...document.structure.renderers import SHORT_SECTION_THRESHOLD
@@ -23,6 +16,11 @@ from ...document.structure.renderers import get_sections_content
 from ...document.structure.renderers import is_likely_heading_only
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...platform.rich_output import build_key_value_table
+from ...platform.rich_output import build_markdown_panel
+from ...platform.rich_output import build_mode_banner
+from ...platform.rich_output import build_sections_table
+from ...platform.rich_output import build_stage_banner
 from .models import ReActAnalysisState
 from .models import ReActIterationDeps
 from .models import ReActIterationInput
@@ -34,17 +32,6 @@ from .prompts import build_iteration_user_prompt
 logger = get_logger(__name__)
 
 console = Console()
-
-SECTION_PREVIEW_LENGTH = 180
-
-
-def _build_section_preview(content: str, max_length: int = SECTION_PREVIEW_LENGTH) -> str:
-    """Collapse section content into a single-line preview for terminal display."""
-    normalized_content = " ".join(content.split())
-    if not normalized_content:
-        return "No visible content"
-    return shorten(normalized_content, width=max_length, placeholder="...")
-
 
 def _get_sections(document: Document, section_names: list[str]) -> list[tuple[str, str]]:
     """Get clean text for the requested section names."""
@@ -60,46 +47,21 @@ def _get_sections(document: Document, section_names: list[str]) -> list[tuple[st
 
 def _render_iteration_header(current_loop: int, max_loops: int, processed_count: int, remaining_count: int) -> None:
     """Render a consistent iteration header."""
-    header = Text.assemble(
-        ("ReAct Iteration ", "bold cyan"),
-        (f"{current_loop}/{max_loops}", "bold white"),
-    )
-    summary = Text.assemble(
-        ("Processed ", "dim"),
-        (str(processed_count), "bold green"),
-        ("  Remaining ", "dim"),
-        (str(remaining_count), "bold yellow"),
-    )
-
     console.print(
-        Panel(
-            Group(header, summary),
+        build_stage_banner(
+            title=f"ReAct Iteration {current_loop}/{max_loops}",
+            summary_lines=[
+                f"Processed sections: {processed_count}",
+                f"Remaining sections: {remaining_count}",
+            ],
             border_style="cyan",
-            box=box.ROUNDED,
-            padding=(0, 1),
         )
     )
 
 
 def _render_sections_read(section_entries: list[tuple[str, str]]) -> None:
     """Render the sections read during the current tool call."""
-    table = Table(box=box.SIMPLE_HEAVY, expand=True, show_header=True, header_style="bold magenta")
-    table.add_column("Section", style="bold cyan", ratio=2)
-    table.add_column("Preview", style="white", ratio=6)
-    table.add_column("Chars", style="green", justify="right", width=8)
-
-    for section_name, content in section_entries:
-        table.add_row(section_name, _build_section_preview(content), str(len(content.strip())))
-
-    console.print(
-        Panel(
-            table,
-            title="Read Sections",
-            title_align="left",
-            border_style="magenta",
-            box=box.ROUNDED,
-        )
-    )
+    console.print(build_sections_table("Read Sections", [(section_name, len(content.strip())) for section_name, content in section_entries]))
 
 
 def _render_iteration_thoughts(
@@ -111,42 +73,19 @@ def _render_iteration_thoughts(
     remaining_count: int,
 ) -> None:
     """Render the agent thoughts for one iteration."""
-    status_text = "Continue" if should_continue else "Complete"
-    status_style = "bold yellow" if should_continue else "bold green"
-    subtitle = Text.assemble(
-        ("Status ", "dim"),
-        (status_text, status_style),
-        ("  Processed ", "dim"),
-        (str(processed_count), "bold green"),
-        ("  Remaining ", "dim"),
-        (str(remaining_count), "bold yellow"),
-    )
-
     console.print(
-        Panel(
-            Markdown(thoughts or "No thoughts returned."),
-            title=f"Thoughts {current_loop}/{max_loops}",
-            subtitle=subtitle,
-            subtitle_align="left",
+        build_markdown_panel(
+            title=f"Iteration Notes {current_loop}/{max_loops}",
+            content=thoughts or "No thoughts returned.",
             border_style="blue",
-            box=box.ROUNDED,
-            padding=(0, 1),
+            subtitle=f"Status: {'Continue' if should_continue else 'Complete'} | Processed: {processed_count} | Remaining: {remaining_count}",
         )
     )
 
 
 def _render_progress_message(title: str, message: str, border_style: str) -> None:
     """Render a compact progress message."""
-    console.print(
-        Panel(
-            Text(message, style="bold"),
-            title=title,
-            title_align="left",
-            border_style=border_style,
-            box=box.ROUNDED,
-            padding=(0, 1),
-        )
-    )
+    console.print(build_stage_banner(title=title, summary_lines=[message], border_style=border_style))
 
 
 def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationState:
@@ -312,11 +251,31 @@ async def analyze_file_with_react(
     _validate_document_file(file_path)
 
     document = load_and_process_document(file_path, to_markdown=to_markdown)
+    metadata = getattr(document, "metadata", None)
+    document_title = getattr(metadata, "title", None) or getattr(document, "source_path", None) or file_path
+    get_section_names = getattr(document, "get_section_names", None)
+    section_count = len(get_section_names()) if callable(get_section_names) else 0
+    chunk_count = len(getattr(document, "chunks", []))
+    console.print()
+    console.print(build_mode_banner("ReAct Analysis", subtitle="Iterative section reading with structured progress"))
+    console.print(
+        build_key_value_table(
+            "Analysis Overview",
+            [
+                ("Document", str(document_title)),
+                ("Task", task),
+                ("Sections", str(section_count)),
+                ("Chunks", str(chunk_count)),
+                ("Max Loops", str(max_loops)),
+            ],
+        )
+    )
 
     agent = ReActAgent(model=model)
     result = await agent.run_analysis(document, task, max_loops=max_loops, show_progress=show_progress)
 
-    console.print(Markdown(result.report))
+    console.print()
+    console.print(build_markdown_panel("Final Report", result.report, border_style="green"))
 
     logger.debug("ReAct analysis completed successfully!")
     return result

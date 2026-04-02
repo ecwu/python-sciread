@@ -85,6 +85,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
                 "personality": personality.value,
                 "insights_count": len(insights),
                 "average_importance": (sum(insight.importance_score for insight in insights) / len(insights) if insights else 0.0),
+                "selected_sections": getattr(agent, "last_selected_sections", []),
             },
         )
 

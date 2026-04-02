@@ -46,6 +46,7 @@ class PersonalityAgent:
         self.logger = get_logger(f"{__name__}.{personality.value}")
         self.message_history: list[ModelMessage] = []
         self.abbrev = AGENT_ABBREVIATIONS.get(personality, "XX")
+        self.last_selected_sections: list[str] = []
 
     def _display_name(self, personality: AgentPersonality | str | None = None) -> str:
         """Return a Chinese display name for a personality."""
@@ -90,6 +91,7 @@ class PersonalityAgent:
                 section_names,
                 section_lengths,
             )
+            self.last_selected_sections = selected_sections
 
             self.logger.debug(f"{self.personality.value} selected sections: {selected_sections}")
 
@@ -110,7 +112,7 @@ class PersonalityAgent:
             result = await self._run_with_history(prompt)
 
             # Parse the response to extract insights
-            insights = self._parse_insights_response(result.output, document)
+            insights = self._parse_insights_response(result.output, document, selected_sections)
 
             # Assign short IDs if not present
             for i, insight in enumerate(insights):
@@ -760,7 +762,7 @@ Recommendations: [请用中文给出下一步建议]
         answered = sum(1 for q in my_questions if q.question_id in response_ids)
         return {"total": len(my_questions), "answered": answered}
 
-    def _parse_insights_response(self, response: str, document: Document) -> list[AgentInsight]:
+    def _parse_insights_response(self, response: str, document: Document, selected_sections: list[str] | None = None) -> list[AgentInsight]:
         """Parse the agent's response to extract AgentInsight objects."""
         insights = []
 
@@ -776,7 +778,7 @@ Recommendations: [请用中文给出下一步建议]
 
                 if line.lower().startswith("insight:") or line.lower().startswith("finding:"):
                     if current_insight and "content" in current_insight:
-                        insights.append(self._create_insight_from_dict(current_insight, document))
+                        insights.append(self._create_insight_from_dict(current_insight, document, selected_sections))
                         insight_count += 1
                         if insight_count >= 3:
                             break
@@ -831,7 +833,7 @@ Recommendations: [请用中文给出下一步建议]
                         current_insight["evidence"] = f"{current_insight['evidence']} {line}"
 
             if current_insight and "content" in current_insight:
-                insights.append(self._create_insight_from_dict(current_insight, document))
+                insights.append(self._create_insight_from_dict(current_insight, document, selected_sections))
 
             if insights:
                 self.logger.debug(f"Parsed {len(insights)} insights from response")
@@ -852,7 +854,7 @@ Recommendations: [请用中文给出下一步建议]
                         importance_score=0.5,
                         confidence=0.5,
                         supporting_evidence=["（未解析出结构化字段，未能提取明确证据）"],
-                        related_sections=document.get_section_names()[:3],
+                        related_sections=selected_sections or document.get_section_names()[:3],
                     )
                 )
 
@@ -865,13 +867,18 @@ Recommendations: [请用中文给出下一步建议]
                     importance_score=0.5,
                     confidence=0.5,
                     supporting_evidence=["（解析响应失败，未能提取证据）"],
-                    related_sections=[],
+                    related_sections=selected_sections or [],
                 )
             )
 
         return insights
 
-    def _create_insight_from_dict(self, insight_dict: dict[str, Any], document: Document) -> AgentInsight:
+    def _create_insight_from_dict(
+        self,
+        insight_dict: dict[str, Any],
+        document: Document,
+        selected_sections: list[str] | None = None,
+    ) -> AgentInsight:
         """Create an AgentInsight from a dictionary."""
         return AgentInsight(
             agent_id=self.personality,
@@ -879,7 +886,7 @@ Recommendations: [请用中文给出下一步建议]
             importance_score=insight_dict.get("importance_score", 0.5),
             confidence=insight_dict.get("confidence", 0.5),
             supporting_evidence=([insight_dict.get("evidence", "")] if insight_dict.get("evidence") else []),
-            related_sections=document.get_section_names()[:3],
+            related_sections=selected_sections or document.get_section_names()[:3],
             questions_raised=([insight_dict.get("questions", "")] if insight_dict.get("questions") else []),
         )
 

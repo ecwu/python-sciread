@@ -21,9 +21,6 @@ import sys
 
 import logfire
 from rich.console import Console
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.table import Table
 
 from ..agent.coordinate import ComprehensiveAnalysisResult
 from ..application import run_coordinate_analysis
@@ -31,6 +28,12 @@ from ..application import run_discussion_analysis
 from ..application import run_react_analysis
 from ..application import run_simple_analysis
 from ..platform.logging import logger
+from ..platform.rich_output import TableColumnSpec
+from ..platform.rich_output import build_data_table
+from ..platform.rich_output import build_key_value_table
+from ..platform.rich_output import build_markdown_panel
+from ..platform.rich_output import build_mode_banner
+from ..platform.rich_output import build_sections_table
 
 logfire.configure()
 logfire.instrument_pydantic_ai()
@@ -54,34 +57,28 @@ def _render_discussion_overview(overview: dict[str, object]) -> None:
         section_names = []
 
     console.print()
-    console.print(Panel.fit("Document Analysis - Discussion Mode", border_style="cyan"))
-
-    overview_table = Table(title="Document Overview", show_header=False)
-    overview_table.add_column("Field", style="cyan", no_wrap=True)
-    overview_table.add_column("Value", style="white")
-    overview_table.add_row("Document", str(overview["document_title"]))
-    overview_table.add_row("Total Content", f"{overview['total_content_chars']} characters")
-    overview_table.add_row("Chunks", str(overview["chunk_count"]))
+    console.print(build_mode_banner("Discussion Analysis", subtitle="Multi-agent discussion with normalized progress output"))
+    overview_rows = [
+        ("Document", str(overview["document_title"])),
+        ("Total Content", f"{overview['total_content_chars']} characters"),
+        ("Chunks", str(overview["chunk_count"])),
+    ]
 
     if section_names:
-        overview_table.add_row("Sections", f"{len(section_names)} main sections identified")
+        overview_rows.append(("Sections", f"{len(section_names)} main sections identified"))
     else:
-        overview_table.add_row("Sections", "No named sections found (continuous text analysis)")
+        overview_rows.append(("Sections", "No named sections found (continuous text analysis)"))
 
-    console.print(overview_table)
+    console.print(build_key_value_table("Document Overview", overview_rows))
 
     if section_names:
-        sections_table = Table(title="Available Sections for Analysis (Top 10)", show_lines=True)
-        sections_table.add_column("#", style="green", justify="right", no_wrap=True)
-        sections_table.add_column("Section", style="yellow")
-
-        for i, section_name in enumerate(section_names[:10], 1):
-            sections_table.add_row(str(i), str(section_name).title())
-
-        if len(section_names) > 10:
-            sections_table.caption = f"... and {len(section_names) - 10} more sections"
-
-        console.print(sections_table)
+        console.print(
+            build_sections_table(
+                "Available Sections for Analysis",
+                [str(section_name).title() for section_name in section_names[:10]],
+                caption=f"... and {len(section_names) - 10} more sections" if len(section_names) > 10 else None,
+            )
+        )
 
     console.print()
 
@@ -117,23 +114,29 @@ def _render_coordinate_plan(result: ComprehensiveAnalysisResult, target_console:
     plan = result.analysis_plan
 
     active_console.print()
-    active_console.print(Panel.fit("Coordinate Analysis Plan", border_style="cyan"))
+    active_console.print(build_mode_banner("Coordinate Analysis Plan", subtitle="Planned sub-agent coverage and final synthesis"))
 
     if plan.reasoning:
-        active_console.print(Panel(plan.reasoning, title="Planner Reasoning", border_style="blue"))
+        active_console.print(build_markdown_panel("Planner Reasoning", plan.reasoning, border_style="blue"))
 
-    plan_table = Table(title="Sub-Agent Section Plan", show_lines=True)
-    plan_table.add_column("Sub-Agent", style="cyan", no_wrap=True)
-    plan_table.add_column("Enabled", style="green", no_wrap=True)
-    plan_table.add_column("Sections to Read", style="yellow")
-
+    rows: list[tuple[str, ...]] = []
     for analysis_type, label, plan_field, sections_field in COORDINATE_PLAN_SPECS:
         enabled = getattr(plan, plan_field)
         enabled_text = "Yes" if enabled else "No"
         sections = _resolve_plan_sections(result, analysis_type, plan_field, sections_field)
-        plan_table.add_row(label, enabled_text, sections)
+        rows.append((label, enabled_text, sections))
 
-    active_console.print(plan_table)
+    active_console.print(
+        build_data_table(
+            title="Sub-Agent Section Plan",
+            columns=[
+                TableColumnSpec("Sub-Agent", style="cyan", no_wrap=True),
+                TableColumnSpec("Enabled", style="green", no_wrap=True),
+                TableColumnSpec("Sections to Read", style="yellow"),
+            ],
+            rows=rows,
+        )
+    )
     active_console.print()
 
 
@@ -271,7 +274,7 @@ MODELS:
         try:
             result = asyncio.run(run_coordinate_analysis(args.pdf_file, args.model))
             _render_coordinate_plan(result)
-            console.print(Markdown(result.final_report))
+            console.print(build_markdown_panel("Final Report", result.final_report, border_style="green"))
             return 0
         except Exception as e:
             logger.error(f"Coordinate analysis failed: {e}")
@@ -392,7 +395,7 @@ MODELS:
                         ]
                     )
 
-            console.print(Markdown("\n".join(markdown_lines)))
+            console.print(build_markdown_panel("Final Report", "\n".join(markdown_lines), border_style="green"))
             return 0
         except Exception as e:
             logger.error(f"Discussion analysis failed: {e}")

@@ -8,12 +8,15 @@ from typing import Any
 
 from pydantic_ai import Agent
 from rich.console import Console
-from rich.markdown import Markdown
-from rich.table import Table
 
 from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...platform.rich_output import TableColumnSpec
+from ...platform.rich_output import build_data_table
+from ...platform.rich_output import build_key_value_table
+from ...platform.rich_output import build_sections_table
+from ...platform.rich_output import build_stage_banner
 from .models import AgentPersonality
 from .models import DiscussionPhase
 from .models import DiscussionResult
@@ -27,6 +30,16 @@ from .task_queue import TaskQueueManager
 
 logger = get_logger(__name__)
 console = Console()
+
+
+PHASE_DISPLAY_NAMES = {
+    DiscussionPhase.INITIAL_ANALYSIS: "Initial Analysis",
+    DiscussionPhase.QUESTIONING: "Questioning",
+    DiscussionPhase.RESPONDING: "Responding",
+    DiscussionPhase.CONVERGENCE: "Convergence",
+    DiscussionPhase.CONSENSUS: "Consensus",
+    DiscussionPhase.COMPLETED: "Completed",
+}
 
 
 class DiscussionAgent:
@@ -165,6 +178,10 @@ class DiscussionAgent:
 
     async def _run_initial_analysis_phase(self, document: Document):
         """Run initial analysis phase where all agents generate insights."""
+        self._render_phase_banner(
+            DiscussionPhase.INITIAL_ANALYSIS,
+            [f"Personalities: {len(AgentPersonality)}"],
+        )
 
         # Create insight generation tasks for all agents
         tasks = []
@@ -200,6 +217,10 @@ class DiscussionAgent:
 
     async def _run_questioning_phase(self):
         """Run questioning phase (batch mode)."""
+        self._render_phase_banner(
+            DiscussionPhase.QUESTIONING,
+            [f"Candidate insights: {sum(len(insights) for insights in self.agent_insights.values())}"],
+        )
 
         question_tasks = []
 
@@ -241,6 +262,7 @@ class DiscussionAgent:
 
         # Collect questions and assign short IDs
         await self._collect_questions_from_tasks(question_tasks)
+        self._render_question_summary(self.all_questions)
 
         # Update phase
         if self.all_questions:
@@ -250,6 +272,13 @@ class DiscussionAgent:
 
     async def _run_responding_phase(self):
         """Run responding phase (batch mode)."""
+        pending_questions = [
+            question for question in self.all_questions if not any(resp.question_id == question.question_id for resp in self.all_responses)
+        ]
+        self._render_phase_banner(
+            DiscussionPhase.RESPONDING,
+            [f"Pending questions: {len(pending_questions)}"],
+        )
 
         response_tasks = []
 
@@ -298,6 +327,14 @@ class DiscussionAgent:
 
     async def _run_convergence_phase(self):
         """Run convergence evaluation phase."""
+        self._render_phase_banner(
+            DiscussionPhase.CONVERGENCE,
+            [
+                f"Insights: {len(self.discussion_state.insights) if self.discussion_state else 0}",
+                f"Questions: {len(self.all_questions)}",
+                f"Responses: {len(self.all_responses)}",
+            ],
+        )
 
         # Evaluate convergence from all agents
         convergence_tasks = []
@@ -328,6 +365,7 @@ class DiscussionAgent:
 
         # Evaluate overall convergence from this iteration's tasks only
         convergence_score = await self._calculate_overall_convergence(convergence_tasks)
+        self._render_convergence_summary(convergence_tasks, convergence_score)
 
         self.discussion_state.convergence_score = convergence_score
 
@@ -344,6 +382,10 @@ class DiscussionAgent:
 
     async def _run_consensus_phase(self, document: Document):
         """Run final consensus building phase."""
+        self._render_phase_banner(
+            DiscussionPhase.CONSENSUS,
+            [f"Final insights: {len(self.discussion_state.insights) if self.discussion_state else 0}"],
+        )
 
         # Import here to avoid circular imports
         from .consensus import ConsensusBuilder
@@ -413,7 +455,8 @@ class DiscussionAgent:
 
                     # Also add to discussion state
                     self.discussion_state.insights.extend(task.result.insights)
-                    self._log_insight_batch(personality_enum, task.result.insights)
+                    selected_sections = task.result.metadata.get("selected_sections", [])
+                    self._log_insight_batch(personality_enum, task.result.insights, selected_sections)
 
     async def _collect_responses_from_tasks(self, task_ids: list[str]):
         """Collect responses from specified tasks only."""
@@ -557,6 +600,86 @@ class DiscussionAgent:
         }
         return display_names.get(agent_value, agent_value.replace("_", " ").title())
 
+    def _render_phase_banner(self, phase: DiscussionPhase, summary_lines: list[str] | None = None) -> None:
+        """Render a normalized banner for a discussion phase."""
+        phase_name = PHASE_DISPLAY_NAMES.get(phase, str(phase))
+        iteration = self.discussion_state.iteration_count if self.discussion_state else 0
+        console.print()
+        console.print(
+            build_stage_banner(
+                title=f"{phase_name} Phase",
+                summary_lines=[f"Iteration: {iteration}"] + (summary_lines or []),
+                border_style="cyan",
+            )
+        )
+
+    def _render_question_summary(self, questions: list) -> None:
+        """Render a compact cross-agent question summary."""
+        if not questions:
+            console.print(build_stage_banner("Questioning Summary", ["No follow-up questions generated."], border_style="yellow"))
+            return
+
+        rows: list[tuple[str, ...]] = []
+        for question in questions:
+            rows.append(
+                (
+                    question.question_id,
+                    self._format_agent_name(question.from_agent),
+                    self._format_agent_name(question.to_agent),
+                    question.question_type,
+                    f"{question.priority:.2f}",
+                )
+            )
+
+        console.print(
+            build_data_table(
+                title="Questions Raised",
+                columns=[
+                    TableColumnSpec("ID", style="cyan", no_wrap=True),
+                    TableColumnSpec("From", style="magenta", no_wrap=True),
+                    TableColumnSpec("To", style="yellow", no_wrap=True),
+                    TableColumnSpec("Type", style="white", no_wrap=True),
+                    TableColumnSpec("Priority", style="green", justify="right", no_wrap=True),
+                ],
+                rows=rows,
+            )
+        )
+
+    def _render_convergence_summary(self, task_ids: list[str], overall_score: float) -> None:
+        """Render convergence scores across personalities."""
+        rows: list[tuple[str, ...]] = []
+        if self.discussion_queue:
+            for task_id in task_ids:
+                task = self.discussion_queue.get_task(task_id)
+                if not task or not task.result:
+                    continue
+
+                personality = task.result.metadata.get("personality")
+                score = float(task.result.metadata.get("convergence_score", 0.0))
+                rows.append((self._format_agent_name(personality), f"{score:.2f}"))
+
+        console.print(
+            build_key_value_table(
+                "Convergence Summary",
+                [
+                    ("Overall Score", f"{overall_score:.2f}"),
+                    ("Threshold", f"{self.convergence_threshold:.2f}"),
+                ],
+            )
+        )
+
+        if rows:
+            console.print(
+                build_data_table(
+                    title="Per-Agent Convergence",
+                    columns=[
+                        TableColumnSpec("Agent", style="cyan", no_wrap=True),
+                        TableColumnSpec("Score", style="green", justify="right", no_wrap=True),
+                    ],
+                    rows=rows,
+                )
+            )
+
     def _truncate_for_log(self, text: str | None, limit: int = 160) -> str:
         """Normalize and trim log text to a readable summary."""
         if not text:
@@ -575,26 +698,43 @@ class DiscussionAgent:
         content = self._truncate_for_log(getattr(insight, "content", ""))
         return f"  - {insight_id} [importance={importance:.2f}, confidence={confidence:.2f}] {content}"
 
-    def _log_insight_batch(self, personality: AgentPersonality, insights: list) -> None:
-        """Render a batch of generated insights as markdown heading + rich table."""
+    def _log_insight_batch(self, personality: AgentPersonality, insights: list, selected_sections: list[str] | None = None) -> None:
+        """Render one agent's selected sections and resulting insight summary."""
         if not insights:
             return
 
-        table = Table(title="", show_lines=True)
-        table.add_column("Insight ID", style="cyan", no_wrap=True)
-        table.add_column("Importance", style="magenta", justify="right", no_wrap=True)
-        table.add_column("Confidence", style="green", justify="right", no_wrap=True)
-        table.add_column("Content", style="white")
+        agent_name = self._format_agent_name(personality)
+        console.print(
+            build_stage_banner(
+                title=f"{agent_name} Output",
+                summary_lines=[f"Insights generated: {len(insights)}"],
+                border_style="magenta",
+            )
+        )
 
+        if selected_sections:
+            console.print(build_sections_table("Sections Read", selected_sections))
+
+        rows: list[tuple[str, ...]] = []
         for insight in insights:
             insight_id = str(getattr(insight, "insight_id", "INS-??"))
             importance = float(getattr(insight, "importance_score", 0.0))
             confidence = float(getattr(insight, "confidence", 0.0))
             content = self._truncate_for_log(getattr(insight, "content", ""), limit=280)
-            table.add_row(insight_id, f"{importance:.2f}", f"{confidence:.2f}", content)
+            rows.append((insight_id, f"{importance:.2f}", f"{confidence:.2f}", content))
 
-        console.print(Markdown(f"### {self._format_agent_name(personality)} Insights"))
-        console.print(table)
+        console.print(
+            build_data_table(
+                title="Generated Insights",
+                columns=[
+                    TableColumnSpec("Insight ID", style="cyan", no_wrap=True),
+                    TableColumnSpec("Importance", style="magenta", justify="right", no_wrap=True),
+                    TableColumnSpec("Confidence", style="green", justify="right", no_wrap=True),
+                    TableColumnSpec("Summary", style="white"),
+                ],
+                rows=rows,
+            )
+        )
 
     def _format_question_log_entry(self, question) -> str:
         """Format a single question log line."""
@@ -621,18 +761,14 @@ class DiscussionAgent:
         return f"{base} | A: {answer_text}"
 
     def _log_response_batch(self, personality: AgentPersonality, responses: list) -> None:
-        """Render answered Q&A pairs as markdown heading + rich table."""
+        """Render answered Q&A pairs in the normalized table style."""
         if not responses:
             return
 
         question_map = {question.question_id: question for question in self.all_questions}
 
-        table = Table(title="", show_lines=True)
-        table.add_column("Meta", style="cyan", max_width=44, overflow="fold")
-        table.add_column("Question", style="yellow", ratio=2, overflow="fold")
-        table.add_column("Answer", style="white", ratio=3, overflow="fold")
-
         rendered_rows = 0
+        rows: list[tuple[str, ...]] = []
         for response in responses:
             question = question_map.get(response.question_id)
             if not question:
@@ -644,19 +780,31 @@ class DiscussionAgent:
             answer_text = (response.content or "").strip()
             meta_text = f"{response.question_id}\n{from_name} -> {to_name}\n{response.stance}, c={response.confidence:.2f}"
 
-            table.add_row(
-                meta_text,
-                question_text,
-                answer_text,
-            )
+            rows.append((meta_text, question_text, answer_text))
             rendered_rows += 1
 
         if rendered_rows == 0:
             return
 
         agent_name = self._format_agent_name(personality)
-        console.print(Markdown(f"### {agent_name} Q&A"))
-        console.print(table)
+        console.print(
+            build_stage_banner(
+                title=f"{agent_name} Responses",
+                summary_lines=[f"Responses generated: {rendered_rows}"],
+                border_style="magenta",
+            )
+        )
+        console.print(
+            build_data_table(
+                title="Questions & Answers",
+                columns=[
+                    TableColumnSpec("Meta", style="cyan", max_width=44),
+                    TableColumnSpec("Question", style="yellow", ratio=2),
+                    TableColumnSpec("Answer", style="white", ratio=3),
+                ],
+                rows=rows,
+            )
+        )
 
     async def _collect_questions_from_tasks(self, task_ids: list[str]):
         """Collect questions and assign short IDs."""
