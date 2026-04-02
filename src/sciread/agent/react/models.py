@@ -46,10 +46,7 @@ class ReActIterationDeps:
 class ReActIterationState:
     """Mutable per-iteration state used by tools."""
 
-    read_section_called: bool = False
-    add_memory_called: bool = False
     sections_read: list[str] = field(default_factory=list)
-    section_content: str = ""
     memory_text: str = ""
 
 

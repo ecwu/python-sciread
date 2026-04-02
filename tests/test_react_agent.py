@@ -1,5 +1,7 @@
 """Tests for the ReAct agent helpers and state management."""
 
+from sciread.agent.react import analyze_file_with_react
+from sciread.agent.react import analyze_file_with_react_sync
 from sciread.agent.react.agent import normalize_section_names
 from sciread.agent.react.models import ReActAnalysisState
 from sciread.agent.react.models import ReActIterationDeps
@@ -49,7 +51,8 @@ def test_build_iteration_system_prompt_switches_to_final_iteration() -> None:
     )
 
     assert "=== 首轮迭代：先制定阅读策略 ===" in regular_prompt
-    assert "必须且仅能调用一次 read_section()" in regular_prompt
+    assert "可按需要调用 read_section()" in regular_prompt
+    assert "仅能调用一次" not in regular_prompt
     assert "=== 最终迭代（3/3）——仅做综合 ===" in final_prompt
     assert "不要调用 read_section()" in final_prompt
 
@@ -81,3 +84,18 @@ def test_react_analysis_state_accumulates_sections_memory_and_report() -> None:
     assert analysis_state.remaining_sections == []
     assert analysis_state.accumulated_memory == "- [CLAIM] Strong baseline.\n- [RESULT] +3.2 points."
     assert analysis_state.build_final_output().report == "Structured final report."
+
+
+def test_react_iteration_state_can_accumulate_multiple_memory_fragments() -> None:
+    """Iteration state should allow repeated memory writes without extra guards."""
+    iteration_state = ReActIterationState(memory_text="- [CLAIM] First finding.")
+
+    iteration_state.memory_text = f"{iteration_state.memory_text}\n\n- [RESULT] Second finding.".strip()
+
+    assert iteration_state.memory_text == "- [CLAIM] First finding.\n\n- [RESULT] Second finding."
+
+
+def test_react_public_api_uses_clarified_names() -> None:
+    """The public API should expose file-oriented entrypoints and analysis-oriented methods."""
+    assert analyze_file_with_react.__name__ == "analyze_file_with_react"
+    assert analyze_file_with_react_sync.__name__ == "analyze_file_with_react_sync"

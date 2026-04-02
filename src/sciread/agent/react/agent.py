@@ -56,11 +56,6 @@ def _clean_section_names(section_names: list[object]) -> list[str] | None:
     return cleaned_names or None
 
 
-def _get_unprocessed_sections(iteration_input: ReActIterationInput) -> list[str]:
-    """Return section names that have not yet been processed."""
-    return [section for section in iteration_input.available_sections if section not in iteration_input.processed_sections]
-
-
 def _resolve_sections(document: Document, requested_sections: list[str], available_sections: list[str]) -> list[str]:
     """Resolve requested section names against exact and fuzzy document matches."""
     resolved_sections: list[str] = []
@@ -152,18 +147,18 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
     return None
 
 
-async def analyze_document_with_react(
-    document_file: str,
+async def analyze_file_with_react(
+    file_path: str,
     task: str,
     model: str = "deepseek-chat",
     max_loops: int = 8,
     to_markdown: bool = True,
     show_progress: bool = True,
 ) -> ReActIterationOutput:
-    """Analyze a document using the ReAct agent with multi-iteration loops.
+    """Analyze a file using the ReAct agent with multi-iteration loops.
 
     Args:
-        document_file: Path to the document file (PDF or TXT)
+        file_path: Path to the document file (PDF or TXT)
         task: Analysis task or question about the document
         model: Model identifier for the LLM provider
         max_loops: Maximum number of analysis iterations
@@ -177,18 +172,16 @@ async def analyze_document_with_react(
         FileNotFoundError: If the document file is not found
         Exception: If the analysis fails
     """
-    logger.debug(f"Starting ReAct analysis for file: {document_file}")
+    logger.debug(f"Starting ReAct analysis for file: {file_path}")
     logger.debug(f"Task: {task[:100]}...")
     logger.debug(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
-    _validate_document_file(document_file)
+    _validate_document_file(file_path)
 
-    # Load and process the document
-    document = load_and_process_document(document_file, to_markdown=to_markdown)
+    document = load_and_process_document(file_path, to_markdown=to_markdown)
 
-    # Create and run the ReAct agent
     agent = ReActAgent(model=model)
-    result = await agent.analyze_document(document, task, max_loops=max_loops, show_progress=show_progress)
+    result = await agent.run_analysis(document, task, max_loops=max_loops, show_progress=show_progress)
 
     console.print(Markdown(result.report))
 
@@ -196,8 +189,8 @@ async def analyze_document_with_react(
     return result
 
 
-def analyze_document_with_react_sync(
-    document_file: str,
+def analyze_file_with_react_sync(
+    file_path: str,
     task: str,
     model: str = "deepseek-chat",
     max_loops: int = 8,
@@ -206,8 +199,8 @@ def analyze_document_with_react_sync(
 ) -> ReActIterationOutput:
     """Synchronous wrapper for top-level callers such as the CLI."""
     return asyncio.run(
-        analyze_document_with_react(
-            document_file=document_file,
+        analyze_file_with_react(
+            file_path=file_path,
             task=task,
             model=model,
             max_loops=max_loops,
@@ -233,43 +226,33 @@ async def react_iteration_system_prompt(
 
 @react_iteration_agent.tool
 async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[str] | str | None = None) -> str:
-    """Read one or more unprocessed sections. Call EXACTLY ONCE per iteration.
+    """Read one or more sections.
 
     Args:
         section_names: Section names to read (list or comma-separated string).
-                      If None, reads the first unprocessed section.
+                      If None, reads the first available section.
     """
     deps = ctx.deps
     iteration_state = _get_iteration_state(ctx)
     iteration_input = deps.iteration_input
-
-    # Enforce single-call rule
-    if iteration_state.read_section_called:
-        return "错误：本轮已调用过 read_section()，不能重复调用。"
-
-    iteration_state.read_section_called = True
-
     available_sections = iteration_input.available_sections
-    processed_sections = iteration_input.processed_sections
-    unprocessed_sections = _get_unprocessed_sections(iteration_input)
 
-    if not unprocessed_sections:
+    if not available_sections:
         return "提示：所有章节都已处理，没有可读取内容。"
 
     normalized_section_names = normalize_section_names(section_names)
-    requested_sections = normalized_section_names or [unprocessed_sections[0]]
+    requested_sections = normalized_section_names or [available_sections[0]]
     resolved_sections = _resolve_sections(deps.document, requested_sections, available_sections)
 
-    next_sections = [section for section in resolved_sections if section not in processed_sections]
+    next_sections = resolved_sections
     if not next_sections:
-        return f"提示：请求章节 {resolved_sections} 已处理。当前未处理章节：{unprocessed_sections}"
+        return f"提示：未能匹配到请求章节。可用章节：{available_sections}"
 
     section_content = get_section_content(deps.document, next_sections)
     if not section_content.strip():
         return f"警告：在章节 {next_sections} 中未找到内容，请尝试其他章节。"
 
-    iteration_state.sections_read = next_sections
-    iteration_state.section_content = section_content
+    iteration_state.sections_read.extend(next_sections)
 
     if deps.show_progress:
         print(f"\n[Iteration] Read sections: {', '.join(next_sections)}")
@@ -279,24 +262,18 @@ async def read_section(ctx: RunContext[ReActIterationDeps], section_names: list[
 
 @react_iteration_agent.tool
 async def add_memory(ctx: RunContext[ReActIterationDeps], memory: str) -> str:
-    """Record discovered memory from the current read. Call EXACTLY ONCE per iteration.
+    """Record discovered memory from the current read.
 
     Args:
         memory: Extracted findings and key information from newly read sections.
     """
     iteration_state = _get_iteration_state(ctx)
 
-    # Enforce single-call rule
-    if iteration_state.add_memory_called:
-        return "错误：本轮已调用过 add_memory()，不能重复调用。"
-
-    iteration_state.add_memory_called = True
-
     fragment = memory.strip()
     if not fragment:
         return "警告：记忆文本为空。"
 
-    iteration_state.memory_text = fragment
+    iteration_state.memory_text = f"{iteration_state.memory_text}\n\n{fragment}".strip() if iteration_state.memory_text else fragment
 
     return "记忆已记录"
 
@@ -386,7 +363,7 @@ class ReActAgent:
         self.logger.error(f"Iteration failed: {error}")
         self.logger.error(f"Traceback: {traceback.format_exc()}")
 
-    async def analyze_one_iteration(
+    async def run_iteration(
         self,
         document: Document,
         iteration_input: ReActIterationInput,
@@ -395,7 +372,7 @@ class ReActAgent:
         accumulated_memory: str = "",
         show_progress: bool = True,
     ) -> tuple[ReActIterationOutput, ReActIterationState]:
-        """Perform a single ReAct iteration: read once, add memory once, return thoughts.
+        """Run a single ReAct iteration and return its output plus tool state.
 
         Args:
             document: The document to analyze
@@ -437,14 +414,14 @@ class ReActAgent:
 
         return self._finalize_iteration_output(output, current_loop, max_loops, accumulated_memory), iteration_state
 
-    async def analyze_document(
+    async def run_analysis(
         self,
         document: Document,
         task: str,
         max_loops: int = 8,
         show_progress: bool = True,
     ) -> ReActIterationOutput:
-        """Main analysis method: iterate up to max_loops times, accumulating memory.
+        """Run the multi-iteration ReAct analysis over a prepared document.
 
         Args:
             document: Processed document with natural markdown sections
@@ -465,7 +442,7 @@ class ReActAgent:
         for loop_num in range(1, max_loops + 1):
             self.logger.debug(f"Starting iteration {loop_num}/{max_loops}")
 
-            iteration_output, iteration_state = await self.analyze_one_iteration(
+            iteration_output, iteration_state = await self.run_iteration(
                 document=document,
                 iteration_input=analysis_state.build_iteration_input(),
                 current_loop=loop_num,

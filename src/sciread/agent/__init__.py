@@ -35,7 +35,7 @@ Example Usage:
     comprehensive_result = await coordinate_agent.analyze(doc)
 
     # Generate iterative analysis with ReAct agent
-    react_result = await react_agent.analyze_document(doc, "What are the main contributions?")
+    react_result = await react_agent.run_analysis(doc, "What are the main contributions?")
 
     # Generate discussion-based analysis with personality agents
     discussion_result = await discussion_agent.analyze_document(doc)
@@ -71,8 +71,8 @@ from .discussion import TaskType
 from .discussion import create_personality_agent
 from .react import ReActAgent
 from .react import ReActIterationOutput
-from .react import analyze_document_with_react
-from .react import analyze_document_with_react_sync
+from .react import analyze_file_with_react
+from .react import analyze_file_with_react_sync
 from .react import load_and_process_document
 from .shared import remove_references
 from .simple import SimpleAgent
@@ -110,8 +110,8 @@ __all__ = [
     "TaskResult",
     "TaskStatus",
     "TaskType",
-    "analyze_document_with_react",
-    "analyze_document_with_react_sync",
+    "analyze_file_with_react",
+    "analyze_file_with_react_sync",
     "create_personality_agent",
     "load_and_process_document",
     "remove_references",

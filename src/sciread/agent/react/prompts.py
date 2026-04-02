@@ -66,7 +66,7 @@ def _build_regular_iteration_prompt(
             "    （摘要、引言、结论，以及任何“贡献”小节优先级最高。）\n"
             "  • 哪些章节包含你后续需要的实验证据？\n"
             "  • 哪些章节对当前任务价值较低（如附录、致谢）？\n"
-            "先读信息密度最高的章节。你可以在一次 read_section() 调用中批量读取多个相关章节。\n"
+            "先读信息密度最高的章节。你可以按需要多次调用 read_section() 读取相关章节。\n"
             "请在输出的 thoughts 字段中记录你的阅读计划。\n\n"
         )
 
@@ -78,13 +78,13 @@ def _build_regular_iteration_prompt(
         f"{unprocessed_sections}\n\n"
         f"{previous_context}\n\n"
         f"=== 本轮规则 ===\n"
-        f"1. 必须且仅能调用一次 read_section()。\n"
+        f"1. 可按需要调用 read_section()。\n"
         f"   • 章节选择要有策略，不要只按顺序读下一个。\n"
         f"   • 优先选择能直接回答：论文主张了什么？创新点是什么？\n"
-        f"   • 可在一次调用中批量读取多个主题相关章节。\n"
+        f"   • 可以一次读取多个主题相关章节，也可以重复读取你需要再次核对的章节。\n"
         f"   • 剩余轮次：{remaining_loops}。如果本轮后只剩 1 轮，\n"
         f"     请聚焦最高价值的未读章节，跳过低优先级内容。\n\n"
-        f"2. 必须且仅能调用一次 add_memory()。\n"
+        f"2. 可按需要调用 add_memory()。\n"
         f"   • 记录贡献（CONTRIBUTIONS）、主张（CLAIMS）和关键发现（KEY FINDINGS），不要写内容摘要。\n"
         f"   • 记忆内容请使用要点格式：\n"
         f"     - [CLAIM] <论文提出的主张>\n"
@@ -103,9 +103,9 @@ def _build_regular_iteration_prompt(
         f"       若 report 为空，不要设置 should_continue=False。\n\n"
         f"   • report：保持为空（仅最终迭代才进行综合）。\n\n"
         f"=== 允许的工具 ===\n"
-        f"  ✓ read_section(section_names)  —— 仅调用一次\n"
-        f"  ✓ add_memory(memory)           —— 仅调用一次\n"
-        f"  ✓ get_all_memory()             —— 常规迭代请不要使用，仅生成报告的迭代才应使用\n"
+        f"  ✓ read_section(section_names)  —— 按需要调用\n"
+        f"  ✓ add_memory(memory)           —— 按需要调用\n"
+        f"  ✓ get_all_memory()             —— 仅在生成最终报告时使用\n"
     )
 
 

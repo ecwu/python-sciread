@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from ...agent.react import analyze_document_with_react
+from ...agent.react import analyze_file_with_react
 from ...platform.logging import get_logger
 
 logger = get_logger(__name__)
@@ -21,7 +21,7 @@ async def run_react_analysis(
     logger.debug(f"Configuration: model={model}, max_loops={max_loops}, show_progress={show_progress}")
 
     try:
-        return await analyze_document_with_react(
+        return await analyze_file_with_react(
             document_file,
             task,
             model=model,
