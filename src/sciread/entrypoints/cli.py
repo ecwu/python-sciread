@@ -25,6 +25,7 @@ from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.table import Table
 
+from ..agent.coordinate import ComprehensiveAnalysisResult
 from ..application import run_coordinate_analysis
 from ..application import run_discussion_analysis
 from ..application import run_react_analysis
@@ -34,6 +35,16 @@ from ..platform.logging import logger
 logfire.configure()
 logfire.instrument_pydantic_ai()
 console = Console()
+
+
+COORDINATE_PLAN_SPECS = (
+    ("metadata", "Metadata", "analyze_metadata", None),
+    ("previous_methods", "Previous Methods", "analyze_previous_methods", "previous_methods_sections"),
+    ("research_questions", "Research Questions", "analyze_research_questions", "research_questions_sections"),
+    ("methodology", "Methodology", "analyze_methodology", "methodology_sections"),
+    ("experiments", "Experiments", "analyze_experiments", "experiments_sections"),
+    ("future_directions", "Future Directions", "analyze_future_directions", "future_directions_sections"),
+)
 
 
 def _render_discussion_overview(overview: dict[str, object]) -> None:
@@ -73,6 +84,57 @@ def _render_discussion_overview(overview: dict[str, object]) -> None:
         console.print(sections_table)
 
     console.print()
+
+
+def _resolve_plan_sections(
+    result: ComprehensiveAnalysisResult,
+    analysis_type: str,
+    plan_field: str,
+    sections_field: str | None,
+) -> str:
+    """Return a display string for the sections assigned to one sub-agent."""
+    plan = result.analysis_plan
+    if not getattr(plan, plan_field):
+        return "-"
+
+    executed_sections = result.sections_analyzed.get(analysis_type)
+    if executed_sections:
+        return "\n".join(executed_sections)
+
+    if sections_field is None:
+        return "First 3 chunks"
+
+    planned_sections = getattr(plan, sections_field)
+    if planned_sections:
+        return "\n".join(planned_sections)
+
+    return "All sections"
+
+
+def _render_coordinate_plan(result: ComprehensiveAnalysisResult, target_console: Console | None = None) -> None:
+    """Render the coordinate analysis plan and section allocation."""
+    active_console = target_console or console
+    plan = result.analysis_plan
+
+    active_console.print()
+    active_console.print(Panel.fit("Coordinate Analysis Plan", border_style="cyan"))
+
+    if plan.reasoning:
+        active_console.print(Panel(plan.reasoning, title="Planner Reasoning", border_style="blue"))
+
+    plan_table = Table(title="Sub-Agent Section Plan", show_lines=True)
+    plan_table.add_column("Sub-Agent", style="cyan", no_wrap=True)
+    plan_table.add_column("Enabled", style="green", no_wrap=True)
+    plan_table.add_column("Sections to Read", style="yellow")
+
+    for analysis_type, label, plan_field, sections_field in COORDINATE_PLAN_SPECS:
+        enabled = getattr(plan, plan_field)
+        enabled_text = "Yes" if enabled else "No"
+        sections = _resolve_plan_sections(result, analysis_type, plan_field, sections_field)
+        plan_table.add_row(label, enabled_text, sections)
+
+    active_console.print(plan_table)
+    active_console.print()
 
 
 def run(argv=sys.argv):
@@ -208,6 +270,7 @@ MODELS:
 
         try:
             result = asyncio.run(run_coordinate_analysis(args.pdf_file, args.model))
+            _render_coordinate_plan(result)
             console.print(Markdown(result.final_report))
             return 0
         except Exception as e:
