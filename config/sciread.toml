@@ -7,6 +7,7 @@ default_model = "deepseek-chat"
 base_url = "https://api.deepseek.com"
 
 [llm_providers.volcengine]
+# Volcengine currently also falls back to VOLCES_API from the environment.
 api_key = "${VOLCES_API}"
 default_model = "doubao-seed-2.0-code"
 base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
@@ -20,35 +21,19 @@ default_model = "qwen3:4b"
 provider = "deepseek"
 model = "deepseek-chat"
 
-# Document splitting configuration
+# Document splitter configuration exposed by the current config model.
+# Note: the document builder still auto-selects MarkdownSplitter for markdown
+# input and SemanticSplitter for non-markdown input unless a splitter is
+# provided explicitly in code.
 [document_splitters]
-# Default splitter to use: "regex_section", "topic_flow"
-default_splitter = "topic_flow"
+# Supported value in the current implementation: "regex_section"
+default_splitter = "regex_section"
 
 [document_splitters.regex_section]
 min_chunk_size = 200
 confidence_threshold = 0.3
-merge_small_chunks = true
 # Custom patterns (optional)
 # custom_patterns = { "my_pattern" = "my regex pattern" }
-
-[document_splitters.topic_flow]
-model = "embeddinggemma:latest"
-base_url = "http://localhost:11434"
-# Continuity thresholds
-local_continuity_threshold = 0.6
-context_continuity_threshold = 0.65
-# Size constraints
-min_segment_sentences = 4
-min_segment_chars = 300
-max_segment_chars = 2000
-# Processing parameters
-embedding_batch_size = 10
-timeout = 30
-cache_embeddings = true
-# Adaptive thresholds
-adaptive_floor = 0.4
-soft_target = 0.7
 
 # Mineru API Configuration (for PDF to Markdown conversion)
 [mineru]
@@ -59,6 +44,8 @@ enable_table = true       # Enable table extraction
 language = "ch"           # Document language: "ch" for Chinese, "en" for English
 timeout = 600             # Processing timeout in seconds
 poll_interval = 10        # Status poll interval in seconds
+enable_cache = true       # Cache Mineru responses when possible
+# cache_dir = "~/.sciread/mineru_cache"
 
 # Vector store configuration for RAG functionality
 [vector_store]

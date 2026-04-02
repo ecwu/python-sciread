@@ -3,299 +3,285 @@
 ## Build, Lint, and Test Commands
 
 ```bash
-# Install: uv sync
-# Install with test deps: uv sync --group test
-# Install with all dev deps: uv sync --group test --group dev
+# Install runtime dependencies
+uv sync
 
-# Lint (fails on errors): uv run ruff check src/ tests/
-# Format: uv run ruff format src/ tests/
+# Install test dependencies
+uv sync --group test
 
-# Run all tests: uv run pytest tests/
+# Install full local dev environment
+uv sync --group test --group dev
 
-# Run single test file: uv run pytest tests/test_core.py
-# Run specific test: uv run pytest tests/test_core.py::test_compute
-# Run with coverage: uv run pytest --cov src/ tests/test_core.py
+# Lint
+uv run ruff check src/ tests/
 
-# Run tests by module: uv run pytest tests/test_document/
-# Run tests with verbose: uv run pytest -v tests/test_document/test_document.py
+# Format
+uv run ruff format src/ tests/
+
+# Run all tests
+uv run pytest tests/
+
+# Run a single test file
+uv run pytest tests/test_cli.py
+uv run pytest tests/test_document/test_document.py
+
+# Run a specific test
+uv run pytest tests/test_cli.py::test_render_coordinate_plan_shows_subagents_and_sections
+
+# Run a test module/directory
+uv run pytest tests/test_document/
+uv run pytest tests/test_llm_provider/
+
+# Run with coverage
+uv run pytest --cov src/ tests/
 ```
+
+## Repository Layout
+
+The current package structure is organized by subsystem:
+
+- `src/sciread/agent/`: agent implementations for `simple`, `coordinate`, `react`, and `discussion`
+- `src/sciread/application/use_cases/`: top-level orchestration for CLI-facing workflows
+- `src/sciread/document/`: document API, builders, models, ingestion, structure, and retrieval
+- `src/sciread/embedding_provider/`: embedding clients and factory helpers
+- `src/sciread/llm_provider/`: LLM provider integrations and factories
+- `src/sciread/platform/`: shared config and logging
+- `src/sciread/entrypoints/cli.py`: CLI parser and rendering
+- `config/sciread.toml`: example project configuration
+- `tests/`: subsystem tests plus top-level CLI and integration-style tests
 
 ## Code Style Guidelines
 
 ### Imports
-**Order**: stdlib → third-party → local (relative imports)
+
+Order imports as stdlib -> third-party -> local.
+
+Use one import per line for imported names because Ruff is configured with `force_single_line = true`.
+
 ```python
 from pathlib import Path
-from typing import Optional, Any
-from pydantic_ai import Agent
-from .error_handling import handle_model_retry
-from ..document import Document
-```
-**Never**: `from module import *`
-**Group imports** logically with blank lines between groups
+from typing import Any
 
-### Formatting & Style
-- **Line length**: 140 chars (pyproject.toml: `[tool.ruff] line-length = 140`)
-- **Quotes**: Double quotes for strings
-- **Indentation**: 4 spaces
-- **Trailing whitespace**: Never
-- **Run**: `uv run ruff format src/ tests/` before committing
+from pydantic import BaseModel
+from pydantic import Field
+
+from ..platform.logging import get_logger
+from .models import Chunk
+```
+
+Never use `from module import *`.
+
+### Formatting and Style
+
+- Line length: 140
+- Quotes: double quotes
+- Indentation: 4 spaces
+- Keep trailing whitespace out of the repo
+- Run `uv run ruff format src/ tests/` after substantial edits
 
 ### Type Hints
-Use modern syntax consistently:
+
+Prefer modern Python 3.12+ syntax:
+
 ```python
-# Primitives and simple types
-def func(name: str, count: int) -> str: ...
+def analyze(document_path: str, max_loops: int = 8) -> str: ...
 
-# Nullable
-def maybe(data: Optional[dict]) -> None: ...
+def load_config(path: Path | None = None) -> ScireadConfig: ...
 
-# Collections (modern syntax)
-items: list[Chunk]
-mapping: dict[str, Config]
-pairs: tuple[str, int]
+chunks: list[Chunk]
+providers: dict[str, LLMProviderConfig]
+page_range: tuple[int, int] | None
 
-# Type aliasing
-ModelId = str
-Embedding = list[float]
-
-# Functions with flexible args
 def process(**kwargs: Any) -> None: ...
 ```
 
+Use `| None` instead of `Optional[...]` unless matching existing local style in untouched code.
+
 ### Naming Conventions
+
 ```python
-# Classes: PascalCase, descriptive
 class SimpleAgent: ...
-class DocumentFactory: ...
+class DocumentBuilder: ...
 class AnalysisTimeoutError: ...
 
-# Functions/methods: snake_case, verb-focused
-def analyze_document(): ...
-def get_config(): ...
-async def process_chunks(): ...
+def run_simple_analysis(): ...
+def ensure_file_exists(): ...
+async def analyze_document(): ...
 
-# Private members: _prefix
-def _calculate_hash(): ...
-self._internal_state = ...
-
-# Constants: UPPER_SNAKE_CASE
-MAX_RETRIES = 3
 DEFAULT_TIMEOUT = 300.0
-SUPPORTED_MODELS = {...}
-
-# Modules/files: snake_case
-# simple_agent.py, document_builder.py, error_handling.py
+TEXT_FILE_EXTENSIONS = {".txt", ".md"}
 ```
 
-**Class suffix patterns**:
+Patterns already used in this repo:
+
 - Agents: `*Agent`
-- Models/Results: `*Model`, `*Result`
-- Configs: `*Config`
-- Factories: `*Factory`
+- Result models: `*Result`
+- Config models: `*Config`
+- Factories/builders: `*Factory`, `*Builder`
 - Exceptions: `*Error`
 
-### Error Handling
-```python
-# Custom exceptions (inherit from base)
-class AgentError(Exception):
-    def __init__(self, message: str, cause: Optional[Exception] = None):
-        super().__init__(message)
-        self.cause = cause
+## Logging
 
-# Pattern: validate, log, raise
-try:
-    result = await operation()
-    return result
-except SpecificError as e:
-    logger.error(f"Operation failed: {e}")
-    raise OperationError(f"Could not complete: {e}") from e
-```
-**Rules**:
-- Use `raise ... from e` to chain exceptions
-- Log before re-raising
-- Provide user-friendly messages with suggestions
-- Define domain-specific exceptions in `agent/error_handling.py`
+Use the shared logging helpers in `src/sciread/platform/logging.py`.
 
-### Logging (loguru)
 ```python
-from ..logging_config import get_logger
+from ...platform.logging import get_logger
 
 logger = get_logger(__name__)
 
 class MyClass:
     def __init__(self):
         self.logger = get_logger(__name__)
-
-# Usage
-self.logger.debug("Detailed info for debugging")
-self.logger.info("Milestone completed")
-self.logger.warning("Recoverable issue detected")
-self.logger.error(f"Failure: {exception}")
 ```
-**Debug mode**: `LOG_LEVEL=DEBUG uv run sciread coordinate paper.pdf`
 
-### Async/Await Patterns
+Prefer `self.logger` on stateful classes and module-level `logger` in utility modules.
+
+Debug runs typically use:
+
+```bash
+LOG_LEVEL=DEBUG uv run sciread coordinate paper.pdf
+```
+
+## Error Handling
+
+Shared agent error utilities live in `src/sciread/agent/shared/error_handling.py`.
+
+Use the existing helpers where applicable:
+
 ```python
-# Agent methods calling LLMs must be async
-async def analyze(self, document: Document) -> str:
-    try:
-        result = await safe_agent_execution(
-            self.agent.run("Task", deps=deps),
-            timeout=self.timeout,
-            operation_name="analysis",
-        )
-        return result
-    except Exception as e:
-        self.logger.error(f"Analysis failed: {e}")
-        raise
+from ..shared.error_handling import AnalysisTimeoutError
+from ..shared.error_handling import safe_agent_execution
 
-# CLI wiring: wrap async with asyncio.run()
-result = asyncio.run(async_function(arg1, arg2))
+result = await safe_agent_execution(
+    self.agent.run(prompt, deps=deps),
+    timeout=self.timeout,
+    operation_name="discussion analysis",
+    error_type=AnalysisTimeoutError,
+)
 ```
-**Rules**:
-- Use `async def` for all LLM-calling methods
-- Use `await safe_agent_execution()` for timeouts
-- Use `asyncio.run()` in CLI to bridge sync→async
-- Track state across async iterations with dataclasses
 
-### Pydantic Models
+Rules:
+
+- Raise domain-specific exceptions when the failure is part of the package contract
+- Chain exceptions with `raise ... from e`
+- Log failures before re-raising when they add useful runtime context
+- Reuse `handle_model_retry()` for pydantic-ai retry translation
+
+## Async and Agent Patterns
+
+- Agent methods that call models should remain `async def`
+- CLI handlers should bridge to async code with `asyncio.run(...)`
+- Reuse application-layer use cases from `src/sciread/application/use_cases/` instead of embedding orchestration directly in the CLI
+- Keep prompt definitions alongside the agent implementation that uses them
+- Prefer shared document-loading helpers such as `load_document()` and `ensure_file_exists()` from `application/use_cases/common.py`
+
+## Config and Providers
+
+Configuration is centralized in `src/sciread/platform/config.py` and `config/sciread.toml`.
+
+Current repo conventions:
+
+- Environment prefix: `SCIREAD_`
+- Provider config models live in `ScireadConfig`
+- API keys may come from config-file placeholders or environment variables
+- Do not hardcode secrets in code or tests
+
+Current provider and document-related settings include:
+
+- `llm_providers`
+- `document_splitters`
+- `mineru`
+- `vector_store`
+
+If you add a new configurable behavior, update both the config model and the sample config file when appropriate.
+
+## Document Pipeline
+
+The canonical document entrypoint is `sciread.document.Document`.
+
+Preferred patterns:
+
 ```python
-# Configuration (use BaseModel)
-from pydantic import BaseModel, Field
-
-class LLMProviderConfig(BaseModel):
-    api_key: Optional[str] = Field(default=None, description="API key")
-    default_model: str = Field(description="Default model name")
-
-# Data containers (use @dataclass)
-from dataclasses import dataclass, field
-import uuid
-
-@dataclass
-class Chunk:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()), init=False)
-    content: str
-    confidence: float = 1.0
-
-    def __post_init__(self):
-        if self.confidence < 0.0 or self.confidence > 1.0:
-            raise ValueError("Confidence must be between 0.0 and 1.0")
+document = Document.from_file("paper.pdf", to_markdown=False, auto_split=True)
+document = Document.from_text(raw_text, auto_split=True)
 ```
-**Rules**:
-- `BaseModel` for config with validation
-- `@dataclass` for simple data containers
-- Use `Field()` for descriptions and defaults
-- Use `default_factory` for mutable defaults
-- Use `init=False` for computed fields
+
+Implementation notes:
+
+- `DocumentFactory` and `DocumentBuilder` own document construction
+- PDF and text loading live under `document/ingestion/loaders/`
+- Default splitting currently routes markdown documents through `MarkdownSplitter`
+- Non-markdown documents default to `SemanticSplitter`
+- Retrieval and vector indexing live under `document/retrieval/`
+
+Avoid bypassing the builder/factory stack unless there is a clear reason.
+
+## Data Models
+
+Use:
+
+- `pydantic.BaseModel` for configuration and validated structured inputs
+- `@dataclass` for lightweight document and state containers
+
+Examples already present in the repo:
+
+- `LLMProviderConfig`, `ScireadConfig`: `BaseModel` / `BaseSettings`
+- `Chunk`, `DocumentMetadata`, `ProcessingState`: dataclasses
+
+Use `field(default_factory=...)` for mutable defaults and generated identifiers.
 
 ## Testing Guidelines
 
-### Test File Structure
-Mirror `src/` directory structure:
-```
-tests/
-├── test_llm_provider/
-│   ├── conftest.py          # Shared fixtures
-│   └── test_factory.py       # Feature tests
-├── test_document/
-│   └── conftest.py
-└── test_core.py
-```
+The tests directory is a mix of mirrored subsystem tests and top-level behavior tests. Follow the existing structure instead of forcing everything into a single pattern.
 
-### Fixture Patterns
-```python
-# Simple fixtures
-@pytest.fixture
-def temp_dir() -> Generator[Path, None, None]:
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        yield Path(tmp_dir)
+Examples:
 
-# Content fixtures
-@pytest.fixture
-def sample_text() -> str:
-    return "Abstract\nTest content..."
+- `tests/test_document/`: document subsystem tests and fixtures
+- `tests/test_llm_provider/`: provider tests and fixtures
+- `tests/test_cli.py`: CLI behavior and rendering tests
+- `tests/test_coordinate_agent.py`, `tests/test_react_agent.py`: agent-focused integration-style tests
 
-# Composable fixtures
-@pytest.fixture
-def test_file(temp_dir: Path) -> Path:
-    file_path = temp_dir / "test.txt"
-    file_path.write_text(sample_text())
-    return file_path
-```
+Guidelines:
 
-### Mock Patterns
-```python
-from unittest.mock import patch, Mock
-
-# Patch external dependencies
-@patch("module.get_config")
-def test_function(mock_config):
-    mock_config.return_value = "test-value"
-    result = function_under_test()
-    assert result == "expected"
-
-# Mock HTTP calls
-@patch("requests.post")
-def test_api_call(mock_post):
-    mock_response = Mock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"data": [...]}
-    mock_post.return_value = mock_response
-    # Test...
-```
-
-### Test Naming
-- Files: `test_<module_name>.py`
-- Classes: `Test<ClassName>`
-- Functions: `test_<function>` or `test_<scenario>`
-- Errors: `test_<function>_error` or `test_<function>_failure`
-- Async: `@pytest.mark.asyncio` decorator (unused but available)
-
-### Running Tests
-```bash
-# Single test: uv run pytest tests/test_document/test_document.py::test_method
-# Module tests: uv run pytest tests/test_document/
-# With coverage: uv run pytest --cov src/ tests/
-# Verbose: uv run pytest -v tests/
-```
-
-## Architectural Principles
-
-1. **Async-first**: Agent methods calling LLMs are `async def`
-2. **Factory patterns**: Providers, loaders, splitters use factories
-3. **Config-driven**: All defaults via `config/sciread.toml` or env vars
-4. **Dependency injection**: Pass dependencies, don't instantiate internally
-5. **Logging everywhere**: Use `get_logger(__name__)` in every module
-6. **Type safety**: All public APIs have type hints
-7. **Error boundaries**: Custom exceptions for domain errors
+- Add tests for new behavior
+- Prefer the nearest existing test module for the subsystem you are changing
+- Use `unittest.mock.patch` or fixtures to isolate provider/network dependencies
+- Keep tests deterministic and avoid real external service calls unless the file is explicitly for integration coverage
 
 ## CLI Patterns
 
-Adding a new command (in `cli.py`):
-```python
-# 1. Define parser
-new_parser = subparsers.add_parser("command", help="...")
-new_parser.add_argument("document_file")
-new_parser.add_argument("--model", default="deepseek/deepseek-chat")
+The CLI entrypoint is `src/sciread/entrypoints/cli.py` and uses subcommands.
 
-# 2. Add handler (import core function first)
-elif args.command == "new_command":
-    try:
-        result = asyncio.run(core_function(args.document_file, args.model))
-        print(f"Result: {result}")
-        return 0
-    except Exception as e:
-        logger.error(f"Command failed: {e}")
-        return 1
-```
+Current commands:
+
+- `simple`
+- `coordinate`
+- `react`
+- `discussion`
+
+When adding a command:
+
+1. Add a subparser in `cli.py`
+2. Prefer `--model` style options over positional model arguments
+3. Wire the command to an application-layer use case in `src/sciread/application/use_cases/`
+4. Return integer exit codes from the CLI entrypoint
+5. Add or update CLI tests in `tests/test_cli.py`
+
+## Architectural Principles
+
+1. Async-first model interaction
+2. Application-layer orchestration for CLI workflows
+3. Factory/builder-based document creation
+4. Config-driven provider and splitter behavior
+5. Shared logging and error-handling utilities
+6. Typed public APIs and structured result objects
+7. Clear separation between ingestion, structure, retrieval, and agent logic
 
 ## Guardrails
 
-- **Never**: Edit `tests/` unless adding tests
-- **Never**: Commit without user request
-- **Never**: Suppress type errors with `as any`, `@ts-ignore`
-- **Always**: Run `uv run ruff check` before committing
-- **Always**: Add tests for new features
-- **Always**: Follow existing async/await patterns
-- **Always**: Use `get_logger(__name__)` for logging
+- Never commit unless the user explicitly asks
+- Never remove or revert unrelated user changes
+- Never hardcode credentials or tokens
+- Always run `uv run ruff check src/ tests/` after code changes when feasible
+- Always add or update tests for new behavior
+- Always keep `AGENTS.md`, `README.rst`, and config examples aligned when changing developer-facing workflows

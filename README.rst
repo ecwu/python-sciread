@@ -28,7 +28,7 @@ Or with ``pip``::
 
 Install the development version::
 
-    uv add git+https://gitea.ecwu.xyz/ecwu/python-sciread.git@main
+    uv add git+https://github.com/ecwu/python-sciread.git@main
 
 Quick Start
 ===========
@@ -49,6 +49,17 @@ You can also run the package directly::
 
     uv run python -m sciread --help
 
+Configuration
+=============
+
+Project and local settings are defined in ``config/sciread.toml``.
+
+Typical local setup:
+
+- copy the example config to ``~/.config/sciread/config.toml`` and adjust it for your environment
+- or set provider credentials with environment variables such as ``DEEPSEEK_API_KEY`` and ``MINERU_TOKEN``
+- choose a model explicitly with ``--model`` when testing different providers
+
 Python API
 ==========
 
@@ -66,7 +77,7 @@ Example::
 
     document = Document.from_file("paper.pdf", to_markdown=False, auto_split=True)
     agent = SimpleAgent("deepseek/deepseek-chat")
-    report = await agent.analyze(document, "Explain the paper clearly for an engineer.")
+    report = await agent.run_analysis(document, "Explain the paper clearly for an engineer.")
 
 Project Layout
 ==============
@@ -96,13 +107,14 @@ Set up the local environment::
 
     uv sync --group test --group dev
 
-Install git hooks::
-
-    uv run pre-commit install --install-hooks
-
 Run tests::
 
     uv run pytest tests/
+
+Run a focused test file::
+
+    uv run pytest tests/test_cli.py
+    uv run pytest tests/test_document/test_document.py
 
 Run tests with coverage::
 
@@ -116,4 +128,7 @@ Run formatting::
 
     uv run ruff format src/ tests/
 
-``pre-commit`` runs ``uv run ruff format`` for Python files before commit.
+If you change documentation and want to build it locally::
+
+    uv pip install -r docs/requirements.txt
+    uv run sphinx-build -b html docs docs/_build/html
