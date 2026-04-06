@@ -30,6 +30,7 @@ from ..application import run_simple_analysis
 from ..platform.logging import logger
 from ..platform.rich_output import TableColumnSpec
 from ..platform.rich_output import build_data_table
+from ..platform.rich_output import build_discussion_report
 from ..platform.rich_output import build_key_value_table
 from ..platform.rich_output import build_markdown_panel
 from ..platform.rich_output import build_mode_banner
@@ -346,81 +347,7 @@ MODELS:
             overview, result = asyncio.run(run_discussion_analysis(args.document_file, args.model))
             _render_discussion_overview(overview)
 
-            markdown_lines = [
-                "# Discussion-Based Analysis Result",
-                "",
-                "## Overview",
-                f"- **Document:** {result.document_title}",
-                f"- **Overall Confidence:** {result.confidence_score:.2f}",
-                f"- **Total Insights:** {len(result.final_insights)}",
-                f"- **Consensus Points:** {len(result.consensus_points)}",
-                f"- **Divergent Views:** {len(result.divergent_views)}",
-            ]
-
-            if result.discussion_metadata:
-                markdown_lines.extend(["", "## Discussion Metadata"])
-                for key, value in result.discussion_metadata.items():
-                    if key != "error":
-                        markdown_lines.append(f"- **{key.replace('_', ' ').title()}:** {value}")
-
-            markdown_lines.extend(["", "## Analysis Summary", result.summary])
-
-            if result.key_contributions:
-                markdown_lines.extend(["", "## Key Contributions"])
-                for contribution in result.key_contributions:
-                    markdown_lines.append(f"- {contribution}")
-
-            if result.significance:
-                markdown_lines.extend(["", "## Significance Assessment", result.significance])
-
-            if result.final_insights:
-                markdown_lines.extend(["", "## Final Insights From Discussion"])
-                for i, insight in enumerate(result.final_insights, 1):
-                    markdown_lines.extend(
-                        [
-                            "",
-                            f"### {i}. From {insight.agent_id}",
-                            f"- **Confidence:** {insight.confidence:.2f}",
-                            f"- **Importance:** {insight.importance_score:.2f}",
-                            "",
-                            insight.content,
-                        ]
-                    )
-                    if insight.supporting_evidence:
-                        markdown_lines.append("\n**Supporting Evidence:**")
-                        for evidence in insight.supporting_evidence:
-                            markdown_lines.append(f"- {evidence}")
-                    if insight.related_sections:
-                        markdown_lines.append(f"\n**Related Sections:** {', '.join(insight.related_sections)}")
-
-            if result.consensus_points:
-                markdown_lines.extend(["", "## Consensus Points"])
-                for i, point in enumerate(result.consensus_points, 1):
-                    markdown_lines.extend(
-                        [
-                            "",
-                            f"### {i}. {point.topic}",
-                            f"- **Strength:** {point.strength:.2f}",
-                            f"- **Supporting Agents:** {point.supporting_agents}",
-                            "",
-                            point.content,
-                        ]
-                    )
-
-            if result.divergent_views:
-                markdown_lines.extend(["", "## Divergent Views"])
-                for i, view in enumerate(result.divergent_views, 1):
-                    markdown_lines.extend(
-                        [
-                            "",
-                            f"### {i}. {view.topic}",
-                            f"- **Held By:** {view.holding_agent}",
-                            "",
-                            view.content,
-                        ]
-                    )
-
-            console.print(build_markdown_panel("Final Report", "\n".join(markdown_lines), border_style="green"))
+            console.print(build_discussion_report(result))
             return 0
         except Exception as e:
             logger.error(f"Discussion analysis failed: {e}")

@@ -22,6 +22,7 @@ from .models import DiscussionPhase
 from .models import DiscussionResult
 from .models import DiscussionState
 from .models import QuestionIdGenerator
+from .models import get_personality_display_name
 from .task_models import TaskPriority
 from .task_models import TaskQueue
 from .task_models import TaskStatus
@@ -569,36 +570,24 @@ class DiscussionAgent:
                     (r for r in self.all_responses if r.question_id == q.question_id),
                     None,
                 )
-                to_name = self._format_agent_name(q.to_agent)
-                status = f"已回答（立场：{resp.stance}）" if resp else "待处理"
-                lines.append(f'  [{q.question_id}] \u2192 {to_name}: "{q.content[:100]}..." ({status})')
+                to_name = get_personality_display_name(q.to_agent)
+                status = "已回答" if resp else "待回答"
+                lines.append(f'  [{q.question_id}] → {to_name}: "{q.content[:100]}..." ({status})')
 
         if directed_to_me:
-            lines.append("\n指向你的问题：")
+            if lines:
+                lines.append("")
+            lines.append("指向你的问题：")
             for q in directed_to_me:
                 resp = next(
                     (r for r in self.all_responses if r.question_id == q.question_id),
                     None,
                 )
-                from_name = self._format_agent_name(q.from_agent)
+                from_name = get_personality_display_name(q.from_agent)
                 status = "已回答" if resp else "待回答"
                 lines.append(f'  [{q.question_id}] 来自 {from_name}: "{q.content[:100]}..." ({status})')
 
         return "\n".join(lines) if lines else "此前没有与你相关的问答。"
-
-    def _format_agent_name(self, personality: AgentPersonality | str | None) -> str:
-        """Format agent personality names for logs."""
-        if personality is None:
-            return "未知角色"
-
-        agent_value = personality.value if isinstance(personality, AgentPersonality) else str(personality)
-        display_names = {
-            AgentPersonality.CRITICAL_EVALUATOR.value: "批判性评估者",
-            AgentPersonality.INNOVATIVE_INSIGHTER.value: "创新洞察者",
-            AgentPersonality.PRACTICAL_APPLICATOR.value: "实践应用者",
-            AgentPersonality.THEORETICAL_INTEGRATOR.value: "理论整合者",
-        }
-        return display_names.get(agent_value, agent_value.replace("_", " ").title())
 
     def _render_phase_banner(self, phase: DiscussionPhase, summary_lines: list[str] | None = None) -> None:
         """Render a normalized banner for a discussion phase."""
@@ -624,8 +613,8 @@ class DiscussionAgent:
             rows.append(
                 (
                     question.question_id,
-                    self._format_agent_name(question.from_agent),
-                    self._format_agent_name(question.to_agent),
+                    get_personality_display_name(question.from_agent),
+                    get_personality_display_name(question.to_agent),
                     question.question_type,
                     f"{question.priority:.2f}",
                 )
@@ -656,7 +645,7 @@ class DiscussionAgent:
 
                 personality = task.result.metadata.get("personality")
                 score = float(task.result.metadata.get("convergence_score", 0.0))
-                rows.append((self._format_agent_name(personality), f"{score:.2f}"))
+                rows.append((get_personality_display_name(personality), f"{score:.2f}"))
 
         console.print(
             build_key_value_table(
@@ -703,7 +692,7 @@ class DiscussionAgent:
         if not insights:
             return
 
-        agent_name = self._format_agent_name(personality)
+        agent_name = get_personality_display_name(personality)
         console.print(
             build_stage_banner(
                 title=f"{agent_name} Output",
@@ -738,8 +727,8 @@ class DiscussionAgent:
 
     def _format_question_log_entry(self, question) -> str:
         """Format a single question log line."""
-        from_name = self._format_agent_name(question.from_agent)
-        to_name = self._format_agent_name(question.to_agent)
+        from_name = get_personality_display_name(question.from_agent)
+        to_name = get_personality_display_name(question.to_agent)
         content = self._truncate_for_log(question.content)
         return f"  - {question.question_id} [{question.question_type}, p={question.priority:.2f}] {from_name} -> {to_name}: {content}"
 
@@ -750,8 +739,8 @@ class DiscussionAgent:
 
     def _format_response_log_entry(self, response, question=None) -> str:
         """Format a single response log line."""
-        from_name = self._format_agent_name(response.from_agent)
-        to_name = self._format_agent_name(question.from_agent) if question else "Unknown Agent"
+        from_name = get_personality_display_name(response.from_agent)
+        to_name = get_personality_display_name(question.from_agent) if question else "Unknown Agent"
         question_text = self._truncate_for_log(question.content) if question else ""
         answer_text = self._truncate_for_log(response.content)
         base = f"  - {response.question_id} [{response.stance}, c={response.confidence:.2f}] {from_name} -> {to_name}"
@@ -774,8 +763,8 @@ class DiscussionAgent:
             if not question:
                 continue
 
-            from_name = self._format_agent_name(response.from_agent)
-            to_name = self._format_agent_name(question.from_agent)
+            from_name = get_personality_display_name(response.from_agent)
+            to_name = get_personality_display_name(question.from_agent)
             question_text = (question.content or "").strip()
             answer_text = (response.content or "").strip()
             meta_text = f"{response.question_id}\n{from_name} -> {to_name}\n{response.stance}, c={response.confidence:.2f}"
@@ -786,7 +775,7 @@ class DiscussionAgent:
         if rendered_rows == 0:
             return
 
-        agent_name = self._format_agent_name(personality)
+        agent_name = get_personality_display_name(personality)
         console.print(
             build_stage_banner(
                 title=f"{agent_name} Responses",

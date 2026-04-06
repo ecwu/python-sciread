@@ -25,6 +25,28 @@ AGENT_ABBREVIATIONS = {
     AgentPersonality.THEORETICAL_INTEGRATOR: "TI",
 }
 
+PERSONALITY_DISPLAY_NAMES = {
+    AgentPersonality.CRITICAL_EVALUATOR: "批判性评估者",
+    AgentPersonality.INNOVATIVE_INSIGHTER: "创新洞察者",
+    AgentPersonality.PRACTICAL_APPLICATOR: "实践应用者",
+    AgentPersonality.THEORETICAL_INTEGRATOR: "理论整合者",
+}
+
+
+def get_personality_display_name(personality: AgentPersonality | str | None) -> str:
+    """Return a Chinese display name for a personality."""
+    if personality is None:
+        return "未知角色"
+
+    if isinstance(personality, AgentPersonality):
+        return PERSONALITY_DISPLAY_NAMES.get(personality, str(personality))
+
+    try:
+        enum_value = AgentPersonality(personality)
+        return PERSONALITY_DISPLAY_NAMES.get(enum_value, str(personality))
+    except (ValueError, TypeError):
+        return str(personality).replace("_", " ").title()
+
 
 class DiscussionPhase(StrEnum):
     """Phases of the discussion process."""

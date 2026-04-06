@@ -98,7 +98,8 @@ class ScireadConfig(BaseSettings):
     def load_from_file(cls, config_path: Path | None = None) -> "ScireadConfig":
         """Load configuration from file and environment variables."""
 
-        if config_path is None:
+        found_config_path = config_path
+        if found_config_path is None:
             # Look for config in standard locations
             config_paths = [
                 Path.cwd() / "config" / "sciread.toml",
@@ -109,49 +110,56 @@ class ScireadConfig(BaseSettings):
 
             for path in config_paths:
                 if path.exists():
-                    config_path = path
+                    found_config_path = path
                     break
-            else:
-                # No config file found, use defaults
-                return cls()
+
+        # If no config file found, start with default settings
+        if not found_config_path:
+            return cls()
 
         try:
-            with config_path.open("rb") as f:
+            with found_config_path.open("rb") as f:
                 config_data = tomllib.load(f)
 
             # Extract provider configurations
-            providers_config = config_data.get("llm_providers", {})
+            raw_providers = config_data.get("llm_providers", {})
             providers = {}
 
-            for provider_name, provider_data in providers_config.items():
-                # Support environment variable substitution
-                api_key = provider_data.get("api_key")
-                if api_key and isinstance(api_key, str) and api_key.startswith("${") and api_key.endswith("}"):
+            for name, data in raw_providers.items():
+                if name == "default":
+                    continue
+
+                if not isinstance(data, dict):
+                    continue
+
+                # Process environment variable substitution in file
+                api_key = data.get("api_key")
+                if isinstance(api_key, str) and api_key.startswith("${") and api_key.endswith("}"):
                     env_var = api_key[2:-1]
                     api_key = os.getenv(env_var)
 
-                providers[provider_name] = LLMProviderConfig(
+                # If still None, it will be lazily loaded from env by get_api_key()
+                providers[name] = LLMProviderConfig(
                     api_key=api_key,
-                    base_url=provider_data.get("base_url"),
-                    default_model=provider_data.get("default_model", provider_name),
+                    base_url=data.get("base_url"),
+                    default_model=data.get("default_model", name),
                 )
 
             # Extract default configuration
-            default_config = config_data.get("llm_providers", {}).get("default", {})
+            raw_default = raw_providers.get("default", {})
             default_settings = DefaultConfig(
-                provider=default_config.get("provider", "deepseek"),
-                model=default_config.get("model", "deepseek-chat"),
+                provider=raw_default.get("provider", "deepseek"),
+                model=raw_default.get("model", "deepseek-chat"),
             )
 
-            # Extract document splitters configuration
+            # Extract document splitters
             splitters_config = config_data.get("document_splitters", {})
             document_splitters = DocumentSplitterConfig(**splitters_config)
 
             # Extract Mineru configuration
             mineru_config = config_data.get("mineru", {})
-            # Support environment variable substitution for token
             mineru_token = mineru_config.get("token")
-            if mineru_token and isinstance(mineru_token, str) and mineru_token.startswith("${") and mineru_token.endswith("}"):
+            if isinstance(mineru_token, str) and mineru_token.startswith("${") and mineru_token.endswith("}"):
                 env_var = mineru_token[2:-1]
                 mineru_token = os.getenv(env_var)
             mineru_config["token"] = mineru_token
@@ -167,11 +175,12 @@ class ScireadConfig(BaseSettings):
                 document_splitters=document_splitters,
                 mineru=mineru,
                 vector_store=vector_store,
-                config_file=config_path,
+                config_file=found_config_path,
             )
 
-        except Exception:
-            # If config file is invalid, use defaults
+        except Exception as e:
+            # If config file is invalid, use defaults but log warning
+            print(f"Warning: Failed to load configuration from {found_config_path}: {e}")
             return cls()
 
     def get_provider_config(self, provider_name: str) -> LLMProviderConfig:
@@ -181,18 +190,36 @@ class ScireadConfig(BaseSettings):
         return self.llm_providers[provider_name]
 
     def get_api_key(self, provider_name: str) -> str:
-        """Get API key for a specific provider."""
+        """Get API key for a specific provider.
+
+        Prioritizes:
+        1. Contextual configuration (from file or explicit set)
+        2. Standard environment variables (e.g., DEEPSEEK_API_KEY)
+        3. Prefixed environment variables (e.g., SCIREAD_LLM_PROVIDERS__DEEPSEEK__API_KEY)
+        """
         provider_config = self.get_provider_config(provider_name)
-        if not provider_config.api_key:
-            # Try environment variable
+        if provider_config.api_key:
+            return provider_config.api_key
+
+        # Try standard environment variable names first
+        standard_env_map = {
+            "deepseek": "DEEPSEEK_API_KEY",
+            "volcengine": "VOLCES_API",
+            "ark": "ARK_API_KEY",
+        }
+
+        env_var_name = standard_env_map.get(provider_name.lower())
+        if not env_var_name:
             env_var_name = f"{provider_name.upper()}_API_KEY"
-            api_key = os.getenv(env_var_name)
-            if not api_key:
-                raise ValueError(
-                    f"No API key found for provider '{provider_name}'. Set {env_var_name} environment variable or configure in config file."
-                )
+
+        api_key = os.getenv(env_var_name)
+        if api_key:
             return api_key
-        return provider_config.api_key
+
+        # If not found, raise informative error
+        raise ValueError(
+            f"No API key found for provider '{provider_name}'. Set {env_var_name} environment variable or configure in sciread.toml."
+        )
 
     def get_splitter_config(self, splitter_name: str):
         """Get configuration for a specific splitter."""
@@ -208,13 +235,14 @@ class ScireadConfig(BaseSettings):
 
     def get_mineru_token(self) -> str:
         """Get Mineru API token."""
-        if not self.mineru.token:
-            # Try environment variable
-            api_key = os.getenv("MINERU_TOKEN")
-            if not api_key:
-                raise ValueError("No Mineru token found. Set MINERU_TOKEN environment variable or configure in config file.")
-            return api_key
-        return self.mineru.token
+        if self.mineru.token:
+            return self.mineru.token
+
+        # Try standard environment variable
+        api_key = os.getenv("MINERU_TOKEN")
+        if not api_key:
+            raise ValueError("No Mineru token found. Set MINERU_TOKEN environment variable or configure in sciread.toml.")
+        return api_key
 
 
 # Global configuration instance

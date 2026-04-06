@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 from rich import box
 from rich.console import Group
@@ -162,3 +163,83 @@ def build_markdown_panel(
         box=box.ROUNDED,
         padding=(0, 1),
     )
+
+
+def build_discussion_report(result: Any) -> Panel:
+    """Build a comprehensive markdown panel for discussion-based analysis results."""
+    markdown_lines = [
+        "# Discussion-Based Analysis Result",
+        "",
+        "## Overview",
+        f"- **Document:** {result.document_title}",
+        f"- **Overall Confidence:** {result.confidence_score:.2f}",
+        f"- **Total Insights:** {len(result.final_insights)}",
+        f"- **Consensus Points:** {len(result.consensus_points)}",
+        f"- **Divergent Views:** {len(result.divergent_views)}",
+    ]
+
+    if result.discussion_metadata:
+        markdown_lines.extend(["", "## Discussion Metadata"])
+        for key, value in result.discussion_metadata.items():
+            if key != "error":
+                name = key.replace("_", " ").title()
+                markdown_lines.append(f"- **{name}:** {value}")
+
+    markdown_lines.extend(["", "## Analysis Summary", result.summary])
+
+    if result.key_contributions:
+        markdown_lines.extend(["", "## Key Contributions"])
+        for contribution in result.key_contributions:
+            markdown_lines.append(f"- {contribution}")
+
+    if result.significance:
+        markdown_lines.extend(["", "## Significance Assessment", result.significance])
+
+    if result.final_insights:
+        markdown_lines.extend(["", "## Final Insights From Discussion"])
+        for i, insight in enumerate(result.final_insights, 1):
+            markdown_lines.extend(
+                [
+                    "",
+                    f"### {i}. From {insight.agent_id}",
+                    f"- **Confidence:** {insight.confidence:.2f}",
+                    f"- **Importance:** {insight.importance_score:.2f}",
+                    "",
+                    insight.content,
+                ]
+            )
+            if hasattr(insight, "supporting_evidence") and insight.supporting_evidence:
+                markdown_lines.append("\n**Supporting Evidence:**")
+                for evidence in insight.supporting_evidence:
+                    markdown_lines.append(f"- {evidence}")
+            if hasattr(insight, "related_sections") and insight.related_sections:
+                markdown_lines.append(f"\n**Related Sections:** {', '.join(insight.related_sections)}")
+
+    if result.consensus_points:
+        markdown_lines.extend(["", "## Consensus Points"])
+        for i, point in enumerate(result.consensus_points, 1):
+            markdown_lines.extend(
+                [
+                    "",
+                    f"### {i}. {point.topic}",
+                    f"- **Strength:** {point.strength:.2f}",
+                    f"- **Supporting Agents:** {point.supporting_agents}",
+                    "",
+                    point.content,
+                ]
+            )
+
+    if result.divergent_views:
+        markdown_lines.extend(["", "## Divergent Views"])
+        for i, view in enumerate(result.divergent_views, 1):
+            markdown_lines.extend(
+                [
+                    "",
+                    f"### {i}. {view.topic}",
+                    f"- **Held By:** {view.holding_agent}",
+                    "",
+                    view.content,
+                ]
+            )
+
+    return build_markdown_panel("Final Report", "\n".join(markdown_lines), border_style="green")

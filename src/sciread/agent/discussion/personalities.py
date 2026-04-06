@@ -20,18 +20,11 @@ from .models import AgentInsight
 from .models import AgentPersonality
 from .models import Question
 from .models import Response
+from .models import get_personality_display_name
 from .prompts.personalities import build_insight_generation_prompt
 from .prompts.personalities import get_personality_system_prompt
 
 logger = get_logger(__name__)
-
-
-PERSONALITY_DISPLAY_NAMES = {
-    AgentPersonality.CRITICAL_EVALUATOR: "批判性评估者",
-    AgentPersonality.INNOVATIVE_INSIGHTER: "创新洞察者",
-    AgentPersonality.PRACTICAL_APPLICATOR: "实践应用者",
-    AgentPersonality.THEORETICAL_INTEGRATOR: "理论整合者",
-}
 
 
 class PersonalityAgent:
@@ -51,14 +44,7 @@ class PersonalityAgent:
     def _display_name(self, personality: AgentPersonality | str | None = None) -> str:
         """Return a Chinese display name for a personality."""
         target = personality or self.personality
-        if isinstance(target, AgentPersonality):
-            return PERSONALITY_DISPLAY_NAMES.get(target, target.value)
-
-        try:
-            enum_value = AgentPersonality(target)
-            return PERSONALITY_DISPLAY_NAMES.get(enum_value, enum_value.value)
-        except Exception:
-            return str(target)
+        return get_personality_display_name(target)
 
     async def _run_with_history(self, prompt: str):
         """Run agent with message history persistence."""

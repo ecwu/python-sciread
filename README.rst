@@ -52,13 +52,43 @@ You can also run the package directly::
 Configuration
 =============
 
-Project and local settings are defined in ``config/sciread.toml``.
+Project settings are managed via ``pydantic-settings`` and can be defined in a TOML file or environment variables.
 
-Typical local setup:
+**Configuration File**
 
-- copy the example config to ``~/.config/sciread/config.toml`` and adjust it for your environment
-- or set provider credentials with environment variables such as ``DEEPSEEK_API_KEY`` and ``MINERU_TOKEN``
-- choose a model explicitly with ``--model`` when testing different providers
+The default configuration file is looked for in several standard locations:
+
+1. ``./config/sciread.toml``
+2. ``./sciread.toml``
+3. ``~/.config/sciread/config.toml``
+4. ``~/.sciread.toml``
+
+You should copy the example in ``config/sciread.toml`` to one of these locations and adjust it for your environment.
+
+**Environment Variables**
+
+You can also configure the system using environment variables (standard names for API keys, or prefixed with ``SCIREAD_`` for project-specific settings).
+
+Create a ``.env`` file based on the provided ``.env.example``:
+
+.. code-block:: bash
+
+    cp .env.example .env
+
+Key Environment Variables:
+
+- ``DEEPSEEK_API_KEY``: API key for DeepSeek (used by default).
+- ``VOLCES_API``: API key for Volcengine / Doubao (Ark).
+- ``MINERU_TOKEN``: Required for converting PDF files to high-quality Markdown via the Mineru API.
+- ``SCIREAD_LOG_LEVEL``: Control logging verbosity (DEBUG, INFO, WARNING, ERROR).
+
+**Mineru PDF Conversion**
+
+By default, ``sciread`` uses a simple PDF loader. For much better results (with extracted tables and formulas), set ``MINERU_TOKEN`` and configuration in ``sciread.toml`` to use the Mineru provider.
+
+**Local Models with Ollama**
+
+You can use local models for embeddings or analysis by running `Ollama <https://ollama.com/>`_. By default, the semantic splitter tries to use local embeddings if configured.
 
 Python API
 ==========
