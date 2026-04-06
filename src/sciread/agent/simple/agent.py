@@ -16,6 +16,8 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from rich.console import Console
 
+from ...application.use_cases.common import ensure_file_exists
+from ...application.use_cases.common import load_document
 from ...document import Document
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
@@ -46,14 +48,19 @@ class SimpleAnalysisDeps:
 
 
 def _validate_document_file(file_path: str | Path) -> None:
-    """Validate that the document file exists before processing."""
-    if not Path(file_path).exists():
-        raise FileNotFoundError(f"Document file not found: {file_path}")
+    """Validate that the document file exists before processing.
+
+    DEPRECATED: Use application.use_cases.common.ensure_file_exists instead.
+    """
+    ensure_file_exists(str(file_path))
 
 
 def load_document_for_simple_analysis(file_path: str | Path, to_markdown: bool = False) -> Document:
-    """Load a document for simple-agent analysis."""
-    return Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
+    """Load a document for simple-agent analysis.
+
+    DEPRECATED: Use application.use_cases.common.load_document instead.
+    """
+    return load_document(str(file_path), to_markdown=to_markdown)
 
 
 async def analyze_file_with_simple(
@@ -213,33 +220,37 @@ class SimpleAgent:
         @self.agent.system_prompt
         async def get_system_prompt(ctx: RunContext[SimpleAnalysisDeps]) -> str:
             """Generate system prompt with document context."""
-            deps = ctx.deps
-
-            text = _build_simple_content(
-                document=deps.document,
-                include_metadata=deps.include_metadata,
-                remove_references=deps.remove_references,
-                clean_text=deps.clean_text,
-                max_tokens=8000,
-            )
-
-            if not text or not text.strip():
-                raise handle_model_retry(
-                    ValueError("Document has no text content to analyze"),
-                    "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
-                )
-
-            full_prompt = build_analysis_prompt(
-                text=text,
-                task_prompt=deps.task_prompt,
-                document_metadata=None,  # Metadata is already included in the processed text
-                **deps.additional_context,
-            )
-
-            return f"{self.system_prompt}\n\n{full_prompt}"
+            return await self._build_system_prompt(ctx)
 
         self.logger.debug("SimpleAgent initialized successfully")
+
+    async def _build_system_prompt(self, ctx: RunContext[SimpleAnalysisDeps]) -> str:
+        """构建系统提示词(可复用)"""
+        deps = ctx.deps
+
+        text = _build_simple_content(
+            document=deps.document,
+            include_metadata=deps.include_metadata,
+            remove_references=deps.remove_references,
+            clean_text=deps.clean_text,
+            max_tokens=8000,
+        )
+
+        if not text or not text.strip():
+            raise handle_model_retry(
+                ValueError("Document has no text content to analyze"),
+                "document content validation",
+                "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
+            )
+
+        full_prompt = build_analysis_prompt(
+            text=text,
+            task_prompt=deps.task_prompt,
+            document_metadata=None,  # Metadata is already included in the processed text
+            **deps.additional_context,
+        )
+
+        return f"{self.system_prompt}\n\n{full_prompt}"
 
     async def run_analysis(
         self,
@@ -324,31 +335,7 @@ class SimpleAgent:
         @structured_agent.system_prompt
         async def get_system_prompt(ctx: RunContext[SimpleAnalysisDeps]) -> str:
             """Generate system prompt with document context."""
-            deps = ctx.deps
-
-            text = _build_simple_content(
-                document=deps.document,
-                include_metadata=deps.include_metadata,
-                remove_references=deps.remove_references,
-                clean_text=deps.clean_text,
-                max_tokens=8000,  # Reasonable limit for simple analysis
-            )
-
-            if not text or not text.strip():
-                raise handle_model_retry(
-                    ValueError("Document has no text content to analyze"),
-                    "document content validation",
-                    "Document appears to have no readable text. Please ensure the document is properly loaded and contains content.",
-                )
-
-            full_prompt = build_analysis_prompt(
-                text=text,
-                task_prompt=deps.task_prompt,
-                document_metadata=None,  # Metadata is already included in the processed text
-                **deps.additional_context,
-            )
-
-            return f"{self.system_prompt}\n\n{full_prompt}"
+            return await self._build_system_prompt(ctx)
 
         # Create dependencies object
         deps = SimpleAnalysisDeps(

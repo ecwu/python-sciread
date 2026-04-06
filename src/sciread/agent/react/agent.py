@@ -9,6 +9,8 @@ from pydantic_ai import Agent
 from pydantic_ai import RunContext
 from rich.console import Console
 
+from ...application.use_cases.common import ensure_file_exists
+from ...application.use_cases.common import load_document
 from ...document import Document
 from ...document.structure.renderers import SHORT_SECTION_THRESHOLD
 from ...document.structure.renderers import get_section_length_map
@@ -104,9 +106,11 @@ def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationS
 
 
 def _validate_document_file(document_file: str | Path) -> None:
-    """Validate that the document file exists before processing."""
-    if not Path(document_file).exists():
-        raise FileNotFoundError(f"Document file not found: {document_file}")
+    """Validate that the document file exists before processing.
+
+    DEPRECATED: Use application.use_cases.common.ensure_file_exists instead.
+    """
+    ensure_file_exists(str(document_file))
 
 
 def _clean_section_names(section_names: list[object]) -> list[str] | None:
@@ -137,6 +141,8 @@ def _resolve_sections(document: Document, requested_sections: list[str], availab
 def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
     """Load and process a document using markdown conversion and natural section splitting.
 
+    DEPRECATED: Use application.use_cases.common.load_document instead.
+
     Args:
         file_path: Path to the PDF file
         to_markdown: Whether to convert PDF to markdown using Mineru API
@@ -146,9 +152,7 @@ def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -
     """
     logger.debug(f"Loading document from {file_path} (to_markdown={to_markdown})")
 
-    # Create document with markdown conversion and auto-splitting
-    # Document.from_file() automatically loads and splits the document when auto_split=True
-    document = Document.from_file(file_path, to_markdown=to_markdown, auto_split=True)
+    document = load_document(str(file_path), to_markdown=to_markdown)
 
     logger.debug(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
     logger.debug(f"Available sections: {document.get_section_names()}")

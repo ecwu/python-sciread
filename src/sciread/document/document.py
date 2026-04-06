@@ -6,7 +6,7 @@ from pathlib import Path
 from ..embedding_provider import get_embedding_client
 from ..platform.config import get_config
 from ..platform.logging import get_logger
-from .factory import DocumentFactory
+from .document_builder import DocumentBuilder
 from .models import Chunk
 from .models import DocumentMetadata
 from .models import ProcessingState
@@ -100,7 +100,7 @@ class Document:
         Returns:
             Document instance with loaded content and optionally split chunks.
         """
-        return DocumentFactory.create_from_file(
+        return DocumentBuilder().from_file(
             file_path,
             to_markdown=to_markdown,
             auto_split=auto_split,
@@ -127,7 +127,7 @@ class Document:
         Returns:
             Document instance with text and optionally split chunks.
         """
-        return DocumentFactory.create_from_text(
+        return DocumentBuilder().from_text(
             text,
             metadata=metadata,
             auto_split=auto_split,

@@ -388,10 +388,6 @@ class DiscussionAgent:
             [f"Final insights: {len(self.discussion_state.insights) if self.discussion_state else 0}"],
         )
 
-        # Import here to avoid circular imports
-        from .consensus import ConsensusBuilder
-
-        ConsensusBuilder(self.model_name)
         self.discussion_state.current_phase = DiscussionPhase.COMPLETED
 
     def _should_terminate_discussion(self) -> bool:
