@@ -53,5 +53,7 @@ class TestDocumentPersistence:
         assert loaded.get_chunk_by_id(loaded.chunks[0].chunk_id) == loaded.chunks[0]
         assert loaded.chunks[0].next_chunk_id == loaded.chunks[1].chunk_id
         assert loaded.chunks[1].prev_chunk_id == loaded.chunks[0].chunk_id
+        assert loaded.chunks[0].overlap_prev_chars == 0
+        assert loaded.chunks[0].overlap_next_chars == 0
         assert loaded.vector_index is not None
         assert loaded.vector_index.persist_path.resolve() == persist_path.resolve()

@@ -24,8 +24,33 @@ class RegexSectionSplitterConfig(BaseModel):
     """Configuration for RegexSectionSplitter."""
 
     min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
+    chunk_overlap: int = Field(default=0, ge=0, description="Backward overlap between adjacent chunks in characters")
     confidence_threshold: float = Field(default=0.3, description="Minimum confidence score for chunks")
     custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
+
+
+class MarkdownSplitterConfig(BaseModel):
+    """Configuration for MarkdownSplitter."""
+
+    min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
+    max_chunk_size: int = Field(default=2000, description="Maximum chunk size in characters")
+    chunk_overlap: int = Field(default=0, ge=0, description="Backward overlap between adjacent chunks in characters")
+    preserve_code_blocks: bool = Field(default=True, description="Keep markdown code blocks intact while chunking")
+    split_on_headers: bool = Field(default=True, description="Split markdown content on headings")
+    confidence_threshold: float = Field(default=0.7, description="Minimum confidence score for chunks")
+
+
+class SemanticSplitterConfig(BaseModel):
+    """Configuration for SemanticSplitter."""
+
+    min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
+    max_chunk_size: int = Field(default=2000, description="Maximum chunk size in characters")
+    chunk_overlap: int = Field(default=0, ge=0, description="Backward overlap between adjacent chunks in characters")
+    preserve_code_blocks: bool = Field(default=True, description="Keep code blocks intact while chunking")
+    split_on_headers: bool = Field(default=True, description="Split content on detected section boundaries")
+    confidence_threshold: float = Field(default=0.7, description="Minimum confidence score for chunks")
+    enable_academic_patterns: bool = Field(default=True, description="Enable academic section pattern detection")
+    enable_markdown_patterns: bool = Field(default=False, description="Enable markdown pattern detection")
 
 
 class DocumentSplitterConfig(BaseModel):
@@ -33,6 +58,8 @@ class DocumentSplitterConfig(BaseModel):
 
     default_splitter: str = Field(default="regex_section", description="Default splitter to use")
     regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
+    markdown: MarkdownSplitterConfig = Field(default_factory=MarkdownSplitterConfig)
+    semantic: SemanticSplitterConfig = Field(default_factory=SemanticSplitterConfig)
 
 
 class MineruConfig(BaseModel):
@@ -225,8 +252,12 @@ class ScireadConfig(BaseSettings):
         """Get configuration for a specific splitter."""
         if splitter_name == "regex_section":
             return self.document_splitters.regex_section
+        elif splitter_name == "markdown":
+            return self.document_splitters.markdown
+        elif splitter_name == "semantic":
+            return self.document_splitters.semantic
         else:
-            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section")
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section, markdown, semantic")
 
     def get_default_splitter_config(self):
         """Get configuration for the default splitter."""

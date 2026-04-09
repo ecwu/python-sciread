@@ -22,18 +22,37 @@ provider = "deepseek"
 model = "deepseek-chat"
 
 # Document splitter configuration exposed by the current config model.
-# Note: the document builder still auto-selects MarkdownSplitter for markdown
-# input and SemanticSplitter for non-markdown input unless a splitter is
-# provided explicitly in code.
+# The document builder auto-selects MarkdownSplitter for markdown input and
+# SemanticSplitter for non-markdown input unless a splitter is provided
+# explicitly in code. The sections below configure those default splitters.
 [document_splitters]
-# Supported value in the current implementation: "regex_section"
+# Supported values: "regex_section", "markdown", "semantic"
 default_splitter = "regex_section"
 
 [document_splitters.regex_section]
 min_chunk_size = 200
+chunk_overlap = 0
 confidence_threshold = 0.3
 # Custom patterns (optional)
 # custom_patterns = { "my_pattern" = "my regex pattern" }
+
+[document_splitters.markdown]
+min_chunk_size = 200
+max_chunk_size = 2000
+chunk_overlap = 0
+preserve_code_blocks = true
+split_on_headers = true
+confidence_threshold = 0.7
+
+[document_splitters.semantic]
+min_chunk_size = 200
+max_chunk_size = 2000
+chunk_overlap = 0
+preserve_code_blocks = true
+split_on_headers = true
+confidence_threshold = 0.7
+enable_academic_patterns = true
+enable_markdown_patterns = false
 
 # Mineru API Configuration (for PDF to Markdown conversion)
 [mineru]

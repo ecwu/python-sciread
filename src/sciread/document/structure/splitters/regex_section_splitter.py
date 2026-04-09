@@ -16,6 +16,7 @@ class RegexSectionSplitter(BaseSplitter):
         self,
         patterns: dict[str, str] | None = None,
         min_chunk_size: int = 200,
+        chunk_overlap: int = 0,
         confidence_threshold: float = 0.3,
     ):
         """Initialize regex splitter with configuration.
@@ -23,9 +24,11 @@ class RegexSectionSplitter(BaseSplitter):
         Args:
             patterns: Custom patterns dictionary. If None, uses default academic patterns.
             min_chunk_size: Minimum chunk size in characters.
+            chunk_overlap: Number of backward-overlap characters to include in each non-initial chunk.
             confidence_threshold: Minimum confidence score for chunks.
         """
         self.min_chunk_size = min_chunk_size
+        self.chunk_overlap = self._validate_chunk_overlap(chunk_overlap)
         self.confidence_threshold = confidence_threshold
 
         # Load patterns (custom or default)
@@ -35,7 +38,8 @@ class RegexSectionSplitter(BaseSplitter):
     @property
     def splitter_name(self) -> str:
         """Return the splitter name."""
-        return f"RegexSectionSplitter(patterns={len(self.patterns)}, min_size={self.min_chunk_size})"
+        overlap_suffix = f", overlap={self.chunk_overlap}" if self.chunk_overlap else ""
+        return f"RegexSectionSplitter(patterns={len(self.patterns)}, min_size={self.min_chunk_size}{overlap_suffix})"
 
     def split(self, text: str) -> list[Chunk]:
         """Split text using regex patterns."""
@@ -49,6 +53,7 @@ class RegexSectionSplitter(BaseSplitter):
 
         # Create Chunk objects with metadata
         chunks = self._create_chunks(raw_chunks)
+        chunks = self._apply_chunk_overlap(text, chunks)
 
         # Reassign positions to ensure continuous ordering
         for i, chunk in enumerate(chunks):

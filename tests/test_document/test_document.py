@@ -282,6 +282,28 @@ class TestDocument:
         assert "[linked](https://example.com)" not in doc.chunks[0].content_plain
         assert doc.chunks[0].retrieval_text.startswith("[Section] intro\n\n")
 
+    def test_chunk_enrichment_derives_overlap_metadata_from_char_ranges(self):
+        """Test document chunk enrichment records overlap metadata from source ranges."""
+        doc = Document.from_text("abcdefghij", auto_split=False)
+        chunks = [
+            Chunk(content="abcdef", char_range=(0, 6), chunk_name="intro"),
+            Chunk(content="efghij", char_range=(4, 10), chunk_name="intro"),
+        ]
+
+        doc._set_chunks(chunks)
+
+        assert doc.chunks[0].overlap_prev_chars == 0
+        assert doc.chunks[0].overlap_next_chars == 2
+        assert doc.chunks[1].overlap_prev_chars == 2
+        assert doc.chunks[1].overlap_next_chars == 0
+
+    def test_get_full_text_prefers_raw_text_when_chunks_overlap(self):
+        """Test overlap-aware full text avoids duplicating chunk overlap content."""
+        text = "# Intro\n\nAlpha beta gamma.\n\n# Results\n\nGamma delta epsilon."
+        doc = Document.from_text(text, is_markdown=True, chunk_overlap=8)
+
+        assert doc.get_full_text() == text
+
     def test_get_chunk_by_id(self):
         """Test retrieving chunk by chunk_id."""
         doc = Document.from_text("placeholder")

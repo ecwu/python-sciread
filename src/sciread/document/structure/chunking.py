@@ -95,6 +95,39 @@ def enrich_chunks(document: Document, chunks: list[Chunk]) -> None:
         chunk.prev_chunk_id = chunks[index - 1].chunk_id if index > 0 else None
         chunk.next_chunk_id = chunks[index + 1].chunk_id if index < len(chunks) - 1 else None
 
+    _sync_chunk_overlap_metadata(chunks)
+
+
+def _sync_chunk_overlap_metadata(chunks: list[Chunk]) -> None:
+    """Derive adjacency overlap metadata from chunk character ranges."""
+    for chunk in chunks:
+        chunk.overlap_prev_chars = 0
+        chunk.overlap_next_chars = 0
+
+    for index in range(1, len(chunks)):
+        previous_chunk = chunks[index - 1]
+        current_chunk = chunks[index]
+
+        overlap_chars = _calculate_char_overlap(previous_chunk, current_chunk)
+        if overlap_chars <= 0:
+            continue
+
+        previous_chunk.overlap_next_chars = overlap_chars
+        current_chunk.overlap_prev_chars = overlap_chars
+
+
+def _calculate_char_overlap(left_chunk: Chunk, right_chunk: Chunk) -> int:
+    """Return the number of overlapping source characters between adjacent chunks."""
+    if left_chunk.char_range is None or right_chunk.char_range is None:
+        return 0
+
+    left_start, left_end = left_chunk.char_range
+    right_start, right_end = right_chunk.char_range
+
+    overlap_start = max(left_start, right_start)
+    overlap_end = min(left_end, right_end)
+    return max(0, overlap_end - overlap_start)
+
 
 def set_document_chunks(document: Document, chunks: list[Chunk]) -> None:
     """Attach chunks to a document and update processing state."""

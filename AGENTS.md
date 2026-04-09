@@ -193,6 +193,12 @@ Current provider and document-related settings include:
 - `mineru`
 - `vector_store`
 
+Current splitter config sections include:
+
+- `document_splitters.regex_section`
+- `document_splitters.markdown`
+- `document_splitters.semantic`
+
 If you add a new configurable behavior, update both the config model and the sample config file when appropriate.
 
 ## Document Pipeline
@@ -204,6 +210,7 @@ Preferred patterns:
 ```python
 document = Document.from_file("paper.pdf", to_markdown=False, auto_split=True)
 document = Document.from_text(raw_text, auto_split=True)
+document = Document.from_text(raw_text, auto_split=True, chunk_overlap=150)
 ```
 
 Implementation notes:
@@ -212,6 +219,7 @@ Implementation notes:
 - PDF and text loading live under `document/ingestion/loaders/`
 - Default splitting currently routes markdown documents through `MarkdownSplitter`
 - Non-markdown documents default to `SemanticSplitter`
+- Chunk overlap should remain opt-in via `chunk_overlap`; default behavior must stay non-overlapping
 - Retrieval and vector indexing live under `document/retrieval/`
 
 Avoid bypassing the builder/factory stack unless there is a clear reason.

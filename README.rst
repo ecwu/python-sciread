@@ -109,6 +109,13 @@ Example::
     agent = SimpleAgent("deepseek/deepseek-chat")
     report = await agent.run_analysis(document, "Explain the paper clearly for an engineer.")
 
+You can enable overlap-aware chunking for RAG-oriented retrieval without changing the default behavior::
+
+    document = Document.from_text(markdown_text, is_markdown=True, chunk_overlap=150)
+
+The same overlap behavior can be configured globally in ``config/sciread.toml`` under
+``[document_splitters.markdown]`` or ``[document_splitters.semantic]``.
+
 Project Layout
 ==============
 

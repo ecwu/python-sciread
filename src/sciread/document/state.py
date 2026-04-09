@@ -231,6 +231,10 @@ def get_full_text(document: Document, separator: str = "\n\n") -> str:
     """Return full document text, preferring chunk content when present."""
     if not document._chunks:
         return document._raw_text
+
+    if any(chunk.has_overlap for chunk in document._chunks):
+        return document._raw_text
+
     return separator.join(chunk.content for chunk in document._chunks)
 
 

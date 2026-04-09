@@ -1,6 +1,7 @@
 """Tests for document builder orchestration."""
 
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -42,3 +43,41 @@ class TestDocumentBuilder:
 
         with pytest.raises(ValueError, match=r"Unsupported file format: \.docx"):
             builder.from_file(unsupported_file, auto_split=False)
+
+    def test_builder_uses_markdown_splitter_config_for_default_overlap(self):
+        """Test default markdown splitting reads overlap from configuration."""
+        builder = DocumentBuilder()
+        config = SimpleNamespace(
+            document_splitters=SimpleNamespace(
+                markdown=SimpleNamespace(
+                    model_dump=lambda: {
+                        "min_chunk_size": 200,
+                        "max_chunk_size": 2000,
+                        "chunk_overlap": 8,
+                        "preserve_code_blocks": True,
+                        "split_on_headers": True,
+                        "confidence_threshold": 0.7,
+                    }
+                ),
+                semantic=SimpleNamespace(
+                    model_dump=lambda: {
+                        "min_chunk_size": 200,
+                        "max_chunk_size": 2000,
+                        "chunk_overlap": 0,
+                        "preserve_code_blocks": True,
+                        "split_on_headers": True,
+                        "confidence_threshold": 0.7,
+                        "enable_academic_patterns": True,
+                        "enable_markdown_patterns": False,
+                    }
+                ),
+            )
+        )
+        text = "# Intro\n\nAlpha beta.\n\n# Results\n\nGamma delta."
+
+        with patch("sciread.document.document_builder.get_config", return_value=config):
+            document = builder.from_text(text, is_markdown=True)
+
+        assert len(document.chunks) == 2
+        assert document.chunks[0].overlap_next_chars > 0
+        assert document.chunks[1].overlap_prev_chars > 0

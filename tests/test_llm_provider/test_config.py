@@ -22,6 +22,9 @@ class TestScireadConfig:
         assert "deepseek" in config.llm_providers
         assert "volcengine" in config.llm_providers
         assert "ollama" in config.llm_providers
+        assert config.document_splitters.regex_section.chunk_overlap == 0
+        assert config.document_splitters.markdown.chunk_overlap == 0
+        assert config.document_splitters.semantic.chunk_overlap == 0
 
     def test_load_from_file(self, tmp_path):
         """Test loading configuration from file."""
@@ -44,6 +47,36 @@ model = "custom-model"
         assert config.default.model == "custom-model"
         assert "custom" in config.llm_providers
         assert config.llm_providers["custom"].api_key == "custom-key"
+
+    def test_load_splitter_overlap_configuration_from_file(self, tmp_path):
+        """Test splitter overlap values load from TOML."""
+        config_file = tmp_path / "test_config.toml"
+        config_file.write_text(
+            """
+[document_splitters.regex_section]
+chunk_overlap = 48
+
+[document_splitters.markdown]
+chunk_overlap = 96
+
+[document_splitters.semantic]
+chunk_overlap = 144
+""",
+            encoding="utf-8",
+        )
+
+        config = ScireadConfig.load_from_file(config_file)
+
+        assert config.document_splitters.regex_section.chunk_overlap == 48
+        assert config.document_splitters.markdown.chunk_overlap == 96
+        assert config.document_splitters.semantic.chunk_overlap == 144
+
+    def test_get_splitter_config_supports_markdown_and_semantic(self):
+        """Test splitter config lookup covers the builder-backed splitters."""
+        config = ScireadConfig()
+
+        assert config.get_splitter_config("markdown") == config.document_splitters.markdown
+        assert config.get_splitter_config("semantic") == config.document_splitters.semantic
 
     def test_environment_variable_substitution(self, tmp_path):
         """Test environment variable substitution in config."""

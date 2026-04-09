@@ -15,6 +15,7 @@ class MarkdownSplitter(BaseSplitter):
         self,
         min_chunk_size: int = 200,
         max_chunk_size: int = 2000,
+        chunk_overlap: int = 0,
         preserve_code_blocks: bool = True,
         split_on_headers: bool = True,
         confidence_threshold: float = 0.7,
@@ -24,12 +25,14 @@ class MarkdownSplitter(BaseSplitter):
         Args:
             min_chunk_size: Minimum chunk size in characters.
             max_chunk_size: Maximum chunk size in characters.
+            chunk_overlap: Number of backward-overlap characters to include in each non-initial chunk.
             preserve_code_blocks: Whether to keep code blocks intact.
             split_on_headers: Whether to split on markdown headers.
             confidence_threshold: Minimum confidence score for chunks.
         """
         self.min_chunk_size = min_chunk_size
         self.max_chunk_size = max_chunk_size
+        self.chunk_overlap = self._validate_chunk_overlap(chunk_overlap)
         self.preserve_code_blocks = preserve_code_blocks
         self.split_on_headers = split_on_headers
         self.confidence_threshold = confidence_threshold
@@ -40,7 +43,8 @@ class MarkdownSplitter(BaseSplitter):
     @property
     def splitter_name(self) -> str:
         """Return the splitter name."""
-        return f"MarkdownSplitter(min={self.min_chunk_size}, max={self.max_chunk_size})"
+        overlap_suffix = f", overlap={self.chunk_overlap}" if self.chunk_overlap else ""
+        return f"MarkdownSplitter(min={self.min_chunk_size}, max={self.max_chunk_size}{overlap_suffix})"
 
     def _compile_patterns(self):
         """Compile markdown-specific regex patterns."""
@@ -102,6 +106,7 @@ class MarkdownSplitter(BaseSplitter):
 
         # Create chunks based on split points
         chunks = self._create_markdown_chunks(text, split_points)
+        chunks = self._apply_chunk_overlap(text, chunks)
 
         # Restore code blocks if they were extracted
         if self.preserve_code_blocks and code_blocks:

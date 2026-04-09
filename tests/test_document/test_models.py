@@ -116,6 +116,20 @@ class TestChunk:
         assert chunk.processed is True
         assert chunk.retrievable is False
 
+    def test_chunk_overlap_metadata_defaults_and_validation(self):
+        """Test overlap metadata defaults and validation."""
+        chunk = Chunk(content="test")
+
+        assert chunk.overlap_prev_chars == 0
+        assert chunk.overlap_next_chars == 0
+        assert chunk.has_overlap is False
+
+        overlapping_chunk = Chunk(content="test", overlap_prev_chars=5)
+        assert overlapping_chunk.has_overlap is True
+
+        with pytest.raises(ValueError, match="Chunk overlap values must be >= 0"):
+            Chunk(content="test", overlap_prev_chars=-1)
+
 
 class TestDocumentMetadata:
     """Test cases for the DocumentMetadata model."""

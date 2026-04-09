@@ -71,3 +71,19 @@ def test_extract_and_restore_code_blocks_handles_fenced_and_indented_code() -> N
     restored_chunks = splitter._restore_code_blocks(chunks, code_blocks)
 
     assert restored_chunks[0].content == text
+
+
+def test_apply_chunk_overlap_extends_following_chunk_ranges() -> None:
+    """Overlap helper should extend later chunks backward by the configured size."""
+    splitter = DummySplitter()
+    splitter.chunk_overlap = 2
+    chunks = [
+        Chunk(content="abcd", char_range=(0, 4)),
+        Chunk(content="efgh", char_range=(4, 8)),
+    ]
+
+    overlapped_chunks = splitter._apply_chunk_overlap("abcdefgh", chunks)
+
+    assert overlapped_chunks[0].content == "abcd"
+    assert overlapped_chunks[1].content == "cdefgh"
+    assert overlapped_chunks[1].char_range == (2, 8)

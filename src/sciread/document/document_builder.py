@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from .document import Document
 
 from ..embedding_provider import OllamaClient
+from ..platform.config import get_config
 from ..platform.logging import get_logger
 from .ingestion.external_clients import MineruClient
 from .ingestion.loaders import BaseLoader
@@ -250,7 +251,7 @@ class DocumentBuilder:
         # Use provided splitter, default splitter, or create appropriate one
         active_splitter = splitter or self.splitter
         if active_splitter is None:
-            active_splitter = self._create_default_splitter(doc)
+            active_splitter = self._create_default_splitter(doc, **split_kwargs)
 
         # Split the text
         chunks = active_splitter.split(doc.text)
@@ -287,23 +288,22 @@ class DocumentBuilder:
         doc.processing_state.update_timestamp("loaded")
         doc.processing_state.add_note(note)
 
-    def _create_default_splitter(self, doc: "Document") -> BaseSplitter:
+    def _create_default_splitter(self, doc: "Document", **split_kwargs) -> BaseSplitter:
         """Create appropriate splitter based on document content."""
+        config = get_config()
+
         # If document was created with markdown conversion, use the dedicated MarkdownSplitter
         if doc.is_markdown:
+            splitter_kwargs = config.document_splitters.markdown.model_dump()
+            splitter_kwargs.update(split_kwargs)
             return MarkdownSplitter(
-                min_chunk_size=200,
-                max_chunk_size=2000,
-                preserve_code_blocks=True,
-                split_on_headers=True,
-                confidence_threshold=0.7,
+                **splitter_kwargs,
             )
 
         # For other documents, use semantic splitter with academic patterns
-        return SemanticSplitter(
-            enable_academic_patterns=True,
-            enable_markdown_patterns=False,
-        )
+        splitter_kwargs = config.document_splitters.semantic.model_dump()
+        splitter_kwargs.update(split_kwargs)
+        return SemanticSplitter(**splitter_kwargs)
 
     def with_loader(self, loader: BaseLoader) -> "DocumentBuilder":
         """Set custom loader."""

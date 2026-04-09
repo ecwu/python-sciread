@@ -12,6 +12,13 @@ def test_splitter_name_reports_configuration() -> None:
     assert splitter.splitter_name == "MarkdownSplitter(min=10, max=50)"
 
 
+def test_splitter_name_reports_overlap_when_enabled() -> None:
+    """Splitter name should surface non-default overlap configuration."""
+    splitter = MarkdownSplitter(min_chunk_size=10, max_chunk_size=50, chunk_overlap=25)
+
+    assert splitter.splitter_name == "MarkdownSplitter(min=10, max=50, overlap=25)"
+
+
 def test_split_without_headers_returns_single_content_chunk() -> None:
     """Plain text with header splitting disabled should produce one chunk."""
     splitter = MarkdownSplitter(split_on_headers=False)
@@ -43,6 +50,30 @@ def test_split_with_preamble_and_headers_assigns_sections_and_positions() -> Non
     assert [chunk.position for chunk in chunks] == [0, 1, 2]
     assert chunks[1].section_path == ["introduction"]
     assert chunks[2].section_path == ["results"]
+
+
+def test_split_with_overlap_extends_later_markdown_chunks() -> None:
+    """Configured overlap should extend later markdown chunks backward."""
+    splitter = MarkdownSplitter(chunk_overlap=10)
+    text = "\n".join(
+        [
+            "Preface text before the first heading.",
+            "# Introduction",
+            "Intro content",
+            "## Results",
+            "Result content",
+        ]
+    )
+
+    chunks = splitter.split(text)
+
+    assert len(chunks) == 3
+    assert chunks[0].overlap_prev_chars == 0
+    assert chunks[0].overlap_next_chars > 0
+    assert chunks[1].overlap_prev_chars > 0
+    assert chunks[1].char_range is not None
+    assert chunks[0].char_range is not None
+    assert chunks[1].char_range[0] < chunks[0].char_range[1]
 
 
 def test_split_restores_preserved_code_blocks() -> None:

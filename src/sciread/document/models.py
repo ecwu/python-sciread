@@ -24,6 +24,8 @@ class Chunk:
     page_end: int | None = None
     para_index: int | None = None
     char_range: tuple[int, int] | None = None  # (start_char, end_char)
+    overlap_prev_chars: int = 0
+    overlap_next_chars: int = 0
     token_count: int | None = None
 
     prev_chunk_id: str | None = None
@@ -62,6 +64,9 @@ class Chunk:
 
         if self.confidence < 0.0 or self.confidence > 1.0:
             raise ValueError("Confidence must be between 0.0 and 1.0")
+
+        if self.overlap_prev_chars < 0 or self.overlap_next_chars < 0:
+            raise ValueError("Chunk overlap values must be >= 0")
 
         self.sync_page_range()
 
@@ -129,6 +134,11 @@ class Chunk:
     def is_processed(self) -> bool:
         """Check if this chunk is processed."""
         return self.processed
+
+    @property
+    def has_overlap(self) -> bool:
+        """Check whether this chunk overlaps with an adjacent chunk."""
+        return self.overlap_prev_chars > 0 or self.overlap_next_chars > 0
 
 
 @dataclass
