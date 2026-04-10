@@ -194,6 +194,22 @@ async def test_run_search_react_analysis_delegates_with_expected_options(monkeyp
 
 
 @pytest.mark.asyncio
+async def test_run_search_react_analysis_reraises_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Search-react analysis should surface agent failures unchanged."""
+
+    async def fake_analyze_file_with_search_react(*_: object, **__: object) -> str:
+        raise RuntimeError("search-react failure")
+
+    monkeypatch.setattr(
+        "sciread.application.use_cases.search_react.analyze_file_with_search_react",
+        fake_analyze_file_with_search_react,
+    )
+
+    with pytest.raises(RuntimeError, match="search-react failure"):
+        await run_search_react_analysis("paper.pdf", "task")
+
+
+@pytest.mark.asyncio
 async def test_run_coordinate_analysis_loads_document_and_runs_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     """Coordinate analysis should build the agent, load the document, and return the agent result."""
     captured: dict[str, object] = {}

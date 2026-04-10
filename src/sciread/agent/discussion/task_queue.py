@@ -267,8 +267,10 @@ class TaskQueueManager:
         type_counts = defaultdict(int)
 
         for task in queue.pending_tasks + queue.active_tasks + queue.completed_tasks + queue.failed_tasks:
-            status_counts[task.status.value] += 1
-            type_counts[task.task_type.value] += 1
+            status_key = task.status.value if hasattr(task.status, "value") else str(task.status)
+            type_key = task.task_type.value if hasattr(task.task_type, "value") else str(task.task_type)
+            status_counts[status_key] += 1
+            type_counts[type_key] += 1
 
         # Calculate average execution time
         completed_times = [task.result.execution_time for task in queue.completed_tasks if task.result and task.result.execution_time]
