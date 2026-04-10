@@ -3,6 +3,7 @@
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 
@@ -47,12 +48,12 @@ class TestVectorIndex:
         chunks = [Chunk(content="First chunk", chunk_name="introduction"), Chunk(content="Second chunk", chunk_name="methods")]
         embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
-        # Mock the collection.add method to avoid actual ChromaDB dependency in tests
-        vector_index._collection.add = Mock()
+        # Mock the collection.upsert method to avoid actual ChromaDB dependency in tests
+        vector_index._collection.upsert = Mock()
         vector_index.add_chunks(chunks, embeddings)
 
         # Verify add was called with correct parameters
-        vector_index._collection.add.assert_called_once_with(
+        vector_index._collection.upsert.assert_called_once_with(
             embeddings=embeddings,
             documents=["First chunk", "Second chunk"],
             metadatas=[
@@ -61,6 +62,19 @@ class TestVectorIndex:
             ],
             ids=[chunks[0].id, chunks[1].id],
         )
+
+    def test_vector_index_init_can_reset_collection(self):
+        """Reset mode should clear a pre-existing collection before reuse."""
+        client = Mock()
+        collection = Mock()
+        collection.name = "test_collection"
+        client.get_or_create_collection.return_value = collection
+
+        with patch("sciread.document.retrieval.vector_index.chromadb.Client", return_value=client):
+            vector_index = VectorIndex("test_collection", reset_collection=True)
+
+        client.delete_collection.assert_called_once_with(name="test_collection")
+        assert vector_index._collection.name == "test_collection"
 
     def test_search_no_results(self):
         """Test search with no results."""

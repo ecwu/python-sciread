@@ -50,21 +50,22 @@ def test_get_closest_section_name_can_use_embeddings() -> None:
     doc = Document.from_text("placeholder", auto_split=False)
     doc._set_chunks(
         [
-            Chunk(content="a", chunk_name="Introduction"),
-            Chunk(content="b", chunk_name="Methodology"),
+            Chunk(content="a", chunk_name="Alpha"),
+            Chunk(content="b", chunk_name="Beta"),
         ]
     )
     embedding_client = Mock()
-    embedding_client.get_embedding.side_effect = lambda value: {
-        "method": [1.0, 0.0],
-        "introduction": [0.0, 1.0],
-        "methodology": [1.0, 0.0],
-    }.get(value)
+    embedding_client.get_embeddings.return_value = [
+        [1.0, 0.0],
+        [1.0, 0.0],
+        [0.0, 1.0],
+    ]
     doc._runtime.embedding_client = embedding_client
 
-    match = get_closest_section_name(doc, "method", use_embedding=True, threshold=0.8)
+    match = get_closest_section_name(doc, "gamma", use_embedding=True, threshold=0.8)
 
-    assert match == "Methodology"
+    assert match == "Alpha"
+    embedding_client.get_embeddings.assert_called_once_with(["gamma", "alpha", "beta"], batch_size=3)
 
 
 def test_get_closest_section_name_returns_none_for_empty_available_names() -> None:

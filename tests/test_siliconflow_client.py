@@ -51,7 +51,7 @@ class TestSiliconFlowClient:
         client = SiliconFlowClient(cache_embeddings=True)
 
         # Add to cache
-        cache_key = f"{client.model}:{hash('test')}"
+        cache_key = client._build_cache_key("test")
         test_embedding = [1.0, 2.0, 3.0]
         client.embedding_cache[cache_key] = test_embedding
 
@@ -127,7 +127,7 @@ class TestSiliconFlowClient:
         """Test successful single embedding retrieval."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
+        mock_response.json.return_value = {"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}
         mock_post.return_value = mock_response
 
         client = SiliconFlowClient(api_key="test-key")
@@ -152,26 +152,45 @@ class TestSiliconFlowClient:
     @patch("requests.post")
     def test_get_embeddings_with_cache(self, mock_post):
         """Test batch embeddings with caching."""
-        mock_response = Mock()
-        mock_response.status_code = 200
-        mock_response.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
-        mock_post.return_value = mock_response
+        mock_post.return_value = Mock(
+            status_code=200,
+            json=Mock(
+                return_value={
+                    "data": [
+                        {"index": 0, "embedding": [0.1, 0.2, 0.3]},
+                        {"index": 1, "embedding": [0.4, 0.5, 0.6]},
+                    ]
+                }
+            ),
+        )
 
         client = SiliconFlowClient(api_key="test-key", cache_embeddings=True)
 
-        # First call should hit API
         texts = ["text1", "text2"]
-        embeddings = client.get_embeddings(texts, batch_size=1)
+        embeddings = client.get_embeddings(texts, batch_size=10)
 
         assert len(embeddings) == 2
-        assert mock_post.call_count == 2
+        assert mock_post.call_count == 1
 
-        # Second call with same text should use cache
         mock_post.reset_mock()
         embeddings2 = client.get_embeddings(["text1"], batch_size=1)
 
         assert len(embeddings2) == 1
-        assert mock_post.call_count == 0  # Should not call API
+        assert mock_post.call_count == 0
+
+    @patch("requests.post")
+    def test_get_embeddings_deduplicates_repeated_texts(self, mock_post):
+        """Repeated texts in one batch should only trigger one remote embedding request."""
+        mock_post.return_value = Mock(
+            status_code=200,
+            json=Mock(return_value={"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}),
+        )
+
+        client = SiliconFlowClient(api_key="test-key", cache_embeddings=True)
+        embeddings = client.get_embeddings(["same", "same"], batch_size=10)
+
+        assert embeddings == [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3]]
+        assert mock_post.call_count == 1
 
     @patch.dict("os.environ", {}, clear=True)
     def test_get_embeddings_fallback_on_error(self):
@@ -191,7 +210,7 @@ class TestSiliconFlowClient:
         """Test successful connection test."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.json.return_value = {"data": [{"embedding": [0.1, 0.2, 0.3]}]}
+        mock_response.json.return_value = {"data": [{"index": 0, "embedding": [0.1, 0.2, 0.3]}]}
         mock_post.return_value = mock_response
 
         client = SiliconFlowClient(api_key="test-key")

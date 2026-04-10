@@ -59,6 +59,7 @@ def attach_document_chunks(document: Document, chunks: list[Chunk]) -> None:
 def update_chunk_index(document: Document) -> None:
     """Refresh the chunk-id lookup table."""
     document._chunks_by_id = {chunk.id: chunk for chunk in document._chunks}
+    document._runtime.chunk_positions = {chunk.id: index for index, chunk in enumerate(document._chunks)}
 
 
 def get_chunk_map(document: Document) -> dict[str, Chunk]:
@@ -162,11 +163,12 @@ def get_neighbor_chunks(
     if before < 0 or after < 0:
         raise ValueError("before and after must be >= 0")
 
-    center_index = None
-    for index, chunk in enumerate(document._chunks):
-        if chunk.chunk_id == chunk_id:
-            center_index = index
-            break
+    chunk_positions = document._runtime.chunk_positions
+    if len(chunk_positions) != len(document._chunks):
+        update_chunk_index(document)
+        chunk_positions = document._runtime.chunk_positions
+
+    center_index = chunk_positions.get(chunk_id)
 
     if center_index is None:
         return []

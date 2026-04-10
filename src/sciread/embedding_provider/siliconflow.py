@@ -1,6 +1,5 @@
 """SiliconFlow embedding provider."""
 
-import math
 import os
 from typing import Any
 from typing import ClassVar
@@ -8,10 +7,11 @@ from typing import ClassVar
 import requests
 
 from ..platform.logging import get_logger
+from .base import BaseEmbeddingClient
 from .base import BaseEmbeddingProvider
 
 
-class SiliconFlowClient:
+class SiliconFlowClient(BaseEmbeddingClient):
     """Client for interacting with SiliconFlow API (OpenAI-compatible) for embeddings."""
 
     def __init__(
@@ -34,13 +34,14 @@ class SiliconFlowClient:
             cache_embeddings: Whether to cache embeddings
             embedding_dimension: Dimension of the embedding vectors
         """
-        self.model = model
+        super().__init__(
+            model=model,
+            timeout=timeout,
+            cache_embeddings=cache_embeddings,
+            embedding_dimension=embedding_dimension,
+        )
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
-        self.timeout = timeout
-        self.cache_embeddings = cache_embeddings
-        self.embedding_dimension = embedding_dimension
-        self.embedding_cache: dict[str, list[float]] = {}
         self.logger = get_logger(__name__)
 
         if not self.api_key:
@@ -48,72 +49,12 @@ class SiliconFlowClient:
             if not self.api_key:
                 self.logger.warning("No SiliconFlow API key provided. Set SILICONFLOW_API_KEY environment variable.")
 
-    def get_embeddings(self, texts: list[str], batch_size: int = 10) -> list[list[float]]:
-        """
-        Get embeddings for texts using SiliconFlow API.
-
-        Args:
-            texts: List of texts to embed
-            batch_size: Number of texts to process in each batch
-
-        Returns:
-            List of embedding vectors
-        """
-        embeddings = []
-
-        # Process in batches
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i : i + batch_size]
-            batch_embeddings = self._get_batch_embeddings(batch)
-            embeddings.extend(batch_embeddings)
-
-        return embeddings
-
-    def _get_batch_embeddings(self, texts: list[str]) -> list[list[float]]:
-        """Get embeddings for a batch of texts."""
-        batch_embeddings = []
-
-        for text in texts:
-            # Check cache first
-            cache_key = f"{self.model}:{hash(text)}"
-            if self.cache_embeddings and cache_key in self.embedding_cache:
-                batch_embeddings.append(self.embedding_cache[cache_key])
-                continue
-
-            # Get embedding from SiliconFlow
-            try:
-                embedding = self._get_single_embedding(text)
-                if embedding:
-                    batch_embeddings.append(embedding)
-                    if self.cache_embeddings:
-                        self.embedding_cache[cache_key] = embedding
-                else:
-                    batch_embeddings.append([0.0] * self.embedding_dimension)  # Fallback
-            except Exception:
-                batch_embeddings.append([0.0] * self.embedding_dimension)  # Fallback
-
-        return batch_embeddings
-
-    def get_embedding(self, text: str) -> list[float] | None:
-        """Get embedding for a single text from SiliconFlow API."""
-        # Check cache first
-        cache_key = f"{self.model}:{hash(text)}"
-        if self.cache_embeddings and cache_key in self.embedding_cache:
-            return self.embedding_cache[cache_key]
-
-        # Get embedding from SiliconFlow
-        embedding = self._get_single_embedding(text)
-        if embedding and self.cache_embeddings:
-            self.embedding_cache[cache_key] = embedding
-
-        return embedding
-
-    def _get_single_embedding(self, text: str) -> list[float] | None:
-        """Get embedding for a single text from SiliconFlow API using OpenAI format."""
+    def _get_batch_embeddings(self, texts: list[str]) -> list[list[float] | None]:
+        """Get embeddings for a batch of texts using the OpenAI-compatible batch API."""
         try:
             if not self.api_key:
                 self.logger.warning("No API key available for SiliconFlow")
-                return None
+                return [None] * len(texts)
 
             url = f"{self.base_url}/embeddings"
             headers = {
@@ -122,7 +63,7 @@ class SiliconFlowClient:
             }
             payload = {
                 "model": self.model,
-                "input": text,
+                "input": texts,
                 "encoding_format": "float",
             }
 
@@ -130,13 +71,26 @@ class SiliconFlowClient:
 
             if response.status_code == 200:
                 data = response.json()
-                if "data" in data and len(data["data"]) > 0:
-                    embedding = data["data"][0].get("embedding")
-                    if embedding:
-                        return embedding
+                raw_embeddings = data.get("data", [])
+                batch_embeddings: list[list[float] | None] = [None] * len(texts)
+                for fallback_index, item in enumerate(raw_embeddings):
+                    index = item.get("index", fallback_index)
+                    embedding = item.get("embedding")
+                    if isinstance(index, int) and 0 <= index < len(texts):
+                        batch_embeddings[index] = embedding
+                if raw_embeddings and all(embedding is not None for embedding in batch_embeddings):
+                    return batch_embeddings
 
             self.logger.warning(f"SiliconFlow API returned status {response.status_code}: {response.text}")
-            return None
+            return [None] * len(texts)
+        except Exception as e:
+            self.logger.warning(f"Failed to get batch embeddings from SiliconFlow: {e}")
+            return [None] * len(texts)
+
+    def _get_single_embedding(self, text: str) -> list[float] | None:
+        """Get embedding for a single text from SiliconFlow API using OpenAI format."""
+        try:
+            return self._get_batch_embeddings([text])[0]
         except Exception as e:
             self.logger.warning(f"Failed to get embedding from SiliconFlow: {e}")
             return None
@@ -156,46 +110,11 @@ class SiliconFlowClient:
             self.logger.warning(f"Failed to connect to SiliconFlow: {e}")
             return False
 
-    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Calculate cosine similarity between two vectors."""
-        if not vec1 or not vec2 or len(vec1) != len(vec2):
-            return 0.0
-
-        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=True))
-        magnitude1 = math.sqrt(sum(a * a for a in vec1))
-        magnitude2 = math.sqrt(sum(b * b for b in vec2))
-
-        if magnitude1 == 0 or magnitude2 == 0:
-            return 0.0
-
-        return dot_product / (magnitude1 * magnitude2)
-
-    def calculate_centroid(self, embeddings: list[list[float]]) -> list[float]:
-        """Calculate centroid of embeddings."""
-        if not embeddings:
-            return []
-
-        n = len(embeddings[0])
-        centroid = [0.0] * n
-
-        for embedding in embeddings:
-            for i, value in enumerate(embedding):
-                centroid[i] += value
-
-        return [value / len(embeddings) for value in centroid]
-
-    def clear_cache(self):
-        """Clear the embedding cache."""
-        self.embedding_cache.clear()
-
     def get_cache_stats(self) -> dict[str, Any]:
         """Get embedding cache statistics."""
-        return {
-            "cache_size": len(self.embedding_cache),
-            "model": self.model,
-            "cache_enabled": self.cache_embeddings,
-            "embedding_dimension": self.embedding_dimension,
-        }
+        stats = super().get_cache_stats()
+        stats["embedding_dimension"] = self.embedding_dimension
+        return stats
 
 
 class SiliconFlowEmbeddingProvider(BaseEmbeddingProvider):

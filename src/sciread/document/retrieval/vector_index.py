@@ -11,12 +11,13 @@ from sciread.document.models import Chunk
 class VectorIndex:
     """A wrapper around a vector database for semantic search."""
 
-    def __init__(self, collection_name: str, persist_path: Path | None = None):
+    def __init__(self, collection_name: str, persist_path: Path | None = None, reset_collection: bool = False):
         """Initialize the vector index.
 
         Args:
             collection_name: Name of the ChromaDB collection
             persist_path: Path to persist the vector database (optional)
+            reset_collection: Whether to recreate the collection before use
         """
         self.persist_path = persist_path
         if self.persist_path:
@@ -24,10 +25,19 @@ class VectorIndex:
         else:
             self._client = chromadb.Client()
 
-        # Use cosine similarity for better semantic search
-        self._collection = self._client.get_or_create_collection(
+        if reset_collection:
+            try:
+                self._client.delete_collection(name=collection_name)
+            except Exception:
+                pass
+
+        self._collection = self._create_collection(collection_name)
+
+    def _create_collection(self, collection_name: str):
+        """Create or attach to the ChromaDB collection with consistent metadata."""
+        return self._client.get_or_create_collection(
             name=collection_name,
-            metadata={"hnsw:space": "cosine"},  # Use cosine similarity instead of L2
+            metadata={"hnsw:space": "cosine"},
         )
 
     def add_chunks(self, chunks: list[Chunk], embeddings: list[list[float]]) -> None:
@@ -43,7 +53,7 @@ class VectorIndex:
         if len(chunks) != len(embeddings):
             raise ValueError(f"Number of chunks ({len(chunks)}) must match number of embeddings ({len(embeddings)})")
 
-        self._collection.add(
+        self._collection.upsert(
             embeddings=embeddings,
             documents=[chunk.retrieval_text or chunk.content for chunk in chunks],
             metadatas=[

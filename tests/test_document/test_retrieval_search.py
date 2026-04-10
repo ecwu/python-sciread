@@ -1,6 +1,5 @@
 """Tests for unified multi-strategy retrieval helpers."""
 
-
 import pytest
 
 from sciread.document import Document
@@ -123,3 +122,42 @@ def test_hybrid_search_deduplicates_results(monkeypatch: pytest.MonkeyPatch) -> 
 
     assert len(results) == 1
     assert results[0].strategy == "hybrid"
+
+
+def test_hybrid_search_builds_context_only_for_final_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hybrid search should defer context expansion until after fusion and truncation."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    chunks = [
+        Chunk(content="Chunk one", section_path=["intro"], position=0),
+        Chunk(content="Chunk two", section_path=["intro"], position=1),
+    ]
+    doc._set_chunks(chunks)
+
+    lexical_hits = [
+        RetrievedChunk(chunk=chunks[0], score=5.0, strategy="lexical", section_path=["intro"]),
+        RetrievedChunk(chunk=chunks[1], score=4.0, strategy="lexical", section_path=["intro"]),
+    ]
+    semantic_hits = [
+        RetrievedChunk(chunk=chunks[0], score=0.9, strategy="semantic", section_path=["intro"]),
+    ]
+
+    monkeypatch.setattr("sciread.document.retrieval.search.lexical_search", lambda *args, **kwargs: lexical_hits)
+    monkeypatch.setattr("sciread.document.retrieval.search.semantic_chunk_search", lambda *args, **kwargs: semantic_hits)
+    monkeypatch.setattr("sciread.document.retrieval.search.tree_search", lambda *args, **kwargs: [])
+
+    build_calls: list[str] = []
+    monkeypatch.setattr(
+        "sciread.document.retrieval.search._build_expanded_context",
+        lambda document, chunk, neighbor_window: build_calls.append(chunk.chunk_id) or f"context:{chunk.chunk_id}",
+    )
+
+    results = hybrid_search(
+        doc,
+        "intro",
+        top_k=1,
+        neighbor_window=0,
+        section_scope=None,
+    )
+
+    assert len(results) == 1
+    assert build_calls == [chunks[0].chunk_id]

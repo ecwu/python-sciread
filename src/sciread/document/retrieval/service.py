@@ -10,6 +10,7 @@ from sciread.document.state import get_chunk_map
 from sciread.document.state import get_runtime_embedding_client
 from sciread.document.state import set_runtime_embedding_client
 from sciread.embedding_provider import get_embedding_client
+from sciread.embedding_provider.base import cosine_similarity as compute_cosine_similarity
 from sciread.platform.config import get_config
 
 if TYPE_CHECKING:
@@ -17,19 +18,41 @@ if TYPE_CHECKING:
     from sciread.document.models import Chunk
 
 
-def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    """Calculate cosine similarity between two vectors."""
-    try:
-        dot_product = sum(a * b for a, b in zip(vec1, vec2, strict=True))
-        magnitude1 = sum(a * a for a in vec1) ** 0.5
-        magnitude2 = sum(b * b for b in vec2) ** 0.5
+cosine_similarity = compute_cosine_similarity
 
-        if magnitude1 == 0 or magnitude2 == 0:
-            return 0.0
 
-        return dot_product / (magnitude1 * magnitude2)
-    except Exception:
-        return 0.0
+def _resolve_batch_size(embedding_client, default: int = 10) -> int:
+    """Read an optional provider batch size without trusting arbitrary attributes."""
+    batch_size = getattr(embedding_client, "embedding_batch_size", None)
+    if isinstance(batch_size, int) and batch_size > 0:
+        return batch_size
+    return default
+
+
+def _resolve_runtime_embedding_client(
+    document: Document,
+    *,
+    explicit_client=None,
+    get_config_fn=get_config,
+    get_embedding_client_fn=get_embedding_client,
+):
+    """Return the active runtime embedding client, creating and caching it when needed."""
+    if explicit_client is not None:
+        set_runtime_embedding_client(document, explicit_client)
+        return explicit_client
+
+    runtime_client = get_runtime_embedding_client(document)
+    if runtime_client is not None:
+        return runtime_client
+
+    config = get_config_fn()
+    vector_config = config.vector_store
+    runtime_client = get_embedding_client_fn(
+        vector_config.embedding_model,
+        cache_embeddings=vector_config.cache_embeddings,
+    )
+    set_runtime_embedding_client(document, runtime_client)
+    return runtime_client
 
 
 def build_vector_index(
@@ -41,9 +64,9 @@ def build_vector_index(
     vector_index_cls=VectorIndex,
 ) -> None:
     """Build a semantic vector index from document chunks."""
-    chunks = document.chunks
+    chunks = [chunk for chunk in document.chunks if chunk.retrievable]
     if not chunks:
-        document.logger.warning("No chunks to index. Please split the document first.")
+        document.logger.warning("No retrievable chunks to index. Please split the document first.")
         return
 
     document.logger.info(f"Building vector index from {len(chunks)} chunks...")
@@ -53,20 +76,16 @@ def build_vector_index(
         if embedding_client is None:
             config = get_config_fn()
             vector_config = config.vector_store
-            embedding_client = get_embedding_client_fn(
-                vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings,
-            )
-
-        set_runtime_embedding_client(document, embedding_client)
-
-        batch_size = 10
-        if hasattr(embedding_client, "embedding_batch_size"):
-            batch_size = embedding_client.embedding_batch_size
+        embedding_client = _resolve_runtime_embedding_client(
+            document,
+            explicit_client=embedding_client,
+            get_config_fn=get_config_fn,
+            get_embedding_client_fn=get_embedding_client_fn,
+        )
 
         embeddings = embedding_client.get_embeddings(
             [chunk.retrieval_text or chunk.content for chunk in chunks],
-            batch_size=batch_size,
+            batch_size=_resolve_batch_size(embedding_client),
         )
 
         persist_path = None
@@ -82,6 +101,7 @@ def build_vector_index(
         document.vector_index = vector_index_cls(
             collection_name=collection_name,
             persist_path=persist_path,
+            reset_collection=True,
         )
         document.vector_index.add_chunks(chunks, embeddings)
         document.logger.info("Vector index built successfully.")
@@ -104,22 +124,20 @@ def semantic_search(
         document.logger.warning("Vector index not found. Please run `build_vector_index()` first.")
         return []
 
+    normalized_query = query.strip()
+    if not normalized_query:
+        return []
+
     document.logger.info(f"Performing semantic search for: '{query}'")
 
     try:
-        embedding_client = get_runtime_embedding_client(document)
-        if embedding_client is not None:
-            active_embedding_client = embedding_client
-        else:
-            config = get_config_fn()
-            vector_config = config.vector_store
-            active_embedding_client = get_embedding_client_fn(
-                vector_config.embedding_model,
-                cache_embeddings=vector_config.cache_embeddings,
-            )
-            set_runtime_embedding_client(document, active_embedding_client)
+        active_embedding_client = _resolve_runtime_embedding_client(
+            document,
+            get_config_fn=get_config_fn,
+            get_embedding_client_fn=get_embedding_client_fn,
+        )
 
-        query_embedding = active_embedding_client.get_embedding(query)
+        query_embedding = active_embedding_client.get_embedding(normalized_query)
         if not query_embedding:
             document.logger.error("Failed to get embedding for query")
             return []
@@ -130,14 +148,15 @@ def semantic_search(
         if return_scores:
             results_with_scores = []
             for res in search_results:
-                if res["id"] in chunk_map:
-                    chunk = chunk_map[res["id"]]
-                    similarity = res["similarity"]
-                    results_with_scores.append((chunk, similarity))
+                chunk = chunk_map.get(res["id"])
+                if chunk is None or not chunk.retrievable:
+                    continue
+                similarity = res["similarity"]
+                results_with_scores.append((chunk, similarity))
             document.logger.info(f"Found {len(results_with_scores)} matching chunks")
             return results_with_scores
 
-        found_chunks = [chunk_map[res["id"]] for res in search_results if res["id"] in chunk_map]
+        found_chunks = [chunk for res in search_results if (chunk := chunk_map.get(res["id"])) is not None and chunk.retrievable]
         document.logger.info(f"Found {len(found_chunks)} matching chunks")
         return found_chunks
 

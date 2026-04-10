@@ -53,6 +53,11 @@ class TestDocumentRetrievalService:
         assert doc._runtime.embedding_client is embedding_client
         embedding_client.get_embeddings.assert_called_once()
         vector_index.add_chunks.assert_called_once()
+        vector_index_cls.assert_called_once_with(
+            collection_name="unnamed_document",
+            persist_path=None,
+            reset_collection=True,
+        )
 
     def test_build_vector_index_can_create_persisted_index_from_config(self, tmp_path):
         """Persisted indexes should derive their client and storage path from config."""
@@ -84,8 +89,38 @@ class TestDocumentRetrievalService:
         vector_index_cls.assert_called_once_with(
             collection_name="unnamed_document",
             persist_path=tmp_path / "vector_store" / "unnamed_document",
+            reset_collection=True,
         )
         vector_index.add_chunks.assert_called_once()
+
+    def test_build_vector_index_skips_non_retrievable_chunks(self):
+        """Only retrievable chunks should be embedded and indexed."""
+        doc = Document.from_text("placeholder", auto_split=False)
+        doc._set_chunks(
+            [
+                Chunk(content="keep", chunk_name="intro", retrievable=True),
+                Chunk(content="skip", chunk_name="appendix", retrievable=False),
+            ]
+        )
+
+        embedding_client = Mock()
+        embedding_client.get_embeddings.return_value = [[0.1, 0.2]]
+        vector_index = Mock()
+        vector_index_cls = Mock(return_value=vector_index)
+
+        build_vector_index(
+            doc,
+            embedding_client=embedding_client,
+            vector_index_cls=vector_index_cls,
+        )
+
+        embedding_client.get_embeddings.assert_called_once()
+        embedded_texts = embedding_client.get_embeddings.call_args.args[0]
+        assert len(embedded_texts) == 1
+        assert "keep" in embedded_texts[0]
+        assert embedding_client.get_embeddings.call_args.kwargs == {"batch_size": 10}
+        indexed_chunks = vector_index.add_chunks.call_args.args[0]
+        assert [chunk.content for chunk in indexed_chunks] == ["keep"]
 
     def test_build_vector_index_wraps_failures(self):
         """Unexpected indexing failures should be wrapped in a RuntimeError."""
@@ -180,6 +215,26 @@ class TestDocumentRetrievalService:
 
         assert results == []
         doc.vector_index.search.assert_not_called()
+
+    def test_semantic_search_filters_non_retrievable_chunks(self):
+        """Semantic search should not surface chunks marked as non-retrievable."""
+        doc = Document.from_text("placeholder", auto_split=False)
+        retrievable_chunk = Chunk(content="Chunk one", chunk_name="intro")
+        hidden_chunk = Chunk(content="Chunk two", chunk_name="appendix", retrievable=False)
+        doc._set_chunks([retrievable_chunk, hidden_chunk])
+        doc.vector_index = Mock()
+        doc.vector_index.search.return_value = [
+            {"id": hidden_chunk.chunk_id, "similarity": 0.99},
+            {"id": retrievable_chunk.chunk_id, "similarity": 0.88},
+        ]
+
+        embedding_client = Mock()
+        embedding_client.get_embedding.return_value = [0.4, 0.6]
+        set_runtime_embedding_client(doc, embedding_client)
+
+        results = semantic_search(doc, query="intro")
+
+        assert results == [retrievable_chunk]
 
     def test_semantic_search_returns_empty_when_search_raises(self):
         """Unexpected search failures should be swallowed and logged as empty results."""

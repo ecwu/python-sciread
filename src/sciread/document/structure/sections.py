@@ -162,10 +162,19 @@ def get_closest_section_name(
         embedding_client = get_runtime_embedding_client(document)
         if use_embedding and embedding_client is not None:
             try:
-                target_embedding = embedding_client.get_embedding(search_name)
+                embeddings = None
+                if hasattr(embedding_client, "get_embeddings"):
+                    embeddings = embedding_client.get_embeddings([search_name, *normalized_names], batch_size=len(normalized_names) + 1)
+
+                if embeddings and len(embeddings) == len(normalized_names) + 1:
+                    target_embedding = embeddings[0]
+                    candidate_embeddings = embeddings[1:]
+                else:
+                    target_embedding = embedding_client.get_embedding(search_name)
+                    candidate_embeddings = [embedding_client.get_embedding(name) for name in normalized_names]
+
                 if target_embedding:
-                    for i, name in enumerate(normalized_names):
-                        name_embedding = embedding_client.get_embedding(name)
+                    for i, name_embedding in enumerate(candidate_embeddings):
                         if name_embedding:
                             similarity = cosine_similarity(target_embedding, name_embedding)
                             if similarity > best_score and similarity >= threshold:

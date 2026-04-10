@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from dataclasses import field
 from typing import TYPE_CHECKING
 from typing import Any
 
@@ -16,3 +17,4 @@ class DocumentRuntimeState:
 
     embedding_client: Any | None = None
     vector_index: VectorIndex | None = None
+    chunk_positions: dict[str, int] = field(default_factory=dict)

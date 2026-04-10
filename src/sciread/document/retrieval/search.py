@@ -76,6 +76,7 @@ def lexical_search(
     top_k: int,
     neighbor_window: int,
     section_scope: str | None,
+    include_context: bool = True,
 ) -> list[RetrievedChunk]:
     """Perform heuristic lexical retrieval over chunk text and section metadata."""
     query_text = query.strip().lower()
@@ -117,11 +118,10 @@ def lexical_search(
                 strategy="lexical",
                 matched_terms=sorted(set(matched_terms)),
                 section_path=chunk.section_path.copy(),
-                expanded_context=_build_expanded_context(document, chunk, neighbor_window),
             )
         )
 
-    return _limit_results(scored_results, top_k)
+    return _finalize_results(document, scored_results, top_k=top_k, neighbor_window=neighbor_window, include_context=include_context)
 
 
 def semantic_chunk_search(
@@ -131,6 +131,7 @@ def semantic_chunk_search(
     top_k: int,
     neighbor_window: int,
     section_scope: str | None,
+    include_context: bool = True,
 ) -> list[RetrievedChunk]:
     """Perform semantic chunk retrieval, lazily building the vector index."""
     try:
@@ -158,13 +159,18 @@ def semantic_chunk_search(
                 strategy="semantic",
                 matched_terms=[],
                 section_path=chunk.section_path.copy(),
-                expanded_context=_build_expanded_context(document, chunk, neighbor_window),
             )
         )
 
     if not normalized_results:
         return []
-    return _limit_results(normalized_results, top_k)
+    return _finalize_results(
+        document,
+        normalized_results,
+        top_k=top_k,
+        neighbor_window=neighbor_window,
+        include_context=include_context,
+    )
 
 
 def tree_search(
@@ -174,6 +180,7 @@ def tree_search(
     top_k: int,
     neighbor_window: int,
     section_scope: str | None,
+    include_context: bool = True,
 ) -> list[RetrievedChunk]:
     """Search the runtime section tree before selecting descendant chunks."""
     section_tree = build_section_tree(document)
@@ -186,10 +193,7 @@ def tree_search(
 
     for node in section_tree.nodes_by_path.values():
         node_path_text = node.path_text.lower()
-        if scope_prefix and not (
-            node_path_text == scope_prefix
-            or node_path_text.startswith(f"{scope_prefix} >")
-        ):
+        if scope_prefix and not (node_path_text == scope_prefix or node_path_text.startswith(f"{scope_prefix} >")):
             continue
 
         node_score = _score_tree_node(query_text, tokens, node_path_text)
@@ -212,11 +216,10 @@ def tree_search(
                 strategy="tree",
                 matched_terms=sorted(matched_terms_map[chunk_id]),
                 section_path=chunk.section_path.copy(),
-                expanded_context=_build_expanded_context(document, chunk, neighbor_window),
             )
         )
 
-    return _limit_results(results, top_k)
+    return _finalize_results(document, results, top_k=top_k, neighbor_window=neighbor_window, include_context=include_context)
 
 
 def hybrid_search(
@@ -226,6 +229,7 @@ def hybrid_search(
     top_k: int,
     neighbor_window: int,
     section_scope: str | None,
+    include_context: bool = True,
 ) -> list[RetrievedChunk]:
     """Combine lexical, semantic, and tree retrieval with reciprocal-rank fusion."""
     results_by_strategy: dict[str, list[RetrievedChunk]] = {
@@ -235,6 +239,7 @@ def hybrid_search(
             top_k=max(top_k * 2, top_k),
             neighbor_window=neighbor_window,
             section_scope=section_scope,
+            include_context=False,
         ),
         "tree": tree_search(
             document,
@@ -242,6 +247,7 @@ def hybrid_search(
             top_k=max(top_k * 2, top_k),
             neighbor_window=neighbor_window,
             section_scope=section_scope,
+            include_context=False,
         ),
     }
     results_by_strategy["semantic"] = semantic_chunk_search(
@@ -250,6 +256,7 @@ def hybrid_search(
         top_k=max(top_k * 2, top_k),
         neighbor_window=neighbor_window,
         section_scope=section_scope,
+        include_context=False,
     )
 
     fused_scores: dict[str, float] = defaultdict(float)
@@ -266,12 +273,9 @@ def hybrid_search(
                     strategy="hybrid",
                     matched_terms=result.matched_terms.copy(),
                     section_path=result.section_path.copy(),
-                    expanded_context=result.expanded_context,
                 )
             else:
                 existing.matched_terms = sorted(set(existing.matched_terms).union(result.matched_terms))
-                if len(result.expanded_context) > len(existing.expanded_context):
-                    existing.expanded_context = result.expanded_context
 
     fused_results: list[RetrievedChunk] = []
     for chunk_id, fused_score in fused_scores.items():
@@ -279,7 +283,13 @@ def hybrid_search(
         payload.score = fused_score
         fused_results.append(payload)
 
-    return _limit_results(fused_results, top_k)
+    return _finalize_results(
+        document,
+        fused_results,
+        top_k=top_k,
+        neighbor_window=neighbor_window,
+        include_context=include_context,
+    )
 
 
 def format_retrieval_results(results: list[RetrievedChunk], query: str, strategy: str) -> str:
@@ -338,9 +348,7 @@ def _build_expanded_context(document: Document, chunk: Chunk, neighbor_window: i
     parts: list[str] = []
     for neighbor in neighbors:
         section_label = " > ".join(neighbor.section_path) if neighbor.section_path else (neighbor.chunk_name or "unknown")
-        parts.append(
-            f"[{neighbor.citation_key}] {section_label}\n{(neighbor.content_plain or neighbor.content).strip()}"
-        )
+        parts.append(f"[{neighbor.citation_key}] {section_label}\n{(neighbor.content_plain or neighbor.content).strip()}")
     return "\n\n".join(parts)
 
 
@@ -363,3 +371,21 @@ def _limit_results(results: list[RetrievedChunk], top_k: int) -> list[RetrievedC
         if existing is None or result.score > existing.score:
             deduplicated[result.chunk.chunk_id] = result
     return list(deduplicated.values())[:top_k]
+
+
+def _finalize_results(
+    document: Document,
+    results: list[RetrievedChunk],
+    *,
+    top_k: int,
+    neighbor_window: int,
+    include_context: bool,
+) -> list[RetrievedChunk]:
+    """Trim results first, then build expanded context only for the final payload."""
+    limited_results = _limit_results(results, top_k)
+    if not include_context:
+        return limited_results
+
+    for result in limited_results:
+        result.expanded_context = _build_expanded_context(document, result.chunk, neighbor_window)
+    return limited_results
