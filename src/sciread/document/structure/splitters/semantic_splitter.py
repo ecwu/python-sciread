@@ -4,6 +4,10 @@ import re
 import uuid
 
 from sciread.document.models import Chunk
+from sciread.document.structure.paths import build_numbered_section_path
+from sciread.document.structure.paths import clean_section_name
+from sciread.document.structure.paths import get_parent_section_id
+from sciread.document.structure.paths import parse_numbered_section_header
 
 from .base import BaseSplitter
 
@@ -198,18 +202,7 @@ class SemanticSplitter(BaseSplitter):
 
     def _clean_section_name(self, title: str) -> str:
         """Clean section name: lowercase, remove symbols, trim spaces."""
-        # Convert to lowercase
-        cleaned = title.lower()
-
-        # Remove markdown symbols, brackets, and special characters
-        # Keep letters, numbers, spaces, and hyphens only
-        cleaned = re.sub(r"[^\w\s-]", "", cleaned)
-
-        # Replace multiple spaces with single space and trim
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-        # Return "untitled" if empty after cleaning
-        return cleaned if cleaned else "untitled"
+        return clean_section_name(title)
 
     def _find_semantic_split_points(self, text: str) -> list[tuple[int, str, float, str]]:
         """Find split points based on semantic structure."""
@@ -282,15 +275,18 @@ class SemanticSplitter(BaseSplitter):
 
         chunks = []
         prev_pos = 0
+        numbered_titles: dict[str, str] = {}
 
         for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
                     # For content before first header, use "preamble" as section name
-                    content_section_name = None
+                    content_section_name: str | list[str] | None = None
                     if _i == 0:
                         content_section_name = "preamble"
+                    else:
+                        content_section_name = self._resolve_section_path(chunk_text, numbered_titles)
                     chunk = self._create_chunk_from_content(
                         chunk_text,
                         prev_pos,
@@ -306,9 +302,14 @@ class SemanticSplitter(BaseSplitter):
         if prev_pos < len(text):
             chunk_text = text[prev_pos:].strip()
             if chunk_text:
-                # Use section_name from the last split point if available
-                last_section_name = split_points[-1][3] if split_points else None
-                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5, last_section_name)
+                chunk = self._create_chunk_from_content(
+                    chunk_text,
+                    prev_pos,
+                    len(text),
+                    "final",
+                    0.5,
+                    self._resolve_section_path(chunk_text, numbered_titles),
+                )
                 chunks.append(chunk)
 
         return chunks
@@ -320,7 +321,7 @@ class SemanticSplitter(BaseSplitter):
         end_pos: int,
         split_reason: str,
         default_confidence: float,
-        section_name: str | None = None,
+        section_name: str | list[str] | None = None,
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
@@ -330,7 +331,12 @@ class SemanticSplitter(BaseSplitter):
         if section_name is None:
             section_name = self._extract_section_from_content(content)
 
-        section_value = section_name if section_name else "unknown"
+        if isinstance(section_name, list):
+            section_path = [part for part in section_name if part]
+            section_value = section_path[-1] if section_path else "unknown"
+        else:
+            section_value = section_name if section_name else "unknown"
+            section_path = [section_value] if section_value != "unknown" else []
         chunk_id = str(uuid.uuid4())
 
         chunk = Chunk(
@@ -338,7 +344,7 @@ class SemanticSplitter(BaseSplitter):
             chunk_id=chunk_id,
             doc_id="",
             content_plain=content,
-            section_path=[section_value] if section_value != "unknown" else [],
+            section_path=section_path,
             page_start=None,
             page_end=None,
             para_index=0,
@@ -348,7 +354,7 @@ class SemanticSplitter(BaseSplitter):
             token_count=len(content.split()),
             prev_chunk_id=None,
             next_chunk_id=None,
-            parent_section_id=section_value if section_value != "unknown" else None,
+            parent_section_id=get_parent_section_id(section_path),
             citation_key=chunk_id,
             retrievable=True,
             confidence=confidence,
@@ -356,6 +362,20 @@ class SemanticSplitter(BaseSplitter):
         )
 
         return chunk
+
+    def _resolve_section_path(self, content: str, numbered_titles: dict[str, str]) -> list[str] | None:
+        """Resolve the best-effort section path for one chunk."""
+        first_line = content.split("\n", maxsplit=1)[0].strip()
+        numbered_header = parse_numbered_section_header(first_line)
+        if numbered_header:
+            section_number, title = numbered_header
+            numbered_titles[section_number] = title
+            return build_numbered_section_path(section_number, title, numbered_titles)
+
+        section_name = self._extract_section_from_content(content)
+        if section_name:
+            return [section_name]
+        return None
 
     def _extract_section_from_content(self, content: str) -> str | None:
         """Extract section name from content if it starts with a header."""

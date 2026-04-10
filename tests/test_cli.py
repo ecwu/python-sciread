@@ -169,6 +169,28 @@ def test_run_coordinate_success_renders_plan_and_report(monkeypatch: pytest.Monk
             ["sciread", "react", "paper.pdf", "What changed?", "--model", "react-model", "--max-loops", "7", "--no-progress"],
             "react",
         ),
+        (
+            [
+                "sciread",
+                "search-react",
+                "paper.pdf",
+                "What changed?",
+                "--model",
+                "search-model",
+                "--max-loops",
+                "6",
+                "--retriever",
+                "tree",
+                "--compare",
+                "lexical,tree",
+                "--top-k",
+                "4",
+                "--neighbor-window",
+                "2",
+                "--no-progress",
+            ],
+            "search-react",
+        ),
         (["sciread", "simple", "paper.pdf", "--model", "simple-model"], "simple"),
     ],
 )
@@ -198,7 +220,33 @@ def test_run_react_and_simple_success_paths(monkeypatch: pytest.MonkeyPatch, arg
         calls["simple"] = {"document_file": document_file, "model": model}
         return "simple result"
 
+    async def fake_run_search_react_analysis(
+        document_file: str,
+        task: str,
+        *,
+        model: str,
+        max_loops: int,
+        show_progress: bool,
+        retriever: str,
+        compare: list[str] | None,
+        top_k: int,
+        neighbor_window: int,
+    ) -> str:
+        calls["search-react"] = {
+            "document_file": document_file,
+            "task": task,
+            "model": model,
+            "max_loops": max_loops,
+            "show_progress": show_progress,
+            "retriever": retriever,
+            "compare": compare,
+            "top_k": top_k,
+            "neighbor_window": neighbor_window,
+        }
+        return "search-react result"
+
     monkeypatch.setattr(cli, "run_react_analysis", fake_run_react_analysis)
+    monkeypatch.setattr(cli, "run_search_react_analysis", fake_run_search_react_analysis)
     monkeypatch.setattr(cli, "run_simple_analysis", fake_run_simple_analysis)
     monkeypatch.setattr(cli, "console", test_console)
 
@@ -212,6 +260,18 @@ def test_run_react_and_simple_success_paths(monkeypatch: pytest.MonkeyPatch, arg
             "model": "react-model",
             "max_loops": 7,
             "show_progress": False,
+        }
+    elif expected_output == "search-react":
+        assert calls["search-react"] == {
+            "document_file": "paper.pdf",
+            "task": "What changed?",
+            "model": "search-model",
+            "max_loops": 6,
+            "show_progress": False,
+            "retriever": "tree",
+            "compare": ["lexical", "tree"],
+            "top_k": 4,
+            "neighbor_window": 2,
         }
     else:
         assert calls["simple"] == {"document_file": "paper.pdf", "model": "simple-model"}
@@ -301,6 +361,11 @@ def test_run_discussion_success_renders_overview_and_report(monkeypatch: pytest.
             "Error: simple failure",
         ),
         (
+            ["sciread", "search-react", "paper.pdf"],
+            "run_search_react_analysis",
+            "Error: search-react failure",
+        ),
+        (
             ["sciread", "discussion", "paper.pdf"],
             "run_discussion_analysis",
             "Error: discussion failure",
@@ -320,6 +385,7 @@ def test_run_returns_error_code_when_command_fails(
         failure_messages = {
             "run_coordinate_analysis": "coordinate failure",
             "run_react_analysis": "react failure",
+            "run_search_react_analysis": "search-react failure",
             "run_simple_analysis": "simple failure",
             "run_discussion_analysis": "discussion failure",
         }

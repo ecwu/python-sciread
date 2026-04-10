@@ -49,7 +49,7 @@ def test_split_with_preamble_and_headers_assigns_sections_and_positions() -> Non
     assert [chunk.chunk_name for chunk in chunks] == ["preamble", "introduction", "results"]
     assert [chunk.position for chunk in chunks] == [0, 1, 2]
     assert chunks[1].section_path == ["introduction"]
-    assert chunks[2].section_path == ["results"]
+    assert chunks[2].section_path == ["introduction", "results"]
 
 
 def test_split_with_overlap_extends_later_markdown_chunks() -> None:

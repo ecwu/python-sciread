@@ -5,6 +5,9 @@ import uuid
 from re import Pattern
 
 from sciread.document.models import Chunk
+from sciread.document.structure.paths import build_numbered_section_path
+from sciread.document.structure.paths import get_parent_section_id
+from sciread.document.structure.paths import parse_numbered_section_header
 
 from .base import BaseSplitter
 
@@ -269,6 +272,7 @@ class RegexSectionSplitter(BaseSplitter):
     def _create_chunks(self, raw_chunks: list[dict]) -> list[Chunk]:
         """Create Chunk objects from raw chunks."""
         chunks = []
+        numbered_titles: dict[str, str] = {}
 
         for i, raw_chunk in enumerate(raw_chunks):
             content = raw_chunk["text"]
@@ -288,7 +292,8 @@ class RegexSectionSplitter(BaseSplitter):
 
             # Extract actual section name from content
             section_name = self._extract_section_name_from_content(content)
-            section_value = section_name if section_name else "unknown"
+            section_path = self._resolve_section_path(content, section_name, numbered_titles)
+            section_value = section_path[-1] if section_path else (section_name if section_name else "unknown")
             chunk_id = str(uuid.uuid4())
 
             chunk = Chunk(
@@ -296,7 +301,7 @@ class RegexSectionSplitter(BaseSplitter):
                 chunk_id=chunk_id,
                 doc_id="",
                 content_plain=content,
-                section_path=[section_value] if section_value != "unknown" else [],
+                section_path=section_path,
                 page_start=None,
                 page_end=None,
                 para_index=i,
@@ -306,7 +311,7 @@ class RegexSectionSplitter(BaseSplitter):
                 token_count=len(content.split()),
                 prev_chunk_id=None,
                 next_chunk_id=None,
-                parent_section_id=section_value if section_value != "unknown" else None,
+                parent_section_id=get_parent_section_id(section_path),
                 citation_key=chunk_id,
                 retrievable=True,
                 confidence=confidence,
@@ -315,6 +320,23 @@ class RegexSectionSplitter(BaseSplitter):
             chunks.append(chunk)
 
         return chunks
+
+    def _resolve_section_path(
+        self,
+        content: str,
+        section_name: str | None,
+        numbered_titles: dict[str, str],
+    ) -> list[str]:
+        """Build a best-effort section path for one regex-derived chunk."""
+        first_line = content.strip().split("\n", maxsplit=1)[0].strip()
+        numbered_header = parse_numbered_section_header(first_line)
+        if numbered_header:
+            section_number, title = numbered_header
+            numbered_titles[section_number] = title
+            return build_numbered_section_path(section_number, title, numbered_titles)
+        if section_name:
+            return [section_name]
+        return []
 
     def _infer_chunk_type_from_content(self, content: str) -> str:
         """Infer chunk type from the content itself."""

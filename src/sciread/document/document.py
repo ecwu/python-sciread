@@ -10,6 +10,7 @@ from .document_builder import DocumentBuilder
 from .models import Chunk
 from .models import DocumentMetadata
 from .models import ProcessingState
+from .retrieval.search import retrieve_chunks as retrieve_document_chunks
 from .retrieval.service import build_vector_index as build_document_vector_index
 from .retrieval.service import cosine_similarity
 from .retrieval.service import semantic_search as semantic_search_document
@@ -48,6 +49,8 @@ from .structure.sections import get_closest_section_name as resolve_closest_sect
 from .structure.sections import match_section_pattern
 from .structure.sections import prefix_similarity
 from .structure.sections import word_similarity
+from .structure.tree import SectionTree
+from .structure.tree import build_section_tree as build_document_section_tree
 
 
 class Document:
@@ -474,6 +477,24 @@ class Document:
             get_embedding_client_fn=get_embedding_client,
         )
 
+    def retrieve_chunks(
+        self,
+        query: str,
+        strategy: str = "hybrid",
+        top_k: int = 5,
+        neighbor_window: int = 1,
+        section_scope: str | None = None,
+    ):
+        """Retrieve chunks using lexical, semantic, tree, or hybrid search."""
+        return retrieve_document_chunks(
+            self,
+            query=query,
+            strategy=strategy,
+            top_k=top_k,
+            neighbor_window=neighbor_window,
+            section_scope=section_scope,
+        )
+
     # ========== Unified Section Handling Methods ==========
 
     def print_for_human(
@@ -611,6 +632,10 @@ class Document:
             min_confidence=min_confidence,
             min_length=min_length,
         )
+
+    def build_section_tree(self) -> SectionTree:
+        """Build a runtime section tree derived from the current chunk paths."""
+        return build_document_section_tree(self)
 
     # ========== Helper Methods ==========
 

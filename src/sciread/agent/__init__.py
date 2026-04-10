@@ -8,6 +8,7 @@ Main Interface:
     SimpleAgent - Simple agent class for basic document analysis
     CoordinateAgent - Multi-agent controller with expert sub-agents
     ReActAgent - Reasoning and Acting agent for iterative analysis
+    SearchReactAgent - Retrieval-driven iterative analysis with comparable retrievers
     DiscussionAgent - Multi-agent discussion system with personality-driven analysis
 
 Example Usage:
@@ -22,6 +23,7 @@ Example Usage:
 
     # Create a ReAct agent
     react_agent = ReActAgent("deepseek/deepseek-chat")
+    search_react_agent = SearchReactAgent("deepseek/deepseek-chat")
 
     discussion_agent = DiscussionAgent("deepseek/deepseek-chat")
 
@@ -36,6 +38,7 @@ Example Usage:
 
     # Generate iterative analysis with ReAct agent
     react_result = await react_agent.run_analysis(doc, "What are the main contributions?")
+    search_react_result = await search_react_agent.run_analysis(doc, "What are the main contributions?")
 
     # Generate discussion-based analysis with personality agents
     discussion_result = await discussion_agent.analyze_document(doc)
@@ -74,6 +77,12 @@ from .react import ReActIterationOutput
 from .react import analyze_file_with_react
 from .react import analyze_file_with_react_sync
 from .react import load_and_process_document
+from .search_react import SearchReactAgent
+from .search_react import SearchReactAnalysisResult
+from .search_react import SearchReactIterationOutput
+from .search_react import SearchReactStrategyRun
+from .search_react import analyze_file_with_search_react
+from .search_react import analyze_file_with_search_react_sync
 from .shared import remove_references
 from .simple import SimpleAgent
 from .simple import SimpleAnalysisResult
@@ -104,6 +113,10 @@ __all__ = [
     "ReActIterationOutput",
     "ResearchQuestionsResult",
     "Response",
+    "SearchReactAgent",
+    "SearchReactAnalysisResult",
+    "SearchReactIterationOutput",
+    "SearchReactStrategyRun",
     "SimpleAgent",
     "SimpleAnalysisResult",
     "Task",
@@ -115,6 +128,8 @@ __all__ = [
     "TaskType",
     "analyze_file_with_react",
     "analyze_file_with_react_sync",
+    "analyze_file_with_search_react",
+    "analyze_file_with_search_react_sync",
     "analyze_file_with_simple",
     "analyze_file_with_simple_sync",
     "create_personality_agent",

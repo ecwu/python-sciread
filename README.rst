@@ -12,6 +12,7 @@ Features
 - ``simple``: single-agent paper explanation and summarization
 - ``coordinate``: multi-agent comprehensive analysis across metadata, methods, experiments, and future work
 - ``react``: iterative ReAct-style document reasoning
+- ``search-react``: retrieval-driven ReAct analysis with lexical, semantic, tree, and hybrid retrievers
 - ``discussion``: multi-agent discussion with personality-driven collaboration
 - Structured document ingestion, section splitting, and retrieval utilities
 
@@ -38,12 +39,15 @@ CLI usage::
     uv run sciread simple paper.pdf
     uv run sciread coordinate paper.pdf
     uv run sciread react paper.pdf "What are the main contributions?"
+    uv run sciread search-react paper.pdf "What are the main contributions?"
     uv run sciread discussion paper.pdf
 
 Specify a model explicitly when needed::
 
     uv run sciread coordinate paper.pdf --model deepseek/deepseek-chat
     uv run sciread discussion paper.pdf --model deepseek/deepseek-chat
+    uv run sciread search-react paper.pdf "What changed?" --retriever hybrid --top-k 6
+    uv run sciread search-react paper.pdf "What changed?" --compare lexical,semantic,tree,hybrid
 
 You can also run the package directly::
 
@@ -115,6 +119,9 @@ You can enable overlap-aware chunking for RAG-oriented retrieval without changin
 
 The same overlap behavior can be configured globally in ``config/sciread.toml`` under
 ``[document_splitters.markdown]`` or ``[document_splitters.semantic]``.
+
+For retrieval-oriented workflows, ``search-react`` can compare multiple retrievers in one run while reusing the same
+document chunking and vector-store configuration.
 
 Project Layout
 ==============

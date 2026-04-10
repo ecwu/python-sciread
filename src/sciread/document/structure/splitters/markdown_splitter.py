@@ -4,6 +4,8 @@ import re
 import uuid
 
 from sciread.document.models import Chunk
+from sciread.document.structure.paths import clean_section_name
+from sciread.document.structure.paths import get_parent_section_id
 
 from .base import BaseSplitter
 
@@ -127,26 +129,15 @@ class MarkdownSplitter(BaseSplitter):
         Returns:
             Cleaned section name suitable for identification.
         """
-        # Convert to lowercase
-        cleaned = title.lower()
+        return clean_section_name(title)
 
-        # Remove markdown symbols, brackets, and special characters
-        # Keep letters, numbers, spaces, and hyphens only
-        cleaned = re.sub(r"[^\w\s-]", "", cleaned)
-
-        # Replace multiple spaces with single space and trim
-        cleaned = re.sub(r"\s+", " ", cleaned).strip()
-
-        # Return "untitled" if empty after cleaning
-        return cleaned if cleaned else "untitled"
-
-    def _find_markdown_split_points(self, text: str) -> list[tuple[int, str, float, str]]:
+    def _find_markdown_split_points(self, text: str) -> list[tuple[int, str, float, str, int]]:
         """Find split points based on markdown structure.
 
         Returns:
-            List of (position, element_type, confidence, section_name) tuples.
+            List of (position, element_type, confidence, section_name, level) tuples.
         """
-        split_points = []
+        split_points: list[tuple[int, str, float, str, int]] = []
 
         if self.split_on_headers:
             # Find all headers as primary split points
@@ -158,22 +149,22 @@ class MarkdownSplitter(BaseSplitter):
                     # Extract the header title and clean it for section name
                     raw_title = match.group(2).strip()
                     section_name = self._clean_section_name(raw_title)
-                    split_points.append((match.start(), f"h{level}", confidence, section_name))
+                    split_points.append((match.start(), f"h{level}", confidence, section_name, level))
 
         # Sort split points by position
         split_points.sort(key=lambda x: x[0])
 
         # Remove duplicates and keep highest confidence for same position
         filtered_points = []
-        for pos, name, conf, section_name in split_points:
+        for pos, name, conf, section_name, level in split_points:
             if not filtered_points or pos != filtered_points[-1][0]:
-                filtered_points.append((pos, name, conf, section_name))
+                filtered_points.append((pos, name, conf, section_name, level))
             elif conf > filtered_points[-1][2]:
-                filtered_points[-1] = (pos, name, conf, section_name)
+                filtered_points[-1] = (pos, name, conf, section_name, level)
 
         return filtered_points
 
-    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float, str]]) -> list[Chunk]:
+    def _create_markdown_chunks(self, text: str, split_points: list[tuple[int, str, float, str, int]]) -> list[Chunk]:
         """Create chunks based on markdown split points."""
         if not split_points:
             # No markdown structure found, treat as single chunk
@@ -181,34 +172,38 @@ class MarkdownSplitter(BaseSplitter):
 
         chunks = []
         prev_pos = 0
+        active_path: list[str] = []
 
-        for _i, (pos, element_type, confidence, _section_name) in enumerate(split_points):
+        for i, (pos, element_type, confidence, section_name, level) in enumerate(split_points):
             if pos > prev_pos:
                 chunk_text = text[prev_pos:pos].strip()
                 if chunk_text:
-                    # For content before first header, use "preamble" as section name
-                    # For content between headers, don't assign the next header's section name
-                    content_section_name = None
-                    if _i == 0:
-                        content_section_name = "preamble"
                     chunk = self._create_chunk_from_content(
                         chunk_text,
                         prev_pos,
                         pos,
                         element_type,
                         confidence,
-                        content_section_name,
+                        active_path or (["preamble"] if i == 0 else []),
                     )
                     chunks.append(chunk)
+
+            active_path = active_path[: max(level - 1, 0)]
+            active_path.append(section_name)
             prev_pos = pos
 
         # Add final chunk
         if prev_pos < len(text):
             chunk_text = text[prev_pos:].strip()
             if chunk_text:
-                # Use section_name from the last split point if available
-                last_section_name = split_points[-1][3] if split_points else None
-                chunk = self._create_chunk_from_content(chunk_text, prev_pos, len(text), "final", 0.5, last_section_name)
+                chunk = self._create_chunk_from_content(
+                    chunk_text,
+                    prev_pos,
+                    len(text),
+                    "final",
+                    0.5,
+                    active_path.copy(),
+                )
                 chunks.append(chunk)
 
         return chunks
@@ -220,7 +215,7 @@ class MarkdownSplitter(BaseSplitter):
         end_pos: int,
         split_reason: str,
         default_confidence: float,
-        section_name: str | None = None,
+        section_name: str | list[str] | None = None,
     ) -> Chunk:
         """Create a chunk and determine its type and confidence based on content."""
         # Analyze content to determine the most appropriate chunk type
@@ -230,7 +225,12 @@ class MarkdownSplitter(BaseSplitter):
         if section_name is None:
             section_name = self._extract_section_from_content(content)
 
-        section_value = section_name if section_name else "unknown"
+        if isinstance(section_name, list):
+            section_path = [part for part in section_name if part]
+            section_value = section_path[-1] if section_path else "unknown"
+        else:
+            section_value = section_name if section_name else "unknown"
+            section_path = [section_value] if section_value != "unknown" else []
         chunk_id = str(uuid.uuid4())
 
         chunk = Chunk(
@@ -238,7 +238,7 @@ class MarkdownSplitter(BaseSplitter):
             chunk_id=chunk_id,
             doc_id="",
             content_plain=content,
-            section_path=[section_value] if section_value != "unknown" else [],
+            section_path=section_path,
             page_start=None,
             page_end=None,
             para_index=0,
@@ -248,7 +248,7 @@ class MarkdownSplitter(BaseSplitter):
             token_count=len(content.split()),
             prev_chunk_id=None,
             next_chunk_id=None,
-            parent_section_id=section_value if section_value != "unknown" else None,
+            parent_section_id=get_parent_section_id(section_path),
             citation_key=chunk_id,
             retrievable=True,
             confidence=confidence,

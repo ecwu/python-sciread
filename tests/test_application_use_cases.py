@@ -10,6 +10,7 @@ from sciread.application.use_cases import common
 from sciread.application.use_cases.coordinate import run_coordinate_analysis
 from sciread.application.use_cases.discussion import run_discussion_analysis
 from sciread.application.use_cases.react import run_react_analysis
+from sciread.application.use_cases.search_react import run_search_react_analysis
 from sciread.application.use_cases.simple import run_simple_analysis
 
 
@@ -149,6 +150,47 @@ async def test_run_react_analysis_reraises_failures(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(RuntimeError, match="react failure"):
         await run_react_analysis("paper.pdf", "task")
+
+
+@pytest.mark.asyncio
+async def test_run_search_react_analysis_delegates_with_expected_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Search-react analysis should pass through retrieval settings."""
+    captured: dict[str, object] = {}
+
+    async def fake_analyze_file_with_search_react(*args: object, **kwargs: object) -> str:
+        captured["args"] = args
+        captured["kwargs"] = kwargs
+        return "search-react result"
+
+    monkeypatch.setattr(
+        "sciread.application.use_cases.search_react.analyze_file_with_search_react",
+        fake_analyze_file_with_search_react,
+    )
+
+    result = await run_search_react_analysis(
+        "paper.pdf",
+        "What matters?",
+        model="deepseek-chat",
+        max_loops=7,
+        show_progress=False,
+        retriever="tree",
+        compare=["lexical", "tree"],
+        top_k=6,
+        neighbor_window=2,
+    )
+
+    assert result == "search-react result"
+    assert captured["args"] == ("paper.pdf", "What matters?")
+    assert captured["kwargs"] == {
+        "model": "deepseek-chat",
+        "max_loops": 7,
+        "to_markdown": True,
+        "show_progress": False,
+        "retriever": "tree",
+        "compare": ["lexical", "tree"],
+        "top_k": 6,
+        "neighbor_window": 2,
+    }
 
 
 @pytest.mark.asyncio

@@ -3,11 +3,13 @@
 from .coordinate import run_coordinate_analysis
 from .discussion import run_discussion_analysis
 from .react import run_react_analysis
+from .search_react import run_search_react_analysis
 from .simple import run_simple_analysis
 
 __all__ = [
     "run_coordinate_analysis",
     "run_discussion_analysis",
     "run_react_analysis",
+    "run_search_react_analysis",
     "run_simple_analysis",
 ]

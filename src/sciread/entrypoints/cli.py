@@ -26,6 +26,7 @@ from ..agent.coordinate import ComprehensiveAnalysisResult
 from ..application import run_coordinate_analysis
 from ..application import run_discussion_analysis
 from ..application import run_react_analysis
+from ..application import run_search_react_analysis
 from ..application import run_simple_analysis
 from ..platform.logging import logger
 from ..platform.rich_output import TableColumnSpec
@@ -188,6 +189,7 @@ MODES:
          (metadata, methodology, experiments, future directions)
   react  - Uses ReAct agent for intelligent iterative analysis
          with reasoning and acting pattern
+  search-react - Uses retrieval-driven ReAct analysis with comparable retrievers
   discussion - Uses DiscussionAgent with multiple personality-driven agents
          for collaborative analysis through discussion and consensus-building
 
@@ -203,6 +205,9 @@ EXAMPLES:
   sciread react paper.pdf
   sciread react paper.pdf "What are the main contributions?"
   sciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
+  sciread search-react paper.pdf "What are the main contributions?"
+  sciread search-react paper.pdf "What changed?" --retriever lexical --top-k 6
+  sciread search-react paper.pdf "What changed?" --compare lexical,semantic,tree,hybrid
   sciread discussion paper.pdf
   sciread discussion paper.pdf deepseek-reasoner
 
@@ -275,6 +280,61 @@ MODELS:
         help="Hide progress display during analysis",
     )
 
+    search_react_parser = subparsers.add_parser(
+        "search-react",
+        help="Retrieval-driven ReAct analysis",
+        description="Use SearchReactAgent for retrieval-driven iterative analysis with comparable retrievers",
+    )
+    search_react_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
+    search_react_parser.add_argument(
+        "task",
+        nargs="?",
+        default="Analyze this academic paper focusing on: 1) What are the research questions and objectives? 2) What methodology and approach did the researchers use? 3) What are the key findings and results? 4) What are the main contributions and significance of this work?",
+        help="Analysis task or question about the document (default: comprehensive academic analysis)",
+    )
+    search_react_parser.add_argument(
+        "--model",
+        default="deepseek/deepseek-chat",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+    )
+    search_react_parser.add_argument(
+        "--max-loops",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Maximum number of analysis iterations (default: 5)",
+    )
+    search_react_parser.add_argument(
+        "--retriever",
+        default="hybrid",
+        choices=["lexical", "semantic", "tree", "hybrid"],
+        help="Retrieval strategy used for the run (default: hybrid)",
+    )
+    search_react_parser.add_argument(
+        "--compare",
+        default="",
+        help="Comma-separated retrieval strategies to compare sequentially (e.g. lexical,semantic,tree,hybrid)",
+    )
+    search_react_parser.add_argument(
+        "--top-k",
+        type=int,
+        default=5,
+        metavar="N",
+        help="Maximum number of retrieved chunks per search (default: 5)",
+    )
+    search_react_parser.add_argument(
+        "--neighbor-window",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Neighbor chunks to include before/after each hit (default: 1)",
+    )
+    search_react_parser.add_argument(
+        "--no-progress",
+        action="store_true",
+        help="Hide progress display during analysis",
+    )
+
     # Discussion mode parser
     discussion_parser = subparsers.add_parser(
         "discussion",
@@ -326,6 +386,37 @@ MODELS:
             return 0
         except Exception as e:
             logger.error(f"ReAct analysis failed: {e}")
+            print(f"Error: {e}")
+            return 1
+
+    elif args.command == "search-react":
+        task_display = args.task[:100] + "..." if len(args.task) > 100 else args.task
+        compare = [item.strip() for item in args.compare.split(",") if item.strip()] or None
+        logger.debug(
+            "Running search-react mode with "
+            f"file: {args.document_file}, task: {task_display}, model: {args.model}, "
+            f"max_loops: {args.max_loops}, retriever: {args.retriever}, compare: {compare}, "
+            f"top_k: {args.top_k}, neighbor_window: {args.neighbor_window}, "
+            f"show_progress: {not args.no_progress}"
+        )
+
+        try:
+            asyncio.run(
+                run_search_react_analysis(
+                    args.document_file,
+                    args.task,
+                    model=args.model,
+                    max_loops=args.max_loops,
+                    show_progress=not args.no_progress,
+                    retriever=args.retriever,
+                    compare=compare,
+                    top_k=args.top_k,
+                    neighbor_window=args.neighbor_window,
+                )
+            )
+            return 0
+        except Exception as e:
+            logger.error(f"Search-react analysis failed: {e}")
             print(f"Error: {e}")
             return 1
 
