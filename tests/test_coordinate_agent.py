@@ -324,7 +324,9 @@ def test_coordinate_agent_extract_abstract_delegates_to_planner(monkeypatch: pyt
 
 
 @pytest.mark.asyncio
-async def test_coordinate_agent_wrapper_methods_delegate_to_module_helpers(sample_pdf_document: Document, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_coordinate_agent_wrapper_methods_delegate_to_module_helpers(
+    sample_pdf_document: Document, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Wrapper methods should pass through stateful configuration to helper modules."""
     agent = CoordinateAgent.__new__(CoordinateAgent)
     agent.logger = get_logger(__name__)
@@ -430,7 +432,9 @@ async def test_plan_analysis_returns_agent_output_on_success(monkeypatch: pytest
 
     monkeypatch.setattr("sciread.agent.coordinate.planner.extract_abstract", lambda document, logger: "Paper abstract")
     monkeypatch.setattr("sciread.agent.coordinate.planner.get_section_length_map", lambda document, section_names: {"Methods": 240})
-    monkeypatch.setattr("sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars")
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars"
+    )
 
     document = object()
     logger = get_logger(__name__)
@@ -456,7 +460,9 @@ async def test_plan_analysis_falls_back_to_default_plan_on_timeout(monkeypatch: 
 
     monkeypatch.setattr("sciread.agent.coordinate.planner.extract_abstract", lambda document, logger: "Paper abstract")
     monkeypatch.setattr("sciread.agent.coordinate.planner.get_section_length_map", lambda document, section_names: {"Methods": 240})
-    monkeypatch.setattr("sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars")
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars"
+    )
 
     document = object()
     plan = await plan_analysis(
@@ -496,7 +502,9 @@ async def test_plan_analysis_returns_agent_output_even_with_empty_reasoning(monk
 
     monkeypatch.setattr("sciread.agent.coordinate.planner.extract_abstract", lambda document, logger: "Paper abstract")
     monkeypatch.setattr("sciread.agent.coordinate.planner.get_section_length_map", lambda document, section_names: {"Intro": 240})
-    monkeypatch.setattr("sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Intro | 240 chars")
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Intro | 240 chars"
+    )
 
     plan = await plan_analysis(
         document=object(),
@@ -520,7 +528,9 @@ async def test_plan_analysis_falls_back_to_default_plan_on_exception(monkeypatch
 
     monkeypatch.setattr("sciread.agent.coordinate.planner.extract_abstract", lambda document, logger: "Paper abstract")
     monkeypatch.setattr("sciread.agent.coordinate.planner.get_section_length_map", lambda document, section_names: {"Methods": 240})
-    monkeypatch.setattr("sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars")
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 240 chars"
+    )
 
     plan = await plan_analysis(
         document=object(),
@@ -554,8 +564,12 @@ async def test_create_planning_agent_builds_prompt_and_retries_for_empty_documen
     monkeypatch.setattr("sciread.agent.coordinate.planner.Agent", FakeAgent)
     monkeypatch.setattr("sciread.agent.coordinate.planner.extract_abstract", lambda document, logger: "Paper abstract")
     monkeypatch.setattr("sciread.agent.coordinate.planner.get_section_length_map", lambda document, section_names: {"Methods": 480})
-    monkeypatch.setattr("sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 480 chars")
-    monkeypatch.setattr("sciread.agent.coordinate.planner.build_analysis_planning_prompt", lambda abstract, sections: f"Prompt::{abstract}::{sections}")
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.format_section_choices", lambda section_names, section_lengths: "Methods | 480 chars"
+    )
+    monkeypatch.setattr(
+        "sciread.agent.coordinate.planner.build_analysis_planning_prompt", lambda abstract, sections: f"Prompt::{abstract}::{sections}"
+    )
 
     planning_agent = create_planning_agent(model="model", max_retries=2, logger=get_logger(__name__))
     ctx = SimpleNamespace(deps=CoordinateDeps(document=SimpleNamespace(get_section_names=lambda: ["Methods"])))

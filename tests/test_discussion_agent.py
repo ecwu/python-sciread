@@ -174,9 +174,15 @@ async def test_run_questioning_phase_moves_to_responding_when_questions_exist() 
     agent.discussion_state = DiscussionState(current_phase=DiscussionPhase.QUESTIONING, iteration_count=2)
     agent.agent_insights = {
         AgentPersonality.CRITICAL_EVALUATOR: [_make_insight("INS-CE-01", AgentPersonality.CRITICAL_EVALUATOR, "Need stronger evaluation.")],
-        AgentPersonality.INNOVATIVE_INSIGHTER: [_make_insight("INS-II-01", AgentPersonality.INNOVATIVE_INSIGHTER, "The novelty is the planner.")],
-        AgentPersonality.PRACTICAL_APPLICATOR: [_make_insight("INS-PA-01", AgentPersonality.PRACTICAL_APPLICATOR, "Deployment looks feasible.")],
-        AgentPersonality.THEORETICAL_INTEGRATOR: [_make_insight("INS-TI-01", AgentPersonality.THEORETICAL_INTEGRATOR, "The framework unifies prior work.")],
+        AgentPersonality.INNOVATIVE_INSIGHTER: [
+            _make_insight("INS-II-01", AgentPersonality.INNOVATIVE_INSIGHTER, "The novelty is the planner.")
+        ],
+        AgentPersonality.PRACTICAL_APPLICATOR: [
+            _make_insight("INS-PA-01", AgentPersonality.PRACTICAL_APPLICATOR, "Deployment looks feasible.")
+        ],
+        AgentPersonality.THEORETICAL_INTEGRATOR: [
+            _make_insight("INS-TI-01", AgentPersonality.THEORETICAL_INTEGRATOR, "The framework unifies prior work.")
+        ],
     }
 
     async def fake_wait(_task_ids: list[str], timeout_minutes: int = 5) -> None:

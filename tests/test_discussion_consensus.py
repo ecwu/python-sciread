@@ -191,9 +191,7 @@ def test_generate_summary_and_significance_parses_labeled_output() -> None:
 
     class FakeAgent:
         async def run(self, prompt: str):
-            return SimpleNamespace(
-                output="SUMMARY:\n中文摘要。\n\nSIGNIFICANCE:\n整体意义。"
-            )
+            return SimpleNamespace(output="SUMMARY:\n中文摘要。\n\nSIGNIFICANCE:\n整体意义。")
 
     builder.agent = FakeAgent()
     summary, significance = asyncio.run(

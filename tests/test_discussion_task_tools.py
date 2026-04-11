@@ -196,9 +196,7 @@ async def test_question_and_answer_tools_return_failure_results_on_invalid_input
     monkeypatch.setattr(task_tools, "get_cached_agent", lambda *_args, **_kwargs: FakePersonalityAgent())
 
     ask_result = await task_tools.ask_question_tool(Task(task_id="ask-2", task_type=TaskType.ASK_QUESTION, parameters={}))
-    answer_result = await task_tools.answer_question_tool(
-        Task(task_id="answer-2", task_type=TaskType.ANSWER_QUESTION, parameters={})
-    )
+    answer_result = await task_tools.answer_question_tool(Task(task_id="answer-2", task_type=TaskType.ANSWER_QUESTION, parameters={}))
 
     assert ask_result.success is False
     assert ask_result.metadata["from_agent"] == "unknown"
@@ -225,8 +223,6 @@ async def test_evaluate_convergence_tool_and_registry(monkeypatch: pytest.Monkey
     assert task_tools.get_task_tool(TaskType.MONITOR_CONVERGENCE) is task_tools.evaluate_convergence_tool
     assert task_tools.get_task_tool(TaskType.SYNTHESIZE_REPORT) is None
 
-    failed = await task_tools.evaluate_convergence_tool(
-        Task(task_id="eval-2", task_type=TaskType.MONITOR_CONVERGENCE, parameters={})
-    )
+    failed = await task_tools.evaluate_convergence_tool(Task(task_id="eval-2", task_type=TaskType.MONITOR_CONVERGENCE, parameters={}))
     assert failed.success is False
     assert failed.metadata["personality"] == "unknown"

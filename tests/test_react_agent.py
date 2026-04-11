@@ -269,7 +269,9 @@ async def test_run_iteration_falls_back_when_agent_run_raises() -> None:
             raise RuntimeError("model offline")
 
     agent = ReActAgent.__new__(ReActAgent)
-    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.logger = SimpleNamespace(
+        debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None
+    )
     agent.model = object()
     agent.model_identifier = "mock-model"
     agent.agent = FailingAgent()
@@ -298,7 +300,9 @@ async def test_run_iteration_forces_final_report_from_accumulated_memory() -> No
             return _FakeRunResult(ReActIterationOutput(thoughts="Need one more pass.", should_continue=True))
 
     agent = ReActAgent.__new__(ReActAgent)
-    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.logger = SimpleNamespace(
+        debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None
+    )
     agent.model = object()
     agent.model_identifier = "mock-model"
     agent.agent = ContinuingAgent()
@@ -320,7 +324,9 @@ async def test_run_iteration_forces_final_report_from_accumulated_memory() -> No
 async def test_run_analysis_stops_when_all_sections_are_processed(monkeypatch: pytest.MonkeyPatch) -> None:
     """Analysis should stop early once there are no remaining sections to read."""
     agent = ReActAgent.__new__(ReActAgent)
-    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.logger = SimpleNamespace(
+        debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None
+    )
     agent.model = object()
     agent.model_identifier = "mock-model"
     agent.agent = object()
