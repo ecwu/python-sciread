@@ -231,9 +231,15 @@ class SearchReactAgent:
     def __init__(self, model: str = "deepseek-chat") -> None:
         self.logger = get_logger(__name__)
         self.model_identifier = model
-        self.model = get_model(model)
+        self.model = None
         self.agent = search_react_iteration_agent
         self.logger.info(f"Initialized SearchReactAgent with model: {model}")
+
+    def _get_or_create_model(self):
+        """Create the configured model lazily so tests can replace run paths without real provider setup."""
+        if self.model is None:
+            self.model = get_model(self.model_identifier)
+        return self.model
 
     def _build_iteration_deps(
         self,
@@ -307,7 +313,7 @@ class SearchReactAgent:
             result = await self.agent.run(
                 build_iteration_user_prompt(current_loop, max_loops),
                 deps=deps,
-                model=self.model,
+                model=self._get_or_create_model(),
                 metadata={"iteration_state": iteration_state},
             )
             output = result.output if isinstance(result.output, SearchReactIterationOutput) else None

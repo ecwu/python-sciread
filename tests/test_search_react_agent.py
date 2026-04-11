@@ -151,6 +151,21 @@ async def test_search_react_compare_runs_strategies_sequentially(monkeypatch: py
 
 
 @pytest.mark.asyncio
+async def test_search_react_init_defers_model_creation_until_iteration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Agent construction should not require a live provider configuration."""
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("get_model should not run during __init__")
+
+    monkeypatch.setattr("sciread.agent.search_react.agent.get_model", fail_if_called)
+
+    agent = SearchReactAgent(model="deepseek-chat")
+
+    assert agent.model is None
+    assert agent.model_identifier == "deepseek-chat"
+
+
+@pytest.mark.asyncio
 async def test_search_react_run_iteration_falls_back_when_agent_run_raises() -> None:
     """Iteration execution should use the safe fallback when the retrieval model call fails."""
 
