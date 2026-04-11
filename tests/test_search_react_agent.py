@@ -18,6 +18,11 @@ from sciread.document.models import Chunk
 from sciread.document.retrieval.models import RetrievedChunk
 
 
+class _FakeRunResult:
+    def __init__(self, output) -> None:
+        self.output = output
+
+
 @pytest.mark.asyncio
 async def test_search_react_tools_guard_against_repeated_search_and_memory() -> None:
     """Each iteration should allow one retrieval action and one memory write."""
@@ -143,3 +148,120 @@ async def test_search_react_compare_runs_strategies_sequentially(monkeypatch: py
 
     assert [run.strategy for run in result.runs] == ["lexical", "tree"]
     assert expected_runs == ["lexical", "tree"]
+
+
+@pytest.mark.asyncio
+async def test_search_react_run_iteration_falls_back_when_agent_run_raises() -> None:
+    """Iteration execution should use the safe fallback when the retrieval model call fails."""
+
+    class FailingAgent:
+        async def run(self, *args, **kwargs):
+            raise RuntimeError("model offline")
+
+    agent = SearchReactAgent.__new__(SearchReactAgent)
+    agent.logger = SimpleNamespace(error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = FailingAgent()
+
+    output, iteration_state = await agent.run_iteration(
+        document=SimpleNamespace(),
+        iteration_input=SearchReactIterationInput(task="Summarize"),
+        current_loop=1,
+        max_loops=3,
+        accumulated_memory="",
+        show_progress=False,
+    )
+
+    assert output.thoughts == "Iteration failed: could not complete retrieval-driven analysis."
+    assert output.should_continue is True
+    assert iteration_state.queries_run == []
+
+
+@pytest.mark.asyncio
+async def test_search_react_compare_keeps_failures_without_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Compare mode should keep failed strategies in the result while returning successful ones."""
+    monkeypatch.setattr("sciread.agent.search_react.agent.load_document", lambda *args, **kwargs: SimpleNamespace(chunks=[], metadata=None))
+    monkeypatch.setattr("sciread.agent.search_react.agent._validate_document_file", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("sciread.agent.search_react.agent._render_analysis_overview", lambda *args, **kwargs: None)
+    monkeypatch.setattr("sciread.agent.search_react.agent._render_compare_summary", lambda *args, **kwargs: None)
+    monkeypatch.setattr("sciread.agent.search_react.agent.console.print", lambda *args, **kwargs: None)
+
+    async def fake_run_analysis(self, **kwargs):
+        strategy = kwargs["strategy"]
+        if strategy == "tree":
+            raise RuntimeError("tree failed")
+        return SimpleNamespace(
+            strategy=strategy,
+            output=SearchReactIterationOutput(thoughts=f"{strategy} done", should_continue=False, report=f"{strategy} report"),
+            retrieved_chunks=[],
+            total_time_seconds=0.1,
+            error="",
+        )
+
+    monkeypatch.setattr(SearchReactAgent, "run_analysis", fake_run_analysis)
+
+    result = await analyze_file_with_search_react(
+        "paper.pdf",
+        "What changed?",
+        compare=["lexical", "tree"],
+        show_progress=False,
+    )
+
+    assert [run.strategy for run in result.runs] == ["lexical", "tree"]
+    assert result.runs[0].error == ""
+    assert result.runs[0].output.report == "lexical report"
+    assert result.runs[1].error == "tree failed"
+    assert result.runs[1].output.thoughts == "Strategy failed: tree failed"
+
+
+@pytest.mark.asyncio
+async def test_search_react_run_analysis_stops_after_completed_iteration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The multi-iteration loop should stop once one iteration reports completion."""
+    agent = SearchReactAgent.__new__(SearchReactAgent)
+    agent.logger = SimpleNamespace(error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = object()
+
+    chunk = Chunk(content="Body", chunk_name="intro")
+    retrieved = RetrievedChunk(
+        chunk=chunk,
+        score=0.9,
+        strategy="hybrid",
+        section_path=["intro"],
+        expanded_context="Body",
+    )
+
+    async def fake_run_iteration(
+        document,
+        iteration_input: SearchReactIterationInput,
+        current_loop: int,
+        max_loops: int,
+        accumulated_memory: str,
+        show_progress: bool,
+    ) -> tuple[SearchReactIterationOutput, SearchReactIterationState]:
+        assert current_loop == 1
+        return (
+            SearchReactIterationOutput(thoughts="Enough evidence.", should_continue=False, report=""),
+            SearchReactIterationState(
+                queries_run=["main contribution"],
+                retrieved_chunks=[retrieved],
+                memory_text="- [CLAIM] Main contribution found.",
+            ),
+        )
+
+    monkeypatch.setattr(agent, "run_iteration", fake_run_iteration)
+
+    result = await agent.run_analysis(
+        document=SimpleNamespace(),
+        task="Summarize",
+        strategy="hybrid",
+        max_loops=3,
+        show_progress=False,
+    )
+
+    assert result.strategy == "hybrid"
+    assert result.output.should_continue is False
+    assert result.output.report == "- [CLAIM] Main contribution found."
+    assert [item.chunk.chunk_id for item in result.retrieved_chunks] == [chunk.chunk_id]

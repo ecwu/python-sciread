@@ -7,6 +7,7 @@ from rich.console import Console
 
 from sciread.agent.react import analyze_file_with_react
 from sciread.agent.react import analyze_file_with_react_sync
+from sciread.agent.react.agent import ReActAgent
 from sciread.agent.react.agent import _render_sections_read
 from sciread.agent.react.agent import add_memory
 from sciread.agent.react.agent import get_all_memory
@@ -18,6 +19,12 @@ from sciread.agent.react.models import ReActIterationInput
 from sciread.agent.react.models import ReActIterationOutput
 from sciread.agent.react.models import ReActIterationState
 from sciread.agent.react.prompts import build_iteration_system_prompt
+from sciread.document.models import Chunk
+
+
+class _FakeRunResult:
+    def __init__(self, output) -> None:
+        self.output = output
 
 
 def test_normalize_section_names_handles_common_input_shapes() -> None:
@@ -251,3 +258,101 @@ def test_render_sections_read_shows_names_and_lengths_without_body_preview(monke
     assert "Chars" in rendered
     assert "Detailed architecture description with equations." not in rendered
     assert "Ablations and numerical comparisons." not in rendered
+
+
+@pytest.mark.asyncio
+async def test_run_iteration_falls_back_when_agent_run_raises() -> None:
+    """Iteration execution should degrade to the safe fallback when the model call fails."""
+
+    class FailingAgent:
+        async def run(self, *args, **kwargs):
+            raise RuntimeError("model offline")
+
+    agent = ReActAgent.__new__(ReActAgent)
+    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = FailingAgent()
+
+    output, iteration_state = await agent.run_iteration(
+        document=SimpleNamespace(),
+        iteration_input=ReActIterationInput(task="Summarize", available_sections=["Abstract"]),
+        current_loop=1,
+        max_loops=3,
+        accumulated_memory="",
+        show_progress=False,
+    )
+
+    assert output.thoughts == "Iteration failed: could not complete analysis."
+    assert output.should_continue is True
+    assert output.report == ""
+    assert iteration_state.sections_read == []
+
+
+@pytest.mark.asyncio
+async def test_run_iteration_forces_final_report_from_accumulated_memory() -> None:
+    """The last loop should force completion and use accumulated memory when no report is returned."""
+
+    class ContinuingAgent:
+        async def run(self, *args, **kwargs):
+            return _FakeRunResult(ReActIterationOutput(thoughts="Need one more pass.", should_continue=True))
+
+    agent = ReActAgent.__new__(ReActAgent)
+    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = ContinuingAgent()
+
+    output, _iteration_state = await agent.run_iteration(
+        document=SimpleNamespace(),
+        iteration_input=ReActIterationInput(task="Summarize", available_sections=["Abstract"]),
+        current_loop=3,
+        max_loops=3,
+        accumulated_memory="- [CLAIM] Final memory.",
+        show_progress=False,
+    )
+
+    assert output.should_continue is False
+    assert output.report == "- [CLAIM] Final memory."
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_stops_when_all_sections_are_processed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Analysis should stop early once there are no remaining sections to read."""
+    agent = ReActAgent.__new__(ReActAgent)
+    agent.logger = SimpleNamespace(debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None)
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = object()
+
+    async def fake_run_iteration(
+        document,
+        iteration_input: ReActIterationInput,
+        current_loop: int,
+        max_loops: int,
+        accumulated_memory: str,
+        show_progress: bool,
+    ) -> tuple[ReActIterationOutput, ReActIterationState]:
+        assert current_loop == 1
+        assert iteration_input.available_sections == ["Abstract"]
+        return (
+            ReActIterationOutput(thoughts="Read abstract.", should_continue=True),
+            ReActIterationState(sections_read=["Abstract"], memory_text="- [CLAIM] Abstract summary."),
+        )
+
+    monkeypatch.setattr(agent, "run_iteration", fake_run_iteration)
+    monkeypatch.setattr(
+        "sciread.agent.react.agent.get_section_length_map",
+        lambda document, sections: {"Abstract": 120},
+    )
+
+    document = SimpleNamespace(
+        get_section_names=lambda: ["Abstract"],
+        chunks=[Chunk(content="Abstract body", chunk_name="abstract")],
+    )
+
+    result = await agent.run_analysis(document, "Summarize", max_loops=3, show_progress=False)
+
+    assert result.should_continue is False
+    assert result.report == "- [CLAIM] Abstract summary."
+    assert result.thoughts == "Read abstract."
