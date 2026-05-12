@@ -1,7 +1,7 @@
 """LLM Provider module for sciread package.
 
 This module provides a unified interface for working with different LLM providers
-including DeepSeek, Volcengine, and Ollama using pydantic-ai.
+including DeepSeek, Volcengine, LM Studio, and Ollama using pydantic-ai.
 
 Main Interface:
     get_model(model_identifier: str) -> Model
@@ -12,6 +12,7 @@ Example Usage:
     # Explicit provider specification
     model = get_model("deepseek/deepseek-chat")
     model = get_model("volcengine/doubao-seed-2.0-code")
+    model = get_model("lmstudio/qwen3:4b")
     model = get_model("ollama/qwen3:4b")
 
     # Use default provider for known models

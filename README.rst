@@ -83,6 +83,7 @@ Key Environment Variables:
 
 - ``DEEPSEEK_API_KEY``: API key for DeepSeek (used by default).
 - ``VOLCES_API``: API key for Volcengine / Doubao (Ark).
+- ``SILICONFLOW_API_KEY``: API key for SiliconFlow embeddings, used by the default RAG embedding model.
 - ``MINERU_TOKEN``: Required for converting PDF files to high-quality Markdown via the Mineru API.
 - ``SCIREAD_LOG_LEVEL``: Control logging verbosity (DEBUG, INFO, WARNING, ERROR).
 
@@ -90,9 +91,9 @@ Key Environment Variables:
 
 By default, ``sciread`` uses a simple PDF loader. For much better results (with extracted tables and formulas), set ``MINERU_TOKEN`` and configuration in ``sciread.toml`` to use the Mineru provider.
 
-**Local Models with Ollama**
+**RAG Embeddings**
 
-You can use local models for embeddings or analysis by running `Ollama <https://ollama.com/>`_. By default, the semantic splitter tries to use local embeddings if configured.
+RAG uses SiliconFlow ``BAAI/bge-m3`` embeddings by default. Set ``SILICONFLOW_API_KEY`` before building vector indices. You can still use local models explicitly with LM Studio's OpenAI-compatible local server on ``http://localhost:1234/v1`` or with Ollama.
 
 Python API
 ==========

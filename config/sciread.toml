@@ -12,6 +12,11 @@ api_key = "${VOLCES_API}"
 default_model = "doubao-seed-2.0-code"
 base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
 
+[llm_providers.lmstudio]
+api_key = "lm_studio"
+default_model = "qwen3:4b"
+base_url = "http://localhost:1234/v1"
+
 [llm_providers.ollama]
 base_url = "http://localhost:11434/v1"
 default_model = "qwen3:4b"
@@ -70,8 +75,8 @@ enable_cache = true       # Cache Mineru responses when possible
 [vector_store]
 # Path to store vector indices for persistent search
 path = "~/.sciread/vector_store"
-# Default model for embeddings (should match your Ollama setup)
-embedding_model = "embeddinggemma:latest"
+# Default model for embeddings
+embedding_model = "siliconflow/BAAI/bge-m3"
 # Embedding batch size
 batch_size = 10
 # Cache embeddings for better performance

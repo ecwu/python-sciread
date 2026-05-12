@@ -21,7 +21,11 @@ class TestScireadConfig:
         assert config.default.model == "deepseek-chat"
         assert "deepseek" in config.llm_providers
         assert "volcengine" in config.llm_providers
+        assert "lmstudio" in config.llm_providers
         assert "ollama" in config.llm_providers
+        assert config.llm_providers["lmstudio"].base_url == "http://localhost:1234/v1"
+        assert config.llm_providers["lmstudio"].api_key == "lm_studio"
+        assert config.vector_store.embedding_model == "siliconflow/BAAI/bge-m3"
         assert config.document_splitters.regex_section.chunk_overlap == 0
         assert config.document_splitters.markdown.chunk_overlap == 0
         assert config.document_splitters.semantic.chunk_overlap == 0

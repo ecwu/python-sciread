@@ -4,6 +4,7 @@ from .application import run_react_analysis
 from .application import run_search_react_analysis
 from .application import run_simple_analysis
 from .embedding_provider import EmbeddingFactory
+from .embedding_provider import LMStudioClient
 from .embedding_provider import OllamaClient
 from .embedding_provider import SiliconFlowClient
 from .embedding_provider import get_embedding_client
@@ -15,6 +16,7 @@ __version__ = "1.1.0"
 
 __all__ = [
     "EmbeddingFactory",
+    "LMStudioClient",
     "OllamaClient",
     "SiliconFlowClient",
     "get_embedding_client",

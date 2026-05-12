@@ -10,6 +10,7 @@ from sciread.llm_provider.factory import InvalidModelIdentifierError
 from sciread.llm_provider.factory import ModelFactory
 from sciread.llm_provider.factory import UnsupportedModelError
 from sciread.llm_provider.factory import get_model
+from sciread.llm_provider.lmstudio import LMStudioProvider
 from sciread.llm_provider.ollama import OllamaProvider
 from sciread.llm_provider.volcengine import VolcengineProvider
 
@@ -38,6 +39,12 @@ class TestModelFactory:
         provider, model = ModelFactory.parse_model_identifier("deepseek-chat")
         assert provider == "deepseek"
         assert model == "deepseek-chat"
+
+    def test_parse_model_identifier_local_model_defaults_to_lmstudio(self):
+        """Test parsing a bare local model name defaults to LM Studio."""
+        provider, model = ModelFactory.parse_model_identifier("qwen3:4b")
+        assert provider == "lmstudio"
+        assert model == "qwen3:4b"
 
     def test_parse_model_identifier_empty(self):
         """Test parsing empty model identifier."""
@@ -93,6 +100,20 @@ class TestModelFactory:
             assert result == mock_model
 
     @patch("sciread.llm_provider.factory.get_config")
+    def test_create_model_lmstudio(self, mock_config):
+        """Test creating LM Studio model."""
+        mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:1234/v1"
+
+        with patch.object(LMStudioProvider, "create_model") as mock_create:
+            mock_model = MagicMock()
+            mock_create.return_value = mock_model
+
+            result = ModelFactory.create_model("lmstudio/qwen3:4b")
+
+            mock_create.assert_called_once_with("qwen3:4b")
+            assert result == mock_model
+
+    @patch("sciread.llm_provider.factory.get_config")
     def test_create_model_ollama(self, mock_config):
         """Test creating Ollama model."""
         mock_config.return_value.get_provider_config.return_value.base_url = "http://localhost:11434/v1"
@@ -123,15 +144,18 @@ class TestModelFactory:
         providers = ModelFactory.get_supported_providers()
         assert "deepseek" in providers
         assert "volcengine" in providers
+        assert "lmstudio" in providers
         assert "ollama" in providers
         assert "deepseek-chat" in providers["deepseek"]
         assert "glm-4.7" in providers["volcengine"]
+        assert "qwen3:4b" in providers["lmstudio"]
 
     def test_list_all_supported_models(self):
         """Test listing all supported models."""
         models = ModelFactory.list_all_supported_models()
         assert "deepseek/deepseek-chat" in models
         assert "volcengine/glm-4.7" in models
+        assert "lmstudio/qwen3:4b" in models
         assert "ollama/qwen3:4b" in models
 
 

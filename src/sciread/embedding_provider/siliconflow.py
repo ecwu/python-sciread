@@ -16,12 +16,12 @@ class SiliconFlowClient(BaseEmbeddingClient):
 
     def __init__(
         self,
-        model: str = "Qwen/Qwen3-Embedding-8B",
+        model: str = "BAAI/bge-m3",
         base_url: str = "https://api.siliconflow.cn/v1",
         api_key: str | None = None,
         timeout: int = 30,
         cache_embeddings: bool = True,
-        embedding_dimension: int = 4096,
+        embedding_dimension: int = 1024,
     ):
         """
         Initialize SiliconFlow client.

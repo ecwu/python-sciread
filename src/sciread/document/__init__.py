@@ -1,5 +1,6 @@
 """Document APIs, loaders, splitters, and retrieval helpers."""
 
+from ..embedding_provider import LMStudioClient
 from ..embedding_provider import OllamaClient
 from ..embedding_provider import SiliconFlowClient
 from .document import Document
@@ -12,6 +13,7 @@ __all__ = [
     "Chunk",
     "Document",
     "DocumentBuilder",
+    "LMStudioClient",
     "MineruClient",
     "OllamaClient",
     "SemanticSplitter",

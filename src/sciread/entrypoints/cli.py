@@ -216,6 +216,7 @@ MODELS:
   deepseek/deepseek-reasoner
     volcengine/doubao-seed-2.0-code
     volcengine/glm-4.7
+  lmstudio/qwen3:4b
   ollama/qwen3:4b
         """,
     )

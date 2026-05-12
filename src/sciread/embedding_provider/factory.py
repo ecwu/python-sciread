@@ -6,10 +6,12 @@ from typing import TYPE_CHECKING
 from typing import Any
 from typing import ClassVar
 
+from .lmstudio import LMStudioEmbeddingProvider
 from .ollama import OllamaEmbeddingProvider
 from .siliconflow import SiliconFlowEmbeddingProvider
 
 if TYPE_CHECKING:
+    from .lmstudio import LMStudioClient
     from .ollama import OllamaClient
     from .siliconflow import SiliconFlowClient
 
@@ -26,6 +28,7 @@ class EmbeddingFactory:
     """Factory for creating embedding client instances."""
 
     PROVIDERS: ClassVar[dict[str, type]] = {
+        "lmstudio": LMStudioEmbeddingProvider,
         "ollama": OllamaEmbeddingProvider,
         "siliconflow": SiliconFlowEmbeddingProvider,
     }
@@ -53,15 +56,20 @@ class EmbeddingFactory:
             parts = embedding_identifier.split("/", 1)
 
             # Special case: SiliconFlow models contain "/" in their names
-            # e.g., "siliconflow/Qwen/Qwen3-Embedding-8B"
+            # e.g., "siliconflow/BAAI/bge-m3"
             if parts[0] in cls.PROVIDERS:
                 # It's an explicit provider specification
                 provider_name = parts[0].strip()
                 model_name = parts[1].strip()
                 return provider_name, model_name
             else:
-                # It might be a model name itself (e.g., "Qwen/Qwen3-Embedding-8B")
-                # Check if any provider supports this full name
+                # It might be a model name itself (e.g., "BAAI/bge-m3")
+                # Prefer exact advertised model names before permissive provider matchers.
+                for provider_name, provider_class in cls.PROVIDERS.items():
+                    if embedding_identifier in provider_class.get_supported_models():
+                        return provider_name, embedding_identifier
+
+                # Check if any provider supports this full name.
                 for provider_name, provider_class in cls.PROVIDERS.items():
                     if provider_class.is_model_supported(embedding_identifier):
                         return provider_name, embedding_identifier
@@ -73,11 +81,15 @@ class EmbeddingFactory:
         else:
             # No explicit provider, try to infer from model name
             for provider_name, provider_class in cls.PROVIDERS.items():
+                if embedding_identifier in provider_class.get_supported_models():
+                    return provider_name, embedding_identifier
+
+            for provider_name, provider_class in cls.PROVIDERS.items():
                 if provider_class.is_model_supported(embedding_identifier):
                     return provider_name, embedding_identifier
 
-            # Use default Ollama provider if no match found
-            return "ollama", embedding_identifier
+            # Use default LM Studio provider if no match found
+            return "lmstudio", embedding_identifier
 
     @classmethod
     def get_provider_class(cls, provider_name: str):
@@ -98,7 +110,7 @@ class EmbeddingFactory:
         return cls.PROVIDERS[provider_name]
 
     @classmethod
-    def create_client(cls, embedding_identifier: str, **kwargs: Any) -> OllamaClient | SiliconFlowClient:
+    def create_client(cls, embedding_identifier: str, **kwargs: Any) -> LMStudioClient | OllamaClient | SiliconFlowClient:
         """Create an embedding client instance from an embedding identifier.
 
         Args:
@@ -106,16 +118,17 @@ class EmbeddingFactory:
             **kwargs: Additional arguments to pass to the client
 
         Returns:
-            Embedding client instance (OllamaClient or SiliconFlowClient)
+            Embedding client instance (LMStudioClient, OllamaClient, or SiliconFlowClient)
 
         Raises:
             UnsupportedEmbeddingModelError: If the provider or model is not supported
             InvalidEmbeddingIdentifierError: If the identifier format is invalid
 
         Examples:
-            >>> client = EmbeddingFactory.create_client("siliconflow/Qwen/Qwen3-Embedding-8B")
+            >>> client = EmbeddingFactory.create_client("siliconflow/BAAI/bge-m3")
+            >>> client = EmbeddingFactory.create_client("lmstudio/embeddinggemma:latest")
             >>> client = EmbeddingFactory.create_client("ollama/nomic-embed-text")
-            >>> client = EmbeddingFactory.create_client("embeddinggemma:latest")  # Uses Ollama
+            >>> client = EmbeddingFactory.create_client("embeddinggemma:latest")  # Uses LM Studio
         """
         provider_name, model_name = cls.parse_embedding_identifier(embedding_identifier)
         provider_class = cls.get_provider_class(provider_name)
@@ -174,7 +187,7 @@ class EmbeddingFactory:
         return models
 
 
-def get_embedding_client(embedding_identifier: str, **kwargs: Any) -> OllamaClient | SiliconFlowClient:
+def get_embedding_client(embedding_identifier: str, **kwargs: Any) -> LMStudioClient | OllamaClient | SiliconFlowClient:
     """Get an embedding client instance.
 
     This is the main public interface for creating embedding client instances.
@@ -185,19 +198,20 @@ def get_embedding_client(embedding_identifier: str, **kwargs: Any) -> OllamaClie
         **kwargs: Additional arguments to pass to the client
 
     Returns:
-        Embedding client instance (OllamaClient or SiliconFlowClient)
+        Embedding client instance (LMStudioClient, OllamaClient, or SiliconFlowClient)
 
     Examples:
         >>> # Explicit provider specification
-        >>> client = get_embedding_client("siliconflow/Qwen/Qwen3-Embedding-8B")
+        >>> client = get_embedding_client("siliconflow/BAAI/bge-m3")
+        >>> client = get_embedding_client("lmstudio/embeddinggemma:latest")
         >>> client = get_embedding_client("ollama/nomic-embed-text")
         >>>
         >>> # Inferred provider from model name
-        >>> client = get_embedding_client("embeddinggemma:latest")  # Uses Ollama
-        >>> client = get_embedding_client("Qwen/Qwen3-Embedding-8B")  # Uses SiliconFlow
+        >>> client = get_embedding_client("embeddinggemma:latest")  # Uses LM Studio
+        >>> client = get_embedding_client("BAAI/bge-m3")  # Uses SiliconFlow
         >>>
         >>> # Check if concurrent requests are supported
-        >>> if EmbeddingFactory.supports_concurrent_requests("siliconflow/Qwen/Qwen3-Embedding-8B"):
+        >>> if EmbeddingFactory.supports_concurrent_requests("siliconflow/BAAI/bge-m3"):
         ...     print("Can use parallel requests!")
     """
     return EmbeddingFactory.create_client(embedding_identifier, **kwargs)

@@ -48,9 +48,13 @@ class TestIntegration:
         assert provider == "ollama"
         assert model == "model:latest"
 
+        provider, model = ModelFactory.parse_model_identifier("qwen3:4b")
+        assert provider == "lmstudio"
+        assert model == "qwen3:4b"
+
     def test_provider_priority_order(self):
         """Test that providers are checked in the correct order."""
-        # This should go to deepseek, not ollama (even though ollama supports any model)
+        # This should go to deepseek, not local providers.
         provider, model = ModelFactory.parse_model_identifier("deepseek-chat")
         assert provider == "deepseek"
         assert model == "deepseek-chat"

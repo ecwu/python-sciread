@@ -7,6 +7,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from ..platform.config import get_config
 from .deepseek import DeepSeekProvider
+from .lmstudio import LMStudioProvider
 from .ollama import OllamaProvider
 from .volcengine import VolcengineProvider
 
@@ -25,6 +26,7 @@ class ModelFactory:
     PROVIDERS: ClassVar[dict[str, type]] = {
         "deepseek": DeepSeekProvider,
         "volcengine": VolcengineProvider,
+        "lmstudio": LMStudioProvider,
         "ollama": OllamaProvider,
     }
 
@@ -154,6 +156,7 @@ def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel:
     Examples:
         >>> model = get_model("deepseek/deepseek-chat")
         >>> model = get_model("volcengine/doubao-seed-2.0-code")
+        >>> model = get_model("lmstudio/qwen3:4b")
         >>> model = get_model("ollama/qwen3:4b")
         >>> # Use default provider for known models
         >>> model = get_model("deepseek-chat")

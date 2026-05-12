@@ -31,6 +31,11 @@ api_key = "test-volcengine-key"
 default_model = "doubao-seed-2.0-code"
 base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
 
+[llm_providers.lmstudio]
+api_key = "lm_studio"
+default_model = "qwen3:4b"
+base_url = "http://localhost:1234/v1"
+
 [llm_providers.ollama]
 base_url = "http://localhost:11434/v1"
 default_model = "qwen3:4b"
@@ -49,12 +54,14 @@ def mock_config(test_config_file):
     with (
         patch("sciread.llm_provider.deepseek.get_config") as mock_deepseek,
         patch("sciread.llm_provider.volcengine.get_config") as mock_volcengine,
+        patch("sciread.llm_provider.lmstudio.get_config") as mock_lmstudio,
         patch("sciread.llm_provider.ollama.get_config") as mock_ollama,
         patch("sciread.llm_provider.factory.get_config") as mock_factory,
     ):
         config = ScireadConfig.load_from_file(test_config_file)
         mock_deepseek.return_value = config
         mock_volcengine.return_value = config
+        mock_lmstudio.return_value = config
         mock_ollama.return_value = config
         mock_factory.return_value = config
 

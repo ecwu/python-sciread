@@ -15,11 +15,11 @@ class TestSiliconFlowClient:
         """Test client initialization with default parameters."""
         client = SiliconFlowClient()
 
-        assert client.model == "Qwen/Qwen3-Embedding-8B"
+        assert client.model == "BAAI/bge-m3"
         assert client.base_url == "https://api.siliconflow.cn/v1"
         assert client.timeout == 30
         assert client.cache_embeddings is True
-        assert client.embedding_dimension == 4096
+        assert client.embedding_dimension == 1024
         assert len(client.embedding_cache) == 0
 
     def test_initialization_custom_params(self):

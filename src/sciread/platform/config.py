@@ -82,7 +82,7 @@ class VectorStoreConfig(BaseModel):
     """Configuration for vector store (RAG functionality)."""
 
     path: str = Field(default="~/.sciread/vector_store", description="Path to store vector indices")
-    embedding_model: str = Field(default="embeddinggemma:latest", description="Model for embeddings")
+    embedding_model: str = Field(default="siliconflow/BAAI/bge-m3", description="Model for embeddings")
     batch_size: int = Field(default=10, description="Embedding batch size")
     cache_embeddings: bool = Field(default=True, description="Cache embeddings for better performance")
 
@@ -110,6 +110,7 @@ class ScireadConfig(BaseSettings):
                 default_model="doubao-seed-2.0-code",
                 base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
             ),
+            "lmstudio": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:1234/v1", api_key="lm_studio"),
             "ollama": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:11434/v1"),
         }
     )

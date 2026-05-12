@@ -440,8 +440,8 @@ class Document:
 
         Args:
             persist: Whether to persist the index to disk
-            embedding_client: Optional embedding client (OllamaClient or SiliconFlowClient).
-                            If not provided, uses OllamaClient from config.
+            embedding_client: Optional embedding client (LMStudioClient, OllamaClient, or SiliconFlowClient).
+                            If not provided, uses the embedding provider from config.
         """
         build_document_vector_index(
             self,
