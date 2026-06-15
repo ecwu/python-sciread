@@ -1,5 +1,8 @@
 """Document retrieval services and vector indexing."""
 
+from .evidence import EvidenceRetriever
+from .evidence import format_evidence_results
+from .models import Evidence
 from .models import RetrievedChunk
 from .search import SUPPORTED_RETRIEVERS
 from .search import format_retrieval_results
@@ -15,10 +18,13 @@ from .vector_index import VectorIndex
 
 __all__ = [
     "SUPPORTED_RETRIEVERS",
+    "Evidence",
+    "EvidenceRetriever",
     "RetrievedChunk",
     "VectorIndex",
     "build_vector_index",
     "cosine_similarity",
+    "format_evidence_results",
     "format_retrieval_results",
     "hybrid_search",
     "lexical_search",

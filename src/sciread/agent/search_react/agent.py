@@ -15,7 +15,8 @@ from ...application.use_cases.common import ensure_file_exists
 from ...application.use_cases.common import load_document
 from ...document import Document
 from ...document.retrieval import SUPPORTED_RETRIEVERS
-from ...document.retrieval import format_retrieval_results
+from ...document.retrieval import EvidenceRetriever
+from ...document.retrieval import format_evidence_results
 from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ...platform.rich_output import TableColumnSpec
@@ -58,15 +59,15 @@ def _render_retrieval_summary(strategy: str, results) -> None:
     rows = [
         (
             str(index),
-            result.section_path_text or "unknown",
-            result.chunk.citation_key,
+            result.section_label or "unknown",
+            result.citation_key,
             f"{result.score:.3f}",
         )
         for index, result in enumerate(results, start=1)
     ]
     console.print(
         build_data_table(
-            title=f"Retrieved Chunks ({strategy})",
+            title=f"Evidence ({strategy})",
             columns=[
                 TableColumnSpec("#", style="green", justify="right", no_wrap=True, width=4),
                 TableColumnSpec("Section", style="yellow"),
@@ -156,12 +157,16 @@ async def search_document(
     active_top_k = top_k or deps.iteration_input.top_k
     active_neighbor_window = neighbor_window if neighbor_window is not None else deps.iteration_input.neighbor_window
 
-    results = deps.document.retrieve_chunks(
-        query=query,
+    retriever = EvidenceRetriever(
+        deps.document,
         strategy=active_strategy,
-        top_k=active_top_k,
         neighbor_window=active_neighbor_window,
-        section_scope=section_scope,
+    )
+    results = retriever.retrieve(
+        query=query,
+        top_k=active_top_k,
+        expand_context=True,
+        section_filter=[section_scope] if section_scope else None,
     )
 
     iteration_state.queries_run.append(query)
@@ -170,7 +175,7 @@ async def search_document(
     if deps.show_progress:
         _render_retrieval_summary(active_strategy, results)
 
-    return format_retrieval_results(results, query=query, strategy=active_strategy)
+    return format_evidence_results(results, query=query, strategy=active_strategy)
 
 
 @search_react_iteration_agent.tool

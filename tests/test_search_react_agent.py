@@ -15,6 +15,7 @@ from sciread.agent.search_react.models import SearchReactIterationInput
 from sciread.agent.search_react.models import SearchReactIterationOutput
 from sciread.agent.search_react.models import SearchReactIterationState
 from sciread.document.models import Chunk
+from sciread.document.retrieval.models import Evidence
 from sciread.document.retrieval.models import RetrievedChunk
 
 
@@ -63,7 +64,7 @@ async def test_search_react_tools_guard_against_repeated_search_and_memory() -> 
     first_memory = await add_memory(ctx, "- [CLAIM] Main finding.")
     second_memory = await add_memory(ctx, "- [RESULT] Another finding.")
 
-    assert "Retrieval strategy: lexical" in first_search
+    assert "Evidence strategy: lexical" in first_search
     assert "已经执行过检索或结构浏览" in second_search
     assert first_memory == "记忆已记录"
     assert "已调用过 add_memory" in second_memory
@@ -240,12 +241,16 @@ async def test_search_react_run_analysis_stops_after_completed_iteration(monkeyp
     agent.agent = object()
 
     chunk = Chunk(content="Body", chunk_name="intro")
-    retrieved = RetrievedChunk(
-        chunk=chunk,
-        score=0.9,
-        strategy="hybrid",
+    retrieved = Evidence(
+        evidence_id="E1",
+        chunk_id=chunk.chunk_id,
+        citation_key=chunk.citation_key,
         section_path=["intro"],
-        expanded_context="Body",
+        section_label="intro",
+        text="Body",
+        display_text="Body",
+        score=0.9,
+        rank=1,
     )
 
     async def fake_run_iteration(
@@ -279,4 +284,4 @@ async def test_search_react_run_analysis_stops_after_completed_iteration(monkeyp
     assert result.strategy == "hybrid"
     assert result.output.should_continue is False
     assert result.output.report == "- [CLAIM] Main contribution found."
-    assert [item.chunk.chunk_id for item in result.retrieved_chunks] == [chunk.chunk_id]
+    assert [item.chunk_id for item in result.retrieved_chunks] == [chunk.chunk_id]

@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from ...document import Document
-from ...document.retrieval.models import RetrievedChunk
+from ...document.retrieval.models import Evidence
 
 
 class SearchReactIterationInput(BaseModel):
@@ -49,7 +49,7 @@ class SearchReactIterationState:
     """Mutable per-iteration state used by tools."""
 
     queries_run: list[str] = field(default_factory=list)
-    retrieved_chunks: list[RetrievedChunk] = field(default_factory=list)
+    retrieved_chunks: list[Evidence] = field(default_factory=list)
     memory_text: str = ""
     tree_inspected: bool = False
     all_memory_read: bool = False
@@ -66,7 +66,7 @@ class SearchReactAnalysisState:
     processed_queries: list[str] = field(default_factory=list)
     accumulated_memory_fragments: list[str] = field(default_factory=list)
     current_thoughts: str = ""
-    retrieved_chunks: list[RetrievedChunk] = field(default_factory=list)
+    retrieved_chunks: list[Evidence] = field(default_factory=list)
     last_iteration_output: SearchReactIterationOutput | None = None
 
     @property
@@ -98,11 +98,11 @@ class SearchReactAnalysisState:
             if query not in self.processed_queries:
                 self.processed_queries.append(query)
 
-        existing_ids = {result.chunk.chunk_id for result in self.retrieved_chunks}
+        existing_ids = {result.chunk_id for result in self.retrieved_chunks}
         for result in iteration_state.retrieved_chunks:
-            if result.chunk.chunk_id not in existing_ids:
+            if result.chunk_id not in existing_ids:
                 self.retrieved_chunks.append(result)
-                existing_ids.add(result.chunk.chunk_id)
+                existing_ids.add(result.chunk_id)
 
         if iteration_state.memory_text:
             self.accumulated_memory_fragments.append(iteration_state.memory_text)
@@ -128,7 +128,7 @@ class SearchReactStrategyRun:
 
     strategy: str
     output: SearchReactIterationOutput
-    retrieved_chunks: list[RetrievedChunk]
+    retrieved_chunks: list[Evidence]
     total_time_seconds: float
     error: str = ""
 

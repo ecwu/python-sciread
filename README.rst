@@ -122,7 +122,10 @@ The same overlap behavior can be configured globally in ``config/sciread.toml`` 
 ``[document_splitters.markdown]`` or ``[document_splitters.semantic]``.
 
 For retrieval-oriented workflows, ``search-react`` can compare multiple retrievers in one run while reusing the same
-document chunking and vector-store configuration.
+document chunking and vector-store configuration. Agent-facing retrieval should use ``EvidenceRetriever`` from
+``sciread.document.retrieval`` so callers receive citation-ready evidence blocks with section labels, citation keys,
+scores, and optional same-section neighbor context. ``Document.semantic_search()`` and ``Document.retrieve_chunks()``
+remain lower-level APIs for chunk/vector retrieval internals.
 
 Project Layout
 ==============
@@ -133,7 +136,7 @@ The package is organized by subsystem:
 - ``src/sciread/document``: canonical document subsystem root and public entrypoints
 - ``src/sciread/document/ingestion``: loaders, external document clients, and ingestion cache helpers
 - ``src/sciread/document/structure``: chunking, section resolution, rendering, persistence, and splitters
-- ``src/sciread/document/retrieval``: vector indexing and semantic search
+- ``src/sciread/document/retrieval``: vector indexing, semantic search, and evidence retrieval
 - ``src/sciread/platform``: config and logging
 - ``src/sciread/application``: top-level analysis workflows
 - ``src/sciread/entrypoints``: CLI entrypoints
