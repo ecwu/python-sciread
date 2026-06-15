@@ -170,7 +170,9 @@ class TestUnifiedSectionHandling:
         # Test with reasonable confidence threshold
         sections = doc.get_sections_with_confidence(min_confidence=0.7)
 
-        assert len(sections) >= 4  # Should include sections with confidence >= 0.7
+        assert len(sections) == 6  # All fixture sections meet the threshold
+        section_names = [name for name, _ in sections]
+        assert section_names == ["abstract", "introduction", "methodology", "results", "discussion", "conclusion"]
 
         # Check structure of returned data
         for section_name, content in sections:
@@ -193,14 +195,22 @@ class TestUnifiedSectionHandling:
         assert "  has    extra  spaces" not in content
         assert "\n\n\n" not in content
 
-    def test_token_limiting(self, sample_document_with_sections):
-        """Test token limiting functionality."""
-        doc = sample_document_with_sections
+    def test_token_limiting(self):
+        """Test token limiting functionality truncates an oversized section."""
+        long_content = "word " * 400  # ~2400 chars, far above a small token budget
+        chunks = [
+            Chunk(content=long_content, chunk_name="abstract", position=0, confidence=0.9),
+            Chunk(content="Short section two.", chunk_name="introduction", position=1, confidence=0.8),
+        ]
+        doc = Document(text="Full document text...", metadata=DocumentMetadata(title="Sample Paper"))
+        doc._set_chunks(chunks)
 
-        content = doc.get_for_llm(max_tokens=10)  # Very small limit
+        content = doc.get_for_llm(max_tokens=80, include_headers=False)
 
-        # Should truncate content
-        assert "...[truncated" in content or len(content) < 100
+        # Should truncate the long abstract and omit the following section
+        assert "...[truncated due to token limit]" in content
+        assert "=== ABSTRACT ===" in content
+        assert "=== INTRODUCTION ===" not in content
 
     def test_error_handling(self, sample_document_with_sections):
         """Test error handling in unified methods."""

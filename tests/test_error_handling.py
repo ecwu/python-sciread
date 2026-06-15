@@ -147,3 +147,11 @@ def test_format_error_for_user_and_create_retry_message_cover_all_variants() -> 
     assert "Error in consensus: boom" in message
     assert "1. Reduce the document size" in message
     assert "2. Retry with fewer sections" in message
+
+
+def test_create_retry_message_without_suggestions() -> None:
+    """Retry messages should omit the suggestions section when none are provided."""
+    message = create_retry_message(RuntimeError("boom"), "consensus", suggestions=None)
+
+    assert "Error in consensus: boom" in message
+    assert "Suggestions" not in message

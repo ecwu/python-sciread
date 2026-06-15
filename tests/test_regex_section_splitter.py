@@ -34,13 +34,11 @@ This is the methods content."""
         splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
         chunks = splitter.split(text)
 
-        assert len(chunks) >= 2  # At least abstract and methods content
+        assert len(chunks) >= 2
         chunk_names = [chunk.chunk_name for chunk in chunks]
-        # Check for actual section names (capitalized) or abstract in metadata
-        has_abstract = any("abstract" in name.lower() or "Abstract" in name for name in chunk_names)
-        has_abstract_metadata = any(chunk.metadata.get("splitter") == "abstract" for chunk in chunks)
-        assert has_abstract or has_abstract_metadata
-        # Introduction might be grouped with abstract or methods depending on size
+        assert "Abstract" in chunk_names or any(chunk.metadata.get("splitter") == "abstract" for chunk in chunks)
+        assert "Introduction" in chunk_names or any(chunk.metadata.get("splitter") == "introduction" for chunk in chunks)
+        assert any(chunk.metadata.get("splitter") == "methods" for chunk in chunks)
 
     def test_section_detection(self):
         """Test academic section detection."""
@@ -59,44 +57,40 @@ This is section 2."""
         splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
         chunks = splitter.split(text)
 
-        assert len(chunks) >= 2  # Should detect at least some sections
-
-        # Check section detection (subsection might not always be separate)
+        assert len(chunks) == 3
+        chunk_names = [chunk.chunk_name for chunk in chunks]
+        assert chunk_names == ["1 introduction", "1.1 background", "2 related work"]
         chunk_types = [chunk.metadata.get("splitter") for chunk in chunks]
-        # Enhanced classifier now classifies numbered sections by their content
-        assert any(section_type in chunk_types for section_type in ["introduction", "related_work", "section"])
+        assert "introduction" in chunk_types
+        assert "related_work" in chunk_types
 
     def test_confidence_scoring(self):
         """Test confidence scoring for different patterns."""
         text = """Abstract
 
-This is abstract.
+This abstract contains enough text to exceed the minimum chunk size threshold and retain a high confidence score without being merged into adjacent content.
 
 1. Introduction
 
-This is introduction.
+This introduction contains enough text to exceed the minimum chunk size threshold and receive a solid confidence score for the introduction pattern.
 
 Figure 1: Sample Figure
 
-This describes the figure."""
+This figure caption and description provide the content for the figure chunk, which should receive a lower confidence score than the academic section chunks."""
 
-        splitter = RegexSectionSplitter()
+        splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
         chunks = splitter.split(text)
 
-        # Abstract should have reasonable confidence (may be reduced due to small chunk size without merge)
-        abstract_chunks = [c for c in chunks if c.metadata.get("splitter") == "abstract"]
-        if abstract_chunks:
-            assert abstract_chunks[0].confidence >= 0.4  # Lowered from 0.9 due to small chunk penalty
+        by_type: dict[str, list] = {}
+        for chunk in chunks:
+            by_type.setdefault(chunk.metadata.get("splitter", "unknown"), []).append(chunk)
 
-        # Introduction/section should have medium confidence (without merging, may be lower)
-        intro_chunks = [c for c in chunks if c.metadata.get("splitter") in ["introduction", "section"]]
-        if intro_chunks:
-            assert 0.3 <= intro_chunks[0].confidence <= 0.8
-
-        # Figure should have lower confidence
-        figure_chunks = [c for c in chunks if c.metadata.get("splitter") == "figure"]
-        if figure_chunks:
-            assert figure_chunks[0].confidence <= 0.7
+        assert "abstract" in by_type
+        assert by_type["abstract"][0].confidence >= 0.8
+        assert "introduction" in by_type
+        assert 0.5 <= by_type["introduction"][0].confidence <= 0.9
+        assert "figure" in by_type
+        assert all(chunk.confidence <= 0.7 for chunk in by_type["figure"])
 
     def test_min_chunk_size_filtering(self):
         """Test minimum chunk size filtering."""
@@ -322,9 +316,12 @@ This describes figure 2."""
         splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
         chunks = splitter.split(text)
 
-        # Should detect figure/table references
-        figure_chunks = [c for c in chunks if c.metadata.get("splitter") == "figure"]
-        assert len(figure_chunks) >= 1  # May be grouped together
+        figure_table_chunks = [c for c in chunks if c.metadata.get("splitter") in ("figure", "table")]
+        assert len(figure_table_chunks) >= 3
+        chunk_names = [c.chunk_name for c in figure_table_chunks]
+        assert any("Figure 1" in name for name in chunk_names)
+        assert any("Figure 2" in name for name in chunk_names)
+        assert any("Table 1" in name for name in chunk_names)
 
     def test_paragraph_break_pattern(self):
         """Test paragraph break detection."""
@@ -339,12 +336,13 @@ Third paragraph after more spacing."""
         splitter = RegexSectionSplitter(min_chunk_size=20, confidence_threshold=0.1)
         chunks = splitter.split(text)
 
-        # Should split on paragraph breaks
-        assert len(chunks) >= 1
-
-        # Should have lower confidence for paragraph-based splits
-        paragraph_chunks = [c for c in chunks if c.confidence < 0.5]
-        assert len(paragraph_chunks) >= 0  # May be empty if content is grouped
+        assert len(chunks) == 3
+        assert all(chunk.confidence < 0.5 for chunk in chunks)
+        assert [chunk.chunk_name for chunk in chunks] == [
+            "First paragraph with some content.",
+            "Second paragraph after double line break.",
+            "Third paragraph after more spacing.",
+        ]
 
     def test_output_chunk_contains_new_metadata_fields(self):
         """Test regex splitter initializes expanded chunk metadata fields."""

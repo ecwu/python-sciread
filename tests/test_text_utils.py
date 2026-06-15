@@ -83,3 +83,26 @@ def test_extract_document_metadata_returns_empty_dict_when_no_fields_found() -> 
     metadata = extract_document_metadata("\n\nLab\n\n")
 
     assert metadata == {}
+
+
+def test_remove_references_keeps_short_tail() -> None:
+    """A short reference tail should be preserved rather than removed."""
+    text = "Body\n\nReferences\n[1] One citation"
+    assert remove_references(text) == text
+
+
+def test_clean_academic_text_handles_empty_and_whitespace() -> None:
+    """Empty or whitespace-only text should pass through unchanged."""
+    assert clean_academic_text("") == ""
+    assert clean_academic_text("   ") == "   "
+
+
+def test_clean_academic_text_removes_header_footer_lines() -> None:
+    """Standalone page numbers and 'page X of Y' lines should be dropped."""
+    assert clean_academic_text("7") == ""
+    assert clean_academic_text("Page 3 of 10") == ""
+    cleaned = clean_academic_text(
+        "This is a long enough paragraph to exceed the fifty-character threshold and survive filtering. Page 3 of 10"
+    )
+    assert "Page 3 of 10" not in cleaned
+    assert "long enough paragraph" in cleaned

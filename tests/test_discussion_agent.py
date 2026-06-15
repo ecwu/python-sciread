@@ -28,6 +28,7 @@ class _FakeTaskManager:
         self.started = 0
         self.stopped = 0
         self.created_tasks: list[dict] = []
+        self.queues: dict[str, _FakeQueue] = {}
 
     async def start_processing(self) -> None:
         self.started += 1
@@ -35,14 +36,40 @@ class _FakeTaskManager:
     async def stop_processing(self) -> None:
         self.stopped += 1
 
+    def create_queue(self, name: str, description: str | None = None) -> "_FakeQueue":
+        queue = _FakeQueue(name=name)
+        self.queues[name] = queue
+        return queue
+
     def create_task(self, **kwargs) -> str:
         task_id = f"task-{len(self.created_tasks) + 1}"
-        self.created_tasks.append({"task_id": task_id, **kwargs})
+        task_record = {"task_id": task_id, **kwargs}
+        self.created_tasks.append(task_record)
+
+        queue_name = kwargs.get("queue_name", "main_discussion")
+        queue = self.queues.get(queue_name)
+        if queue is not None:
+            from sciread.agent.discussion.task_models import Task
+            from sciread.agent.discussion.task_models import TaskStatus
+
+            task = Task(
+                task_id=task_id,
+                task_type=kwargs["task_type"],
+                priority=kwargs.get("priority", TaskPriority.MEDIUM),
+                assigned_to=kwargs.get("assigned_to"),
+                parameters=kwargs.get("parameters", {}),
+                context=kwargs.get("context", {}),
+                timeout_seconds=kwargs.get("timeout_seconds"),
+                status=TaskStatus.PENDING,
+            )
+            queue.tasks[task_id] = task
+
         return task_id
 
 
 class _FakeQueue:
-    def __init__(self, tasks: dict[str, Task] | None = None) -> None:
+    def __init__(self, tasks: dict[str, Task] | None = None, name: str = "main_discussion") -> None:
+        self.name = name
         self.tasks = tasks or {}
 
     def get_task(self, task_id: str) -> Task | None:
@@ -524,3 +551,229 @@ async def test_advance_phase_moves_to_next_state() -> None:
     await agent._advance_phase()
 
     assert agent.discussion_state.current_phase == DiscussionPhase.CONVERGENCE
+
+
+@pytest.mark.asyncio
+async def test_initialize_discussion_creates_state_and_queue() -> None:
+    agent = _make_agent()
+    document = SimpleNamespace(metadata=SimpleNamespace(title="Paper"))
+
+    await agent._initialize_discussion(document)
+
+    assert agent.discussion_state is not None
+    assert agent.discussion_state.current_phase == DiscussionPhase.INITIAL_ANALYSIS
+    assert agent.discussion_queue is not None
+    assert agent.discussion_queue.name == "main_discussion"
+    assert set(agent.agent_insights.keys()) == set(AgentPersonality)
+
+
+@pytest.mark.asyncio
+async def test_run_initial_analysis_phase_creates_insight_tasks_and_collects() -> None:
+    agent = _make_agent()
+    await agent._initialize_discussion(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+    agent._render_phase_banner = lambda *args, **kwargs: None
+
+    insight = _make_insight("INS-CE-01", AgentPersonality.CRITICAL_EVALUATOR, "Key finding.")
+
+    async def fake_wait(task_ids: list[str], timeout_minutes: int = 5) -> None:
+        for task_id in task_ids:
+            task = agent.discussion_queue.get_task(task_id)
+            if task and str(task.task_type) == TaskType.GENERATE_INSIGHTS.value:
+                personality = AgentPersonality(task.assigned_to)
+                task.status = TaskStatus.COMPLETED
+                task.result = TaskResult(
+                    task_id=task_id,
+                    success=True,
+                    execution_time=0.1,
+                    insights=[insight],
+                    confidence=0.8,
+                    metadata={"personality": personality.value, "selected_sections": ["abstract"]},
+                )
+
+    agent._wait_for_tasks_completion = fake_wait
+
+    await agent._run_initial_analysis_phase(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+
+    assert len(agent.task_manager.created_tasks) == len(AgentPersonality)
+    assert all(task["task_type"] == TaskType.GENERATE_INSIGHTS for task in agent.task_manager.created_tasks)
+    assert agent.discussion_state.current_phase == DiscussionPhase.QUESTIONING
+    assert len(agent.discussion_state.insights) == len(AgentPersonality)
+
+
+@pytest.mark.asyncio
+async def test_wait_for_tasks_completion_handles_failed_tasks() -> None:
+    agent = _make_agent()
+    await agent._initialize_discussion(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+
+    task_id = agent.task_manager.create_task(
+        queue_name="main_discussion",
+        task_type=TaskType.GENERATE_INSIGHTS,
+        parameters={},
+        assigned_to=AgentPersonality.CRITICAL_EVALUATOR,
+    )
+    task = agent.discussion_queue.get_task(task_id)
+    task.status = TaskStatus.FAILED
+
+    async def fake_wait(task_ids: list[str], timeout_minutes: int = 5) -> None:
+        return None
+
+    agent._wait_for_tasks_completion = fake_wait
+    await agent._wait_for_tasks_completion([task_id], timeout_minutes=0)
+
+    assert task.status == TaskStatus.FAILED
+
+
+def test_apply_revised_insights_updates_target_insight() -> None:
+    agent = _make_agent()
+    agent.discussion_state = DiscussionState(current_phase=DiscussionPhase.RESPONDING)
+    original = _make_insight("INS-CE-01", AgentPersonality.CRITICAL_EVALUATOR, "Original claim.")
+    agent.agent_insights[AgentPersonality.CRITICAL_EVALUATOR] = [original]
+    agent.discussion_state.insights.append(original)
+
+    question = Question(
+        question_id="Q-01",
+        from_agent=AgentPersonality.INNOVATIVE_INSIGHTER,
+        to_agent=AgentPersonality.CRITICAL_EVALUATOR,
+        content="Can you clarify?",
+        target_insight="INS-CE-01",
+        target_insight_id="INS-CE-01",
+        question_type="clarification",
+        priority=0.8,
+    )
+    agent.all_questions.append(question)
+
+    response = Response(
+        response_id="R-01",
+        question_id="Q-01",
+        from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+        content="Revised claim.",
+        stance="clarify",
+        revised_insight="Revised claim with more detail.",
+        confidence=0.9,
+    )
+
+    agent._apply_revised_insights([response])
+
+    assert original.content == "Revised claim with more detail."
+    assert original.confidence == 0.9
+    assert any("Q-01" in note for note in original.supporting_evidence)
+
+
+def test_find_insight_for_question_by_id_and_snippet() -> None:
+    agent = _make_agent()
+    agent.discussion_state = DiscussionState(current_phase=DiscussionPhase.RESPONDING)
+    insight = _make_insight("INS-CE-01", AgentPersonality.CRITICAL_EVALUATOR, "Target content here.")
+    agent.agent_insights[AgentPersonality.CRITICAL_EVALUATOR] = [insight]
+
+    by_id = SimpleNamespace(target_insight_id="INS-CE-01", target_insight="")
+    assert agent._find_insight_for_question(by_id) is insight
+
+    by_snippet = SimpleNamespace(target_insight_id=None, target_insight="Target content here.")
+    assert agent._find_insight_for_question(by_snippet) is insight
+
+    missing = SimpleNamespace(target_insight_id=None, target_insight="missing")
+    assert agent._find_insight_for_question(missing) is None
+
+
+def test_update_insight_from_response_skips_unchanged_content() -> None:
+    agent = _make_agent()
+    insight = _make_insight("INS-CE-01", AgentPersonality.CRITICAL_EVALUATOR, "Same content.")
+    response = Response(
+        response_id="R-01",
+        question_id="Q-01",
+        from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+        content="ok",
+        stance="agree",
+        revised_insight="Same content.",
+        confidence=0.8,
+    )
+
+    agent._update_insight_from_response(insight, "Same content.", response)
+
+    assert len(insight.supporting_evidence) == 0
+
+
+@pytest.mark.asyncio
+async def test_build_final_result_delegates_to_consensus_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+    agent = _make_agent()
+    agent.discussion_state = DiscussionState(current_phase=DiscussionPhase.CONSENSUS)
+    expected_result = DiscussionResult(
+        document_title="Paper",
+        summary="summary",
+        significance="High",
+        confidence_score=0.8,
+    )
+
+    class FakeConsensusBuilder:
+        def __init__(self, model_name: str):
+            pass
+
+        async def build_consensus_result(self, **kwargs):
+            return expected_result
+
+    monkeypatch.setattr(
+        "sciread.agent.discussion.consensus.ConsensusBuilder",
+        FakeConsensusBuilder,
+    )
+
+    result = await agent._build_final_result(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+    assert result is expected_result
+
+
+@pytest.mark.asyncio
+async def test_run_discussion_phases_advances_through_pipeline() -> None:
+    agent = _make_agent()
+    await agent._initialize_discussion(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+    agent._render_phase_banner = lambda *args, **kwargs: None
+    phase_log: list[str] = []
+
+    async def fake_initial(_document) -> None:
+        phase_log.append("initial")
+        agent.discussion_state.current_phase = DiscussionPhase.QUESTIONING
+
+    async def fake_questioning() -> None:
+        phase_log.append("questioning")
+        agent.discussion_state.current_phase = DiscussionPhase.RESPONDING
+
+    async def fake_responding() -> None:
+        phase_log.append("responding")
+        agent.discussion_state.current_phase = DiscussionPhase.CONVERGENCE
+
+    async def fake_convergence() -> None:
+        phase_log.append("convergence")
+        agent.discussion_state.current_phase = DiscussionPhase.CONSENSUS
+
+    async def fake_consensus(_document) -> None:
+        phase_log.append("consensus")
+        agent.discussion_state.current_phase = DiscussionPhase.COMPLETED
+
+    agent._run_initial_analysis_phase = fake_initial
+    agent._run_questioning_phase = fake_questioning
+    agent._run_responding_phase = fake_responding
+    agent._run_convergence_phase = fake_convergence
+    agent._run_consensus_phase = fake_consensus
+
+    await agent._run_discussion_phases(SimpleNamespace(metadata=SimpleNamespace(title="Paper")))
+
+    assert phase_log == ["initial", "questioning", "responding", "convergence", "consensus"]
+    assert agent.discussion_state.current_phase == DiscussionPhase.COMPLETED
+
+
+def test_clear_agent_cache_and_status(monkeypatch: pytest.MonkeyPatch) -> None:
+    agent = _make_agent()
+    cache_state = {"cleared": False}
+
+    def fake_clear():
+        cache_state["cleared"] = True
+
+    def fake_status():
+        return {"size": 0}
+
+    monkeypatch.setattr("sciread.agent.discussion.tools.clear_agent_cache", fake_clear)
+    monkeypatch.setattr("sciread.agent.discussion.tools.get_agent_cache_status", fake_status)
+
+    agent.clear_agent_cache()
+    assert cache_state["cleared"] is True
+
+    status = agent.get_agent_cache_status()
+    assert status == {"size": 0}

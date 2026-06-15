@@ -362,3 +362,45 @@ async def test_run_analysis_stops_when_all_sections_are_processed(monkeypatch: p
     assert result.should_continue is False
     assert result.report == "- [CLAIM] Abstract summary."
     assert result.thoughts == "Read abstract."
+
+
+@pytest.mark.asyncio
+async def test_run_analysis_reaches_final_loop_and_forces_completion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Analysis should force completion when the final loop is reached without a report."""
+    agent = ReActAgent.__new__(ReActAgent)
+    agent.logger = SimpleNamespace(
+        debug=lambda *args, **kwargs: None, error=lambda *args, **kwargs: None, info=lambda *args, **kwargs: None
+    )
+    agent.model = object()
+    agent.model_identifier = "mock-model"
+    agent.agent = object()
+
+    async def fake_run_iteration(
+        document,
+        iteration_input: ReActIterationInput,
+        current_loop: int,
+        max_loops: int,
+        accumulated_memory: str,
+        show_progress: bool,
+    ) -> tuple[ReActIterationOutput, ReActIterationState]:
+        return (
+            ReActIterationOutput(thoughts="Need more passes.", should_continue=True),
+            ReActIterationState(sections_read=[iteration_input.available_sections[0]], memory_text=f"- loop {current_loop}"),
+        )
+
+    monkeypatch.setattr(agent, "run_iteration", fake_run_iteration)
+    monkeypatch.setattr(
+        "sciread.agent.react.agent.get_section_length_map",
+        lambda document, sections: dict.fromkeys(sections, 100),
+    )
+
+    document = SimpleNamespace(
+        get_section_names=lambda: ["Abstract", "Methods"],
+        chunks=[Chunk(content="x", chunk_name="Abstract"), Chunk(content="y", chunk_name="Methods")],
+    )
+
+    result = await agent.run_analysis(document, "Summarize", max_loops=2, show_progress=False)
+
+    assert result.should_continue is False
+    assert "loop 1" in result.report
+    assert "loop 2" in result.report

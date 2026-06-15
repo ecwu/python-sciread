@@ -1,9 +1,12 @@
 """Tests for shared rich output helpers."""
 
+from types import SimpleNamespace
+
 from rich.console import Console
 
 from sciread.platform.rich_output import TableColumnSpec
 from sciread.platform.rich_output import build_data_table
+from sciread.platform.rich_output import build_discussion_report
 from sciread.platform.rich_output import build_key_value_table
 from sciread.platform.rich_output import build_markdown_panel
 from sciread.platform.rich_output import build_mode_banner
@@ -78,3 +81,58 @@ def test_build_markdown_panel_uses_fallback_for_blank_content() -> None:
     rendered = console.export_text()
     assert "Final Report" in rendered
     assert "No content generated." in rendered
+
+
+def test_build_mode_banner_without_subtitle() -> None:
+    """A banner without a subtitle should only render the title."""
+    console = Console(record=True, width=80)
+    console.print(build_mode_banner("Simple Analysis"))
+
+    rendered = console.export_text()
+    assert "Simple Analysis" in rendered
+    assert "subtitle" not in rendered.lower()
+
+
+def test_build_sections_table_with_mixed_tuple_and_string() -> None:
+    """A mixed section list should fill missing lengths with '-'."""
+    console = Console(record=True, width=80)
+    console.print(build_sections_table("Sections", [("Results", 120), "Appendix"]))
+
+    rendered = console.export_text()
+    assert "Results" in rendered
+    assert "120" in rendered
+    assert "Appendix" in rendered
+    assert "-" in rendered
+
+
+def test_build_discussion_report_handles_empty_fields() -> None:
+    """Discussion report rendering should tolerate missing optional fields."""
+    result = SimpleNamespace(
+        document_title="Paper",
+        confidence_score=0.75,
+        final_insights=[
+            SimpleNamespace(
+                agent_id="agent-1",
+                confidence=0.8,
+                importance_score=0.7,
+                content="Insight one.",
+            )
+        ],
+        consensus_points=[],
+        divergent_views=[],
+        summary="Short summary.",
+        key_contributions=[],
+        significance="",
+        discussion_metadata={},
+    )
+
+    panel = build_discussion_report(result)
+    console = Console(record=True, width=120)
+    console.print(panel)
+    rendered = console.export_text()
+
+    assert "Paper" in rendered
+    assert "Short summary." in rendered
+    assert "Insight one." in rendered
+    assert "Key Contributions" not in rendered
+    assert "Significance Assessment" not in rendered

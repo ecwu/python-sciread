@@ -49,9 +49,7 @@ class EvidenceRetriever:
         )
 
         filtered_results = [
-            result
-            for result in retrieved_chunks
-            if not section_filter or _chunk_matches_section_filter(result.chunk, section_filter)
+            result for result in retrieved_chunks if not section_filter or _chunk_matches_section_filter(result.chunk, section_filter)
         ][:top_k]
 
         return [

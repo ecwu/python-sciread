@@ -1,6 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
+import pytest
+
 from sciread.agent.discussion.consensus import ConsensusBuilder
 from sciread.agent.discussion.models import AgentInsight
 from sciread.agent.discussion.models import AgentPersonality
@@ -258,3 +260,236 @@ def test_build_consensus_result_assembles_metadata_without_real_llm() -> None:
     assert result.key_contributions == ["Contribution"]
     assert result.discussion_metadata["total_iterations"] == 2
     assert result.discussion_metadata["convergence_score"] == 0.8
+
+
+def test_extract_top_insights_respects_limit() -> None:
+    """Only the top-N insights should be returned."""
+    builder = _make_builder()
+    insights = [
+        AgentInsight(
+            agent_id=AgentPersonality.INNOVATIVE_INSIGHTER, content=f"Insight {i}", importance_score=0.9 - i * 0.05, confidence=0.8
+        )
+        for i in range(15)
+    ]
+    result = builder._extract_top_insights({AgentPersonality.INNOVATIVE_INSIGHTER: insights})
+    assert len(result) == 10
+    assert result[0].content == "Insight 0"
+
+
+def test_group_insights_by_topic() -> None:
+    """Topic grouping should bucket insights by keyword domain."""
+    builder = _make_builder()
+    insights = {
+        AgentPersonality.INNOVATIVE_INSIGHTER: [
+            AgentInsight(
+                agent_id=AgentPersonality.INNOVATIVE_INSIGHTER,
+                content="The method improves accuracy.",
+                importance_score=0.8,
+                confidence=0.8,
+            ),
+            AgentInsight(
+                agent_id=AgentPersonality.INNOVATIVE_INSIGHTER,
+                content="A novel framework is proposed.",
+                importance_score=0.8,
+                confidence=0.8,
+            ),
+        ],
+        AgentPersonality.CRITICAL_EVALUATOR: [
+            AgentInsight(
+                agent_id=AgentPersonality.CRITICAL_EVALUATOR,
+                content="The result lacks reproducibility.",
+                importance_score=0.8,
+                confidence=0.8,
+            ),
+        ],
+    }
+    groups = builder._group_insights_by_topic(insights)
+    assert "方法" in groups
+    assert "理论贡献" in groups
+    assert "结果" in groups
+
+
+def test_extract_topic_from_insight() -> None:
+    """Topic extraction should map content keywords to canonical topics."""
+    builder = _make_builder()
+    assert builder._extract_topic_from_insight("The method is scalable.") == "方法"
+    assert builder._extract_topic_from_insight("Results show gains.") == "结果"
+    assert builder._extract_topic_from_insight("A limitation is noise.") == "局限性"
+    assert builder._extract_topic_from_insight("Something else entirely.") == "综合分析"
+
+
+@pytest.mark.asyncio
+async def test_evaluate_topic_consensus_requires_multiple_insights() -> None:
+    """Consensus evaluation should require at least two insights."""
+    builder = _make_builder()
+    single = AgentInsight(agent_id=AgentPersonality.INNOVATIVE_INSIGHTER, content="Only one.", importance_score=0.8, confidence=0.8)
+    result = await builder._evaluate_topic_consensus("方法", [single], [], [])
+    assert result["has_consensus"] is False
+
+
+@pytest.mark.asyncio
+async def test_evaluate_topic_consensus_detects_conflict_majority() -> None:
+    """If most insights are challenged, consensus should be rejected."""
+    builder = _make_builder()
+    insights = [
+        AgentInsight(agent_id=AgentPersonality.INNOVATIVE_INSIGHTER, content="Method A is best.", importance_score=0.8, confidence=0.8),
+        AgentInsight(agent_id=AgentPersonality.PRACTICAL_APPLICATOR, content="Method B is best.", importance_score=0.8, confidence=0.8),
+    ]
+    responses = [
+        Response(
+            response_id="R-01",
+            question_id="Q-01",
+            from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+            content="I disagree with the method claim.",
+            stance="disagree",
+            confidence=0.9,
+        ),
+        Response(
+            response_id="R-02",
+            question_id="Q-02",
+            from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+            content="The method is still questionable.",
+            stance="challenge",
+            confidence=0.9,
+        ),
+    ]
+    result = await builder._evaluate_topic_consensus("method", insights, [], responses)
+    assert result["has_consensus"] is False
+
+
+@pytest.mark.asyncio
+async def test_evaluate_topic_consensus_builds_point() -> None:
+    """Two supporting insights without strong challenges should form a consensus point."""
+    builder = _make_builder()
+    insights = [
+        AgentInsight(agent_id=AgentPersonality.INNOVATIVE_INSIGHTER, content="Method A is best.", importance_score=0.8, confidence=0.9),
+        AgentInsight(
+            agent_id=AgentPersonality.PRACTICAL_APPLICATOR, content="Method A scales well.", importance_score=0.8, confidence=0.85
+        ),
+    ]
+    result = await builder._evaluate_topic_consensus("方法", insights, [], [])
+    assert result["has_consensus"] is True
+    assert set(result["supporting_agents"]) == {
+        AgentPersonality.INNOVATIVE_INSIGHTER.value,
+        AgentPersonality.PRACTICAL_APPLICATOR.value,
+    }
+    assert result["strength"] == pytest.approx(0.875)
+
+
+def test_calculate_overall_confidence() -> None:
+    """Overall confidence should blend insight confidence and consensus strength."""
+    builder = _make_builder()
+    insights = [
+        AgentInsight(agent_id=AgentPersonality.INNOVATIVE_INSIGHTER, content="A", importance_score=0.8, confidence=0.8),
+        AgentInsight(agent_id=AgentPersonality.PRACTICAL_APPLICATOR, content="B", importance_score=0.8, confidence=0.6),
+    ]
+    consensus_points = [
+        ConsensusPoint(topic="方法", content="Agree.", supporting_agents=[AgentPersonality.INNOVATIVE_INSIGHTER], strength=0.8)
+    ]
+    score = builder._calculate_overall_confidence(insights, consensus_points)
+    expected = (0.7 * 0.7) + (0.3 * (0.8 / 2 / 2))
+    assert score == pytest.approx(expected)
+
+
+def test_calculate_overall_confidence_without_insights() -> None:
+    builder = _make_builder()
+    assert builder._calculate_overall_confidence([], []) == 0.0
+
+
+def test_score_contribution_candidate_branches() -> None:
+    """Contribution scoring should reward action/topic keywords and penalize negatives."""
+    builder = _make_builder()
+    assert builder._score_contribution_candidate("") == 0
+    assert builder._score_contribution_candidate("This paper introduces a novel method.") > 0
+    assert builder._score_contribution_candidate("The evaluation of baselines is omitted.") == 0
+    assert builder._score_contribution_candidate("The method has limitations in public validation.") == 0
+
+
+def test_is_viable_fallback_contribution() -> None:
+    """Fallback contributions should be affirmative and mention concrete concepts."""
+    builder = _make_builder()
+    assert builder._is_viable_fallback_contribution("The system enables a new framework.") is True
+    assert builder._is_viable_fallback_contribution("The method has limitations.") is False
+    assert builder._is_viable_fallback_contribution("Random generic statement.") is False
+
+
+def test_dedupe_contribution_candidate() -> None:
+    """Near-identical contributions should collapse to the same normalized key."""
+    builder = _make_builder()
+    key1 = builder._dedupe_contribution_candidate("Introduces a novel Method...")
+    key2 = builder._dedupe_contribution_candidate("introduces a novel method")
+    assert key1 == key2
+
+
+def test_identify_divergent_views_groups_by_topic() -> None:
+    """Multiple challenges on the same topic should be grouped into one divergent view."""
+    builder = _make_builder()
+    insight = AgentInsight(
+        insight_id="INS-01",
+        agent_id=AgentPersonality.INNOVATIVE_INSIGHTER,
+        content="The proposed method is optimal.",
+        importance_score=0.8,
+        confidence=0.8,
+    )
+    question = Question(
+        question_id="Q-01",
+        from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+        to_agent=AgentPersonality.INNOVATIVE_INSIGHTER,
+        content="Are you sure?",
+        target_insight="The proposed method is optimal.",
+        target_insight_id="INS-01",
+        question_type="challenge",
+        priority=0.9,
+    )
+    responses = [
+        Response(
+            response_id="R-01",
+            question_id="Q-01",
+            from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+            content="It fails on large inputs.",
+            stance="challenge",
+            confidence=0.8,
+        ),
+        Response(
+            response_id="R-02",
+            question_id="Q-01",
+            from_agent=AgentPersonality.CRITICAL_EVALUATOR,
+            content="It is also slow.",
+            stance="challenge",
+            confidence=0.7,
+        ),
+    ]
+
+    views = asyncio.run(
+        builder._identify_divergent_views(
+            {AgentPersonality.INNOVATIVE_INSIGHTER: [insight]},
+            [question],
+            responses,
+        )
+    )
+
+    assert len(views) == 1
+    assert views[0].topic == "方法"
+    assert views[0].holding_agent == AgentPersonality.INNOVATIVE_INSIGHTER
+    assert len(views[0].counter_arguments) == 1
+
+
+def test_build_consensus_result_returns_error_result_on_failure() -> None:
+    """A catastrophic failure during consensus building should return a stable error result."""
+    builder = _make_builder()
+    builder._extract_top_insights = lambda _agent_insights: (_ for _ in ()).throw(RuntimeError("boom"))
+
+    result = asyncio.run(
+        builder.build_consensus_result(
+            document=SimpleNamespace(metadata=SimpleNamespace(title="Paper")),
+            discussion_state=None,
+            agent_insights={},
+            questions=[],
+            responses=[],
+        )
+    )
+
+    assert result.document_title == "Paper"
+    assert result.confidence_score == 0.0
+    assert result.significance == "分析失败"
+    assert "boom" in result.summary
