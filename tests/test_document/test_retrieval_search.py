@@ -7,6 +7,7 @@ from sciread.document.models import Chunk
 from sciread.document.retrieval.models import RetrievedChunk
 from sciread.document.retrieval.search import hybrid_search
 from sciread.document.retrieval.search import lexical_search
+from sciread.document.retrieval.search import retrieve_chunks
 from sciread.document.retrieval.search import semantic_chunk_search
 from sciread.document.retrieval.search import tree_search
 
@@ -34,6 +35,43 @@ def test_lexical_search_matches_text_title_and_section_path() -> None:
     assert results[0].chunk.content == "Detailed setup and training recipe."
     assert "setup" in results[0].matched_terms
     assert "[unnamed_document:1]" in results[0].expanded_context
+
+
+def test_retrieve_chunks_normalizes_strategy_and_rejects_unknown() -> None:
+    """The public retrieval entrypoint should trim strategy names and reject unsupported modes."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    doc._set_chunks([Chunk(content="Intro text", section_path=["intro"])])
+
+    results = retrieve_chunks(doc, "intro", strategy=" Lexical ", top_k=1, neighbor_window=0)
+
+    assert len(results) == 1
+    assert results[0].strategy == "lexical"
+
+    with pytest.raises(ValueError, match="Unsupported retrieval strategy: nope"):
+        retrieve_chunks(doc, "intro", strategy="nope", top_k=1, neighbor_window=0)
+
+
+def test_lexical_search_respects_section_scope_and_retrievable_flag() -> None:
+    """Scoped lexical search should only return retrievable chunks inside the requested section."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    doc._set_chunks(
+        [
+            Chunk(content="Setup method", section_path=["methods"], retrievable=True),
+            Chunk(content="Setup method hidden", section_path=["methods"], retrievable=False),
+            Chunk(content="Setup method outside", section_path=["results"], retrievable=True),
+        ]
+    )
+
+    results = lexical_search(
+        doc,
+        "setup method",
+        top_k=5,
+        neighbor_window=0,
+        section_scope="methods",
+    )
+
+    assert [result.chunk.content for result in results] == ["Setup method"]
+    assert results[0].section_path == ["methods"]
 
 
 def test_tree_search_matches_parent_and_child_nodes() -> None:
@@ -98,6 +136,34 @@ def test_semantic_chunk_search_wraps_index_failures(monkeypatch: pytest.MonkeyPa
 
     with pytest.raises(RuntimeError, match="Semantic retrieval unavailable"):
         semantic_chunk_search(doc, "intro", top_k=1, neighbor_window=0, section_scope=None)
+
+
+def test_semantic_chunk_search_filters_scope_and_wraps_query_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Semantic retrieval should filter scoped hits and wrap query-time failures distinctly."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    in_scope = Chunk(content="Scoped", section_path=["methods"])
+    out_of_scope = Chunk(content="Outside", section_path=["results"])
+    doc._set_chunks([in_scope, out_of_scope])
+    doc.vector_index = object()
+    monkeypatch.setattr(doc, "semantic_search", lambda query, top_k, return_scores: [(out_of_scope, 0.99), (in_scope, 0.5)])
+
+    results = semantic_chunk_search(
+        doc,
+        "method",
+        top_k=5,
+        neighbor_window=0,
+        section_scope="methods",
+    )
+
+    assert [result.chunk.content for result in results] == ["Scoped"]
+
+    def failing_search(query: str, top_k: int, return_scores: bool):
+        raise RuntimeError("query failed")
+
+    monkeypatch.setattr(doc, "semantic_search", failing_search)
+
+    with pytest.raises(RuntimeError, match="Semantic retrieval failed: query failed"):
+        semantic_chunk_search(doc, "method", top_k=1, neighbor_window=0, section_scope=None)
 
 
 def test_hybrid_search_deduplicates_results(monkeypatch: pytest.MonkeyPatch) -> None:

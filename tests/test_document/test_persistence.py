@@ -1,6 +1,11 @@
 """Tests for document persistence and hydration."""
 
+import json
+from datetime import UTC
+from datetime import datetime
 from pathlib import Path
+
+import pytest
 
 from sciread.document import Document
 from sciread.document.models import Chunk
@@ -57,3 +62,57 @@ class TestDocumentPersistence:
         assert loaded.chunks[0].overlap_next_chars == 0
         assert loaded.vector_index is not None
         assert loaded.vector_index.persist_path.resolve() == persist_path.resolve()
+
+    def test_load_preserves_serialized_metadata_and_ignores_missing_vector_index(self, temp_dir: Path):
+        """Loading should hydrate metadata types without requiring a stale vector index path."""
+        state_path = temp_dir / "document.json"
+        source_path = temp_dir / "paper.pdf"
+        missing_index_path = temp_dir / "missing-vector-index"
+        created_at = datetime(2024, 1, 2, 3, 4, 5, tzinfo=UTC)
+        modified_at = datetime(2024, 1, 3, 4, 5, 6, tzinfo=UTC)
+        state_path.write_text(
+            json.dumps(
+                {
+                    "metadata": {
+                        "title": "Serialized",
+                        "author": "Ada",
+                        "source_path": str(source_path),
+                        "created_at": created_at.isoformat(),
+                        "modified_at": modified_at.isoformat(),
+                    },
+                    "text": "Serialized body",
+                    "chunks": [
+                        {
+                            "content": "Serialized chunk",
+                            "chunk_name": "intro",
+                            "section_path": ["intro"],
+                            "position": 0,
+                        }
+                    ],
+                    "vector_index_path": str(missing_index_path),
+                    "is_markdown": False,
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        loaded = Document.load(state_path)
+
+        assert loaded.metadata.title == "Serialized"
+        assert loaded.metadata.author == "Ada"
+        assert loaded.metadata.source_path == source_path
+        assert loaded.metadata.created_at == created_at
+        assert loaded.metadata.modified_at == modified_at
+        assert loaded.text == "Serialized body"
+        assert loaded.chunks[0].doc_id == loaded._build_doc_id()
+        assert loaded.vector_index is None
+
+    def test_load_wraps_invalid_state_with_context(self, temp_dir: Path):
+        """Invalid persisted state should surface the path and preserve the original exception."""
+        state_path = temp_dir / "invalid.json"
+        state_path.write_text("{not-json", encoding="utf-8")
+
+        with pytest.raises(RuntimeError, match=f"Failed to load document from {state_path}") as exc_info:
+            Document.load(state_path)
+
+        assert isinstance(exc_info.value.__cause__, json.JSONDecodeError)

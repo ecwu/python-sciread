@@ -7,7 +7,10 @@ import pytest
 from pydantic_ai import ModelRetry
 
 from sciread.agent.coordinate.agent import CoordinateAgent
+from sciread.agent.coordinate.executor import create_expert_agent
+from sciread.agent.coordinate.executor import deduplicate_sections
 from sciread.agent.coordinate.executor import execute_sub_agents
+from sciread.agent.coordinate.executor import resolve_sections_to_analyze
 from sciread.agent.coordinate.models import AnalysisPlan
 from sciread.agent.coordinate.models import MetadataExtractionResult
 from sciread.agent.coordinate.models import MethodologyResult
@@ -248,6 +251,82 @@ def test_analysis_plan_model_still_accepts_empty_section_lists():
     )
 
     assert plan.reasoning == "fallback"
+
+
+def test_resolve_sections_to_analyze_deduplicates_specific_sections(sample_pdf_document: Document) -> None:
+    """Executor section resolution should preserve order while removing duplicate plan sections."""
+    plan = AnalysisPlan(
+        analyze_metadata=False,
+        analyze_previous_methods=False,
+        analyze_research_questions=False,
+        analyze_methodology=True,
+        analyze_experiments=False,
+        analyze_future_directions=False,
+        previous_methods_sections=[],
+        research_questions_sections=[],
+        methodology_sections=["methods", "methods", "results"],
+        experiments_sections=[],
+        future_directions_sections=[],
+        reasoning="dedupe",
+    )
+    task = SimpleNamespace(sections_field="methodology_sections", analysis_type="methodology")
+
+    sections = resolve_sections_to_analyze(sample_pdf_document, plan, task, get_logger(__name__))
+
+    assert sections == ["methods", "results"]
+    assert deduplicate_sections(["a", "b", "a"]) == ["a", "b"]
+
+
+@pytest.mark.asyncio
+async def test_create_expert_agent_builds_prompt_and_retries_empty_content(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Expert agent factory should wire pydantic-ai options and guard empty assembled content."""
+
+    class FakeAgent:
+        def __init__(self, model, deps_type, output_type, system_prompt, retries) -> None:
+            self.model = model
+            self.deps_type = deps_type
+            self.output_type = output_type
+            self.initial_system_prompt = system_prompt
+            self.retries = retries
+            self.prompt_factory = None
+
+        def system_prompt(self, func):
+            self.prompt_factory = func
+            return func
+
+    captured: dict[str, object] = {}
+
+    def fake_build_expert_content(**kwargs):
+        captured.update(kwargs)
+        return "expert content"
+
+    monkeypatch.setattr("sciread.agent.coordinate.executor.Agent", FakeAgent)
+    monkeypatch.setattr("sciread.agent.coordinate.executor.build_expert_content", fake_build_expert_content)
+
+    expert_agent = create_expert_agent(model="model", max_retries=3, analysis_type="methodology", logger=get_logger(__name__))
+    ctx = SimpleNamespace(
+        deps=SimpleNamespace(
+            document=object(),
+            analysis_type="methodology",
+            sections_to_analyze=["Methods"],
+        )
+    )
+
+    prompt = await expert_agent.prompt_factory(ctx)
+
+    assert expert_agent.model == "model"
+    assert expert_agent.retries == 3
+    assert expert_agent.deps_type.__name__ == "ExpertAgentDeps"
+    assert expert_agent.output_type is MethodologyResult
+    assert "expert content" in prompt
+    assert captured["analysis_type"] == "methodology"
+    assert captured["sections_to_analyze"] == ["Methods"]
+    assert captured["max_tokens"] == 6000
+
+    monkeypatch.setattr("sciread.agent.coordinate.executor.build_expert_content", lambda **kwargs: "   ")
+
+    with pytest.raises(ModelRetry, match="Unable to assemble content for methodology"):
+        await expert_agent.prompt_factory(ctx)
 
 
 def test_build_expert_content_uses_selected_sections_and_standard_limits(monkeypatch: pytest.MonkeyPatch) -> None:
