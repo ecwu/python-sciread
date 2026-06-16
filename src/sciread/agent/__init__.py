@@ -16,16 +16,16 @@ Example Usage:
     from sciread.document import Document
 
     # Create a simple agent
-    agent = SimpleAgent("deepseek/deepseek-chat")
+    agent = SimpleAgent("deepseek/deepseek-v4-flash")
 
     # Create a multi-agent system
-    coordinate_agent = CoordinateAgent("deepseek/deepseek-chat")
+    coordinate_agent = CoordinateAgent("deepseek/deepseek-v4-flash")
 
     # Create a ReAct agent
-    react_agent = ReActAgent("deepseek/deepseek-chat")
-    search_react_agent = SearchReactAgent("deepseek/deepseek-chat")
+    react_agent = ReActAgent("deepseek/deepseek-v4-flash")
+    search_react_agent = SearchReactAgent("deepseek/deepseek-v4-flash")
 
-    discussion_agent = DiscussionAgent("deepseek/deepseek-chat")
+    discussion_agent = DiscussionAgent("deepseek/deepseek-v4-flash")
 
     # Process a document (automatically loaded and split)
     doc = Document.from_file("paper.pdf", to_markdown=True)

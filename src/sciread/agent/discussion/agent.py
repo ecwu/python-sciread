@@ -48,7 +48,7 @@ class DiscussionAgent:
 
     def __init__(
         self,
-        model_name: str = "deepseek-chat",
+        model_name: str = "deepseek-v4-flash",
         max_iterations: int = 5,
         convergence_threshold: float = 0.75,
         max_discussion_time_minutes: int = 30,

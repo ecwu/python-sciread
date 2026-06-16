@@ -204,16 +204,16 @@ EXAMPLES:
   sciread simple paper.txt
   sciread react paper.pdf
   sciread react paper.pdf "What are the main contributions?"
-  sciread react paper.pdf "Custom analysis task" deepseek-chat --max-loops 6
+  sciread react paper.pdf "Custom analysis task" deepseek-v4-flash --max-loops 6
   sciread search-react paper.pdf "What are the main contributions?"
   sciread search-react paper.pdf "What changed?" --retriever lexical --top-k 6
   sciread search-react paper.pdf "What changed?" --compare lexical,semantic,tree,hybrid
   sciread discussion paper.pdf
-  sciread discussion paper.pdf deepseek-reasoner
+  sciread discussion paper.pdf deepseek-v4-pro
 
 MODELS:
-  deepseek/deepseek-chat     (default)
-  deepseek/deepseek-reasoner
+  deepseek/deepseek-v4-flash     (default)
+  deepseek/deepseek-v4-pro
     volcengine/doubao-seed-2.0-code
     volcengine/glm-4.7
   lmstudio/qwen3:4b
@@ -233,8 +233,8 @@ MODELS:
     simple_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     simple_parser.add_argument(
         "--model",
-        default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+        default="deepseek/deepseek-v4-flash",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-v4-flash)",
     )
 
     # Coordinate mode parser
@@ -246,8 +246,8 @@ MODELS:
     coordinate_parser.add_argument("pdf_file", help="Path to the PDF file to analyze")
     coordinate_parser.add_argument(
         "--model",
-        default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+        default="deepseek/deepseek-v4-flash",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-v4-flash)",
     )
 
     # ReAct mode parser
@@ -265,8 +265,8 @@ MODELS:
     )
     react_parser.add_argument(
         "--model",
-        default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+        default="deepseek/deepseek-v4-flash",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-v4-flash)",
     )
     react_parser.add_argument(
         "--max-loops",
@@ -295,8 +295,8 @@ MODELS:
     )
     search_react_parser.add_argument(
         "--model",
-        default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+        default="deepseek/deepseek-v4-flash",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-v4-flash)",
     )
     search_react_parser.add_argument(
         "--max-loops",
@@ -345,8 +345,8 @@ MODELS:
     discussion_parser.add_argument("document_file", help="Path to the document file to analyze (PDF or TXT)")
     discussion_parser.add_argument(
         "--model",
-        default="deepseek/deepseek-chat",
-        help="Model identifier for the LLM provider (default: deepseek/deepseek-chat)",
+        default="deepseek/deepseek-v4-flash",
+        help="Model identifier for the LLM provider (default: deepseek/deepseek-v4-flash)",
     )
 
     # Parse arguments (skip the script name)

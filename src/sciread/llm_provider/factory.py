@@ -154,11 +154,11 @@ def get_model(model_identifier: str, **kwargs: Any) -> OpenAIChatModel:
         Model instance
 
     Examples:
-        >>> model = get_model("deepseek/deepseek-chat")
+        >>> model = get_model("deepseek/deepseek-v4-flash")
         >>> model = get_model("volcengine/doubao-seed-2.0-code")
         >>> model = get_model("lmstudio/qwen3:4b")
         >>> model = get_model("ollama/qwen3:4b")
         >>> # Use default provider for known models
-        >>> model = get_model("deepseek-chat")
+        >>> model = get_model("deepseek-v4-flash")
     """
     return ModelFactory.create_model(model_identifier, **kwargs)

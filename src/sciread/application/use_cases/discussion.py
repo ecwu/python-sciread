@@ -10,7 +10,7 @@ from .common import load_document
 logger = get_logger(__name__)
 
 
-async def run_discussion_analysis(document_file_path: str, model: str = "deepseek-chat") -> tuple[dict[str, object], DiscussionResult]:
+async def run_discussion_analysis(document_file_path: str, model: str = "deepseek-v4-flash") -> tuple[dict[str, object], DiscussionResult]:
     """Run the discussion-based multi-agent workflow."""
     logger.debug(f"Creating DiscussionAgent with model: {model}")
     discussion_agent = DiscussionAgent(model)

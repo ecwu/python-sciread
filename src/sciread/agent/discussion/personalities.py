@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 class PersonalityAgent:
     """Base class for personality-based agents."""
 
-    def __init__(self, personality: AgentPersonality, model_name: str = "deepseek-chat"):
+    def __init__(self, personality: AgentPersonality, model_name: str = "deepseek-v4-flash"):
         """Initialize the personality agent."""
         self.personality = personality
         self.model_name = model_name
@@ -1206,6 +1206,6 @@ Recommendations: [请用中文给出下一步建议]
 
 
 # Factory function to create personality agents
-def create_personality_agent(personality: AgentPersonality, model_name: str = "deepseek-chat") -> PersonalityAgent:
+def create_personality_agent(personality: AgentPersonality, model_name: str = "deepseek-v4-flash") -> PersonalityAgent:
     """Create a personality agent of the specified type."""
     return PersonalityAgent(personality, model_name)

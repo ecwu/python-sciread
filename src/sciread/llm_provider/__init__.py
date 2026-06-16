@@ -10,13 +10,13 @@ Example Usage:
     from sciread.llm_provider import get_model
 
     # Explicit provider specification
-    model = get_model("deepseek/deepseek-chat")
+    model = get_model("deepseek/deepseek-v4-flash")
     model = get_model("volcengine/doubao-seed-2.0-code")
     model = get_model("lmstudio/qwen3:4b")
     model = get_model("ollama/qwen3:4b")
 
     # Use default provider for known models
-    model = get_model("deepseek-chat")  # Uses deepseek provider
+    model = get_model("deepseek-v4-flash")  # Uses deepseek provider
     model = get_model("glm-4.7")        # Uses volcengine provider
 """
 

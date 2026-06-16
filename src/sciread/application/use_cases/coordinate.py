@@ -10,7 +10,7 @@ from .common import load_document
 logger = get_logger(__name__)
 
 
-async def run_coordinate_analysis(document_file_path: str, model: str = "deepseek/deepseek-chat") -> ComprehensiveAnalysisResult:
+async def run_coordinate_analysis(document_file_path: str, model: str = "deepseek/deepseek-v4-flash") -> ComprehensiveAnalysisResult:
     """Run the coordinate-agent workflow on a PDF document."""
     logger.debug(f"Creating CoordinateAgent with model: {model}")
     coordinate_agent = CoordinateAgent(model)

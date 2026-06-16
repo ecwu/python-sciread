@@ -232,7 +232,7 @@ def normalize_section_names(section_names: list[str] | str | None) -> list[str] 
 async def analyze_file_with_react(
     file_path: str,
     task: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
@@ -299,7 +299,7 @@ async def analyze_file_with_react(
 def analyze_file_with_react_sync(
     file_path: str,
     task: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
@@ -442,7 +442,7 @@ class ReActAgent:
     controlled iterative analysis with reduced context accumulation.
     """
 
-    def __init__(self, model: str = "deepseek-chat"):
+    def __init__(self, model: str = "deepseek-v4-flash"):
         """Initialize the ReAct agent.
 
         Args:

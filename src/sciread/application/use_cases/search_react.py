@@ -12,7 +12,7 @@ async def run_search_react_analysis(
     document_file: str,
     task: str,
     *,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     show_progress: bool = True,
     retriever: str = "hybrid",

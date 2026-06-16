@@ -20,7 +20,7 @@ class TestScireadConfig:
         config = ScireadConfig()
 
         assert config.default.provider == "deepseek"
-        assert config.default.model == "deepseek-chat"
+        assert config.default.model == "deepseek-v4-flash"
         assert "deepseek" in config.llm_providers
         assert "volcengine" in config.llm_providers
         assert "lmstudio" in config.llm_providers
@@ -104,7 +104,7 @@ default_model = "test-model"
 
         deepseek_config = config.get_provider_config("deepseek")
         assert isinstance(deepseek_config, LLMProviderConfig)
-        assert deepseek_config.default_model == "deepseek-chat"
+        assert deepseek_config.default_model == "deepseek-v4-flash"
 
     def test_get_provider_config_invalid(self):
         """Test getting configuration for invalid provider."""

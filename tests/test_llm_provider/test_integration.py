@@ -29,11 +29,11 @@ class TestIntegration:
             mock_provider.return_value = mock_provider_instance
 
             # Test actual model creation
-            model = get_model("deepseek/deepseek-chat")
+            model = get_model("deepseek/deepseek-v4-flash")
 
             # Verify the correct calls were made
             mock_provider.assert_called_once_with(api_key="test-api-key")
-            mock_openai.assert_called_once_with(model_name="deepseek-chat", provider=mock_provider_instance)
+            mock_openai.assert_called_once_with(model_name="deepseek-v4-flash", provider=mock_provider_instance)
             assert model == mock_model
 
     def test_model_parsing_edge_cases(self):
@@ -55,9 +55,9 @@ class TestIntegration:
     def test_provider_priority_order(self):
         """Test that providers are checked in the correct order."""
         # This should go to deepseek, not local providers.
-        provider, model = ModelFactory.parse_model_identifier("deepseek-chat")
+        provider, model = ModelFactory.parse_model_identifier("deepseek-v4-flash")
         assert provider == "deepseek"
-        assert model == "deepseek-chat"
+        assert model == "deepseek-v4-flash"
 
     @patch.dict("os.environ", {"DEEPSEEK_API_KEY": "env-test-key"})
     def test_environment_variable_fallback(self, tmp_path):
@@ -66,7 +66,7 @@ class TestIntegration:
         config_content = """
 [llm_providers.deepseek]
 api_key = ""  # Empty in config
-default_model = "deepseek-chat"
+default_model = "deepseek-v4-flash"
 """
         config_file.write_text(config_content)
 

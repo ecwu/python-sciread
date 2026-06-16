@@ -13,8 +13,8 @@ class DeepSeekProvider:
     """DeepSeek LLM provider using pydantic-ai."""
 
     SUPPORTED_MODELS: ClassVar[dict[str, str]] = {
-        "deepseek-chat": "DeepSeek Chat Model",
-        "deepseek-reasoner": "DeepSeek Reasoner Model",
+        "deepseek-v4-flash": "DeepSeek Chat Model",
+        "deepseek-v4-pro": "DeepSeek Reasoner Model",
     }
 
     @classmethod
@@ -22,7 +22,7 @@ class DeepSeekProvider:
         """Create a DeepSeek model instance.
 
         Args:
-            model_name: Name of the DeepSeek model (e.g., 'deepseek-chat', 'deepseek-reasoner')
+            model_name: Name of the DeepSeek model (e.g., 'deepseek-v4-flash', 'deepseek-v4-pro')
             **kwargs: Additional arguments to pass to the model
 
         Returns:

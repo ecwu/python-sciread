@@ -44,8 +44,8 @@ CLI usage::
 
 Specify a model explicitly when needed::
 
-    uv run sciread coordinate paper.pdf --model deepseek/deepseek-chat
-    uv run sciread discussion paper.pdf --model deepseek/deepseek-chat
+    uv run sciread coordinate paper.pdf --model deepseek/deepseek-v4-flash
+    uv run sciread discussion paper.pdf --model deepseek/deepseek-v4-flash
     uv run sciread search-react paper.pdf "What changed?" --retriever hybrid --top-k 6
     uv run sciread search-react paper.pdf "What changed?" --compare lexical,semantic,tree,hybrid
 
@@ -111,7 +111,7 @@ Example::
     from sciread.document import Document
 
     document = Document.from_file("paper.pdf", to_markdown=False, auto_split=True)
-    agent = SimpleAgent("deepseek/deepseek-chat")
+    agent = SimpleAgent("deepseek/deepseek-v4-flash")
     report = await agent.run_analysis(document, "Explain the paper clearly for an engineer.")
 
 You can enable overlap-aware chunking for RAG-oriented retrieval without changing the default behavior::

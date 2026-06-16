@@ -91,7 +91,7 @@ class ConsensusBuilder:
         "relies heavily",
     )
 
-    def __init__(self, model_name: str = "deepseek-chat"):
+    def __init__(self, model_name: str = "deepseek-v4-flash"):
         """Initialize the consensus builder."""
         self.model_name = model_name
         self.model = get_model(model_name)

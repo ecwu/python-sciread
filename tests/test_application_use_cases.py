@@ -121,7 +121,7 @@ async def test_run_react_analysis_delegates_with_expected_options(monkeypatch: p
     result = await run_react_analysis(
         "paper.pdf",
         "What matters?",
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         max_loops=7,
         show_progress=False,
     )
@@ -129,7 +129,7 @@ async def test_run_react_analysis_delegates_with_expected_options(monkeypatch: p
     assert result == "react result"
     assert captured["args"] == ("paper.pdf", "What matters?")
     assert captured["kwargs"] == {
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "max_loops": 7,
         "to_markdown": True,
         "show_progress": False,
@@ -170,7 +170,7 @@ async def test_run_search_react_analysis_delegates_with_expected_options(monkeyp
     result = await run_search_react_analysis(
         "paper.pdf",
         "What matters?",
-        model="deepseek-chat",
+        model="deepseek-v4-flash",
         max_loops=7,
         show_progress=False,
         retriever="tree",
@@ -182,7 +182,7 @@ async def test_run_search_react_analysis_delegates_with_expected_options(monkeyp
     assert result == "search-react result"
     assert captured["args"] == ("paper.pdf", "What matters?")
     assert captured["kwargs"] == {
-        "model": "deepseek-chat",
+        "model": "deepseek-v4-flash",
         "max_loops": 7,
         "to_markdown": True,
         "show_progress": False,

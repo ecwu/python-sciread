@@ -3,7 +3,7 @@
 
 [llm_providers.deepseek]
 api_key = "${DEEPSEEK_API_KEY}"
-default_model = "deepseek-chat"
+default_model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com"
 
 [llm_providers.volcengine]
@@ -24,7 +24,7 @@ default_model = "qwen3:4b"
 [llm_providers.default]
 # Default provider to use when none is specified
 provider = "deepseek"
-model = "deepseek-chat"
+model = "deepseek-v4-flash"
 
 # Document splitter configuration exposed by the current config model.
 # The document builder auto-selects MarkdownSplitter for markdown input and

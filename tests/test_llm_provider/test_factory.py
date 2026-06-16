@@ -20,15 +20,15 @@ class TestModelFactory:
 
     def test_parse_model_identifier_with_provider(self):
         """Test parsing model identifier with explicit provider."""
-        provider, model = ModelFactory.parse_model_identifier("deepseek/deepseek-chat")
+        provider, model = ModelFactory.parse_model_identifier("deepseek/deepseek-v4-flash")
         assert provider == "deepseek"
-        assert model == "deepseek-chat"
+        assert model == "deepseek-v4-flash"
 
     def test_parse_model_identifier_without_provider(self):
         """Test parsing model identifier without explicit provider."""
         with patch("sciread.llm_provider.factory.get_config") as mock_config:
             mock_config.return_value.default.provider = "deepseek"
-            mock_config.return_value.default.model = "deepseek-chat"
+            mock_config.return_value.default.model = "deepseek-v4-flash"
 
             provider, model = ModelFactory.parse_model_identifier("custom-model")
             assert provider == "deepseek"
@@ -36,9 +36,9 @@ class TestModelFactory:
 
     def test_parse_model_identifier_known_model(self):
         """Test parsing model identifier with known model name."""
-        provider, model = ModelFactory.parse_model_identifier("deepseek-chat")
+        provider, model = ModelFactory.parse_model_identifier("deepseek-v4-flash")
         assert provider == "deepseek"
-        assert model == "deepseek-chat"
+        assert model == "deepseek-v4-flash"
 
     def test_parse_model_identifier_local_model_defaults_to_lmstudio(self):
         """Test parsing a bare local model name defaults to LM Studio."""
@@ -79,9 +79,9 @@ class TestModelFactory:
             mock_model = MagicMock()
             mock_create.return_value = mock_model
 
-            result = ModelFactory.create_model("deepseek/deepseek-chat")
+            result = ModelFactory.create_model("deepseek/deepseek-v4-flash")
 
-            mock_create.assert_called_once_with("deepseek-chat")
+            mock_create.assert_called_once_with("deepseek-v4-flash")
             assert result == mock_model
 
     @patch("sciread.llm_provider.factory.get_config")
@@ -146,14 +146,14 @@ class TestModelFactory:
         assert "volcengine" in providers
         assert "lmstudio" in providers
         assert "ollama" in providers
-        assert "deepseek-chat" in providers["deepseek"]
+        assert "deepseek-v4-flash" in providers["deepseek"]
         assert "glm-4.7" in providers["volcengine"]
         assert "qwen3:4b" in providers["lmstudio"]
 
     def test_list_all_supported_models(self):
         """Test listing all supported models."""
         models = ModelFactory.list_all_supported_models()
-        assert "deepseek/deepseek-chat" in models
+        assert "deepseek/deepseek-v4-flash" in models
         assert "volcengine/glm-4.7" in models
         assert "lmstudio/qwen3:4b" in models
         assert "ollama/qwen3:4b" in models
@@ -168,9 +168,9 @@ class TestGetModel:
         mock_model = MagicMock()
         mock_create.return_value = mock_model
 
-        result = get_model("deepseek/deepseek-chat")
+        result = get_model("deepseek/deepseek-v4-flash")
 
-        mock_create.assert_called_once_with("deepseek/deepseek-chat")
+        mock_create.assert_called_once_with("deepseek/deepseek-v4-flash")
         assert result == mock_model
 
     @patch("sciread.llm_provider.factory.ModelFactory.create_model")
@@ -179,7 +179,7 @@ class TestGetModel:
         mock_model = MagicMock()
         mock_create.return_value = mock_model
 
-        result = get_model("deepseek/deepseek-chat", temperature=0.7)
+        result = get_model("deepseek/deepseek-v4-flash", temperature=0.7)
 
-        mock_create.assert_called_once_with("deepseek/deepseek-chat", temperature=0.7)
+        mock_create.assert_called_once_with("deepseek/deepseek-v4-flash", temperature=0.7)
         assert result == mock_model

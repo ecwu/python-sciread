@@ -9,7 +9,7 @@ from ...platform.logging import get_logger
 logger = get_logger(__name__)
 
 
-async def run_simple_analysis(document_file_path: str, model: str = "deepseek/deepseek-chat") -> str:
+async def run_simple_analysis(document_file_path: str, model: str = "deepseek/deepseek-v4-flash") -> str:
     """Run the single-agent paper analysis workflow."""
     logger.debug(f"Starting simple analysis with document file: {document_file_path}")
 

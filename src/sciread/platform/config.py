@@ -91,7 +91,7 @@ class DefaultConfig(BaseModel):
     """Default provider and model settings."""
 
     provider: str = Field(default="deepseek", description="Default provider name")
-    model: str = Field(default="deepseek-chat", description="Default model name")
+    model: str = Field(default="deepseek-v4-flash", description="Default model name")
 
 
 class ScireadConfig(BaseSettings):
@@ -105,7 +105,7 @@ class ScireadConfig(BaseSettings):
 
     llm_providers: dict[str, LLMProviderConfig] = Field(
         default_factory=lambda: {
-            "deepseek": LLMProviderConfig(default_model="deepseek-chat", base_url="https://api.deepseek.com"),
+            "deepseek": LLMProviderConfig(default_model="deepseek-v4-flash", base_url="https://api.deepseek.com"),
             "volcengine": LLMProviderConfig(
                 default_model="doubao-seed-2.0-code",
                 base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
@@ -115,7 +115,7 @@ class ScireadConfig(BaseSettings):
         }
     )
 
-    default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-chat"))
+    default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-v4-flash"))
     document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
     mineru: MineruConfig = Field(default_factory=MineruConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
@@ -177,7 +177,7 @@ class ScireadConfig(BaseSettings):
             raw_default = raw_providers.get("default", {})
             default_settings = DefaultConfig(
                 provider=raw_default.get("provider", "deepseek"),
-                model=raw_default.get("model", "deepseek-chat"),
+                model=raw_default.get("model", "deepseek-v4-flash"),
             )
 
             # Extract document splitters

@@ -18,7 +18,7 @@ logger = get_logger(__name__)
 AGENT_CACHE: dict[str, PersonalityAgent] = {}
 
 
-def get_cached_agent(personality: AgentPersonality, model_name: str = "deepseek-chat") -> PersonalityAgent:
+def get_cached_agent(personality: AgentPersonality, model_name: str = "deepseek-v4-flash") -> PersonalityAgent:
     """Get cached agent instance or create new one if not exists."""
     if personality is None:
         raise ValueError("Personality cannot be None")
@@ -66,7 +66,7 @@ async def generate_insights_tool(task: Task) -> TaskResult:
         if isinstance(personality, str):
             personality = AgentPersonality(personality)
 
-        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-v4-flash"))
 
         # Generate insights
         insights = await agent.generate_insights(document, discussion_context)
@@ -127,7 +127,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
             from_agent = AgentPersonality(from_agent)
 
         # Create agent
-        agent = get_cached_agent(from_agent, task.context.get("model_name", "deepseek-chat"))
+        agent = get_cached_agent(from_agent, task.context.get("model_name", "deepseek-v4-flash"))
 
         # Ask questions in batch
         questions = await agent.ask_questions_batch(target_insights, discussion_context)
@@ -190,7 +190,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(assigned_to) if isinstance(assigned_to, str) else assigned_to
 
         # Create agent
-        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-v4-flash"))
 
         # Answer questions in batch
         responses = await agent.answer_questions_batch(questions, my_insights, discussion_context)
@@ -246,7 +246,7 @@ async def evaluate_convergence_tool(task: Task) -> TaskResult:
             personality = AgentPersonality(personality)
 
         # Create agent
-        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-chat"))
+        agent = get_cached_agent(personality, task.context.get("model_name", "deepseek-v4-flash"))
 
         # Evaluate convergence
         evaluation = await agent.evaluate_convergence(all_insights, all_questions, all_responses, discussion_context)

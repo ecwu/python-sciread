@@ -160,10 +160,10 @@ async def test_search_react_init_defers_model_creation_until_iteration(monkeypat
 
     monkeypatch.setattr("sciread.agent.search_react.agent.get_model", fail_if_called)
 
-    agent = SearchReactAgent(model="deepseek-chat")
+    agent = SearchReactAgent(model="deepseek-v4-flash")
 
     assert agent.model is None
-    assert agent.model_identifier == "deepseek-chat"
+    assert agent.model_identifier == "deepseek-v4-flash"
 
 
 @pytest.mark.asyncio

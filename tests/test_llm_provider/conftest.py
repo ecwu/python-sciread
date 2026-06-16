@@ -23,7 +23,7 @@ def test_config_file(test_config_dir):
     config_content = """
 [llm_providers.deepseek]
 api_key = "test-deepseek-key"
-default_model = "deepseek-chat"
+default_model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com"
 
 [llm_providers.volcengine]
@@ -42,7 +42,7 @@ default_model = "qwen3:4b"
 
 [llm_providers.default]
 provider = "deepseek"
-model = "deepseek-chat"
+model = "deepseek-v4-flash"
 """
     config_file.write_text(config_content)
     return config_file

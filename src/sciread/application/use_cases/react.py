@@ -11,7 +11,7 @@ logger = get_logger(__name__)
 async def run_react_analysis(
     document_file: str,
     task: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     show_progress: bool = True,
 ):

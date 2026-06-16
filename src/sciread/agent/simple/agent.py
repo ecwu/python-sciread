@@ -66,7 +66,7 @@ def load_document_for_simple_analysis(file_path: str | Path, to_markdown: bool =
 async def analyze_file_with_simple(
     file_path: str,
     task_prompt: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     include_metadata: bool = True,
     remove_references: bool = True,
     clean_text: bool = True,
@@ -113,7 +113,7 @@ async def analyze_file_with_simple(
 def analyze_file_with_simple_sync(
     file_path: str,
     task_prompt: str,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     include_metadata: bool = True,
     remove_references: bool = True,
     clean_text: bool = True,

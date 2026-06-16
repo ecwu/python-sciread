@@ -233,7 +233,7 @@ async def get_all_memory(ctx: RunContext[SearchReactDeps]) -> str:
 class SearchReactAgent:
     """ReAct-style agent that reads retrieval bundles instead of raw sections."""
 
-    def __init__(self, model: str = "deepseek-chat") -> None:
+    def __init__(self, model: str = "deepseek-v4-flash") -> None:
         self.logger = get_logger(__name__)
         self.model_identifier = model
         self.model = None
@@ -433,7 +433,7 @@ async def analyze_file_with_search_react(
     file_path: str,
     task: str,
     *,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
@@ -496,7 +496,7 @@ def analyze_file_with_search_react_sync(
     file_path: str,
     task: str,
     *,
-    model: str = "deepseek-chat",
+    model: str = "deepseek-v4-flash",
     max_loops: int = 5,
     to_markdown: bool = True,
     show_progress: bool = True,
