@@ -1,12 +1,16 @@
 name: build
 on: [push, pull_request, workflow_dispatch]
+
+permissions:
+  contents: read
+
 jobs:
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
       - name: ruff check
         run: uv run ruff check src/ tests/
       - name: ruff format
@@ -21,21 +25,19 @@ jobs:
       matrix:
         python: ["3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v5
-      - uses: astral-sh/setup-uv@v7
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
         with:
           python-version: ${{ matrix.python }}
       - name: install dependencies
         run: uv sync --group test
       - name: test
         run: uv run pytest --cov --cov-report=term-missing --cov-report=xml -vv tests/
-
-  finish:
-    needs: [lint, test]
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: codecov/codecov-action@v5
+      - name: upload coverage
+        if: ${{ matrix.python == '3.13' }}
+        uses: codecov/codecov-action@v7
         with:
-          verbose: true
+          files: ./coverage.xml
+          name: py${{ matrix.python }}-ubuntu
           token: ${{ secrets.CODECOV_TOKEN }}
+          verbose: true
