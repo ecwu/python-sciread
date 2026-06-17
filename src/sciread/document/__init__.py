@@ -3,6 +3,7 @@
 from ..embedding_provider import LMStudioClient
 from ..embedding_provider import OllamaClient
 from ..embedding_provider import SiliconFlowClient
+from ..rerank_provider import SiliconFlowRerankClient
 from .document import Document
 from .document_builder import DocumentBuilder
 from .ingestion.external_clients import MineruClient
@@ -22,4 +23,5 @@ __all__ = [
     "OllamaClient",
     "SemanticSplitter",
     "SiliconFlowClient",
+    "SiliconFlowRerankClient",
 ]

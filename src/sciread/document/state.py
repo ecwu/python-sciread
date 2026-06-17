@@ -268,3 +268,13 @@ def get_runtime_embedding_client(document: Document):
 def set_runtime_embedding_client(document: Document, embedding_client) -> None:
     """Cache an embedding client for future retrieval calls."""
     document._runtime.embedding_client = embedding_client
+
+
+def get_runtime_rerank_client(document: Document):
+    """Return the cached runtime rerank client, if any."""
+    return document._runtime.rerank_client
+
+
+def set_runtime_rerank_client(document: Document, rerank_client) -> None:
+    """Cache a rerank client for future retrieval calls."""
+    document._runtime.rerank_client = rerank_client

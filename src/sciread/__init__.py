@@ -11,6 +11,9 @@ from .embedding_provider import get_embedding_client
 from .llm_provider import get_model
 from .platform.logging import get_logger
 from .platform.logging import setup_logging
+from .rerank_provider import RerankFactory
+from .rerank_provider import SiliconFlowRerankClient
+from .rerank_provider import get_rerank_client
 
 __version__ = "1.1.0"
 
@@ -18,10 +21,13 @@ __all__ = [
     "EmbeddingFactory",
     "LMStudioClient",
     "OllamaClient",
+    "RerankFactory",
     "SiliconFlowClient",
+    "SiliconFlowRerankClient",
     "get_embedding_client",
     "get_logger",
     "get_model",
+    "get_rerank_client",
     "run_coordinate_analysis",
     "run_discussion_analysis",
     "run_react_analysis",

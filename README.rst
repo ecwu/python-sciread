@@ -83,7 +83,7 @@ Key Environment Variables:
 
 - ``DEEPSEEK_API_KEY``: API key for DeepSeek (used by default).
 - ``VOLCES_API``: API key for Volcengine / Doubao (Ark).
-- ``SILICONFLOW_API_KEY``: API key for SiliconFlow embeddings, used by the default RAG embedding model.
+- ``SILICONFLOW_API_KEY``: API key for SiliconFlow embeddings and reranking, used by the default RAG embedding/rerank models.
 - ``MINERU_TOKEN``: Required for converting PDF files to high-quality Markdown via the Mineru API.
 - ``SCIREAD_LOG_LEVEL``: Control logging verbosity (DEBUG, INFO, WARNING, ERROR).
 
@@ -91,9 +91,9 @@ Key Environment Variables:
 
 By default, ``sciread`` uses a simple PDF loader. For much better results (with extracted tables and formulas), set ``MINERU_TOKEN`` and configuration in ``sciread.toml`` to use the Mineru provider.
 
-**RAG Embeddings**
+**RAG Embeddings and Reranking**
 
-RAG uses SiliconFlow ``BAAI/bge-m3`` embeddings by default. Set ``SILICONFLOW_API_KEY`` before building vector indices. You can still use local models explicitly with LM Studio's OpenAI-compatible local server on ``http://localhost:1234/v1`` or with Ollama.
+RAG uses SiliconFlow ``BAAI/bge-m3`` embeddings by default. Set ``SILICONFLOW_API_KEY`` before building vector indices. You can still use local models explicitly with LM Studio's OpenAI-compatible local server on ``http://localhost:1234/v1`` or with Ollama. For second-stage ranking, use ``Document.retrieve_chunks(..., strategy="rerank")`` or ``Document.rerank_search(...)``; this reranks semantic candidates with the configured ``vector_store.rerank_model``.
 
 Python API
 ==========
@@ -124,7 +124,7 @@ The same overlap behavior can be configured globally in ``config/sciread.toml`` 
 For retrieval-oriented workflows, ``search-react`` can compare multiple retrievers in one run while reusing the same
 document chunking and vector-store configuration. Agent-facing retrieval should use ``EvidenceRetriever`` from
 ``sciread.document.retrieval`` so callers receive citation-ready evidence blocks with section labels, citation keys,
-scores, and optional same-section neighbor context. ``Document.semantic_search()`` and ``Document.retrieve_chunks()``
+scores, and optional same-section neighbor context. ``Document.semantic_search()``, ``Document.rerank_search()``, and ``Document.retrieve_chunks()``
 remain lower-level APIs for chunk/vector retrieval internals.
 
 Project Layout

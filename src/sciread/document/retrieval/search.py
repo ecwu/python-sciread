@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 
 QUERY_TOKEN_PATTERN = re.compile(r"[a-zA-Z0-9_.-]+")
-SUPPORTED_RETRIEVERS = ("lexical", "semantic", "tree", "hybrid")
+SUPPORTED_RETRIEVERS = ("lexical", "semantic", "rerank", "tree", "hybrid")
 
 
 def retrieve_chunks(
@@ -46,6 +46,14 @@ def retrieve_chunks(
         )
     if normalized_strategy == "semantic":
         return semantic_chunk_search(
+            document,
+            query,
+            top_k=top_k,
+            neighbor_window=neighbor_window,
+            section_scope=section_scope,
+        )
+    if normalized_strategy == "rerank":
+        return rerank_chunk_search(
             document,
             query,
             top_k=top_k,
@@ -157,6 +165,55 @@ def semantic_chunk_search(
                 chunk=chunk,
                 score=float(similarity),
                 strategy="semantic",
+                matched_terms=[],
+                section_path=chunk.section_path.copy(),
+            )
+        )
+
+    if not normalized_results:
+        return []
+    return _finalize_results(
+        document,
+        normalized_results,
+        top_k=top_k,
+        neighbor_window=neighbor_window,
+        include_context=include_context,
+    )
+
+
+def rerank_chunk_search(
+    document: Document,
+    query: str,
+    *,
+    top_k: int,
+    neighbor_window: int,
+    section_scope: str | None,
+    include_context: bool = True,
+) -> list[RetrievedChunk]:
+    """Rerank semantic retrieval candidates with the configured rerank provider."""
+    try:
+        if document.vector_index is None:
+            document.build_vector_index()
+    except Exception as exc:
+        raise RuntimeError(f"Rerank retrieval unavailable: failed to build vector index ({exc})") from exc
+
+    try:
+        raw_results = document.rerank_search(query, top_k=max(top_k * 2, top_k), return_scores=True)
+    except Exception as exc:
+        raise RuntimeError(f"Rerank retrieval failed: {exc}") from exc
+
+    if not raw_results:
+        return []
+
+    normalized_results: list[RetrievedChunk] = []
+    for chunk, score in raw_results:
+        if section_scope and not _chunk_in_scope(chunk, section_scope):
+            continue
+        normalized_results.append(
+            RetrievedChunk(
+                chunk=chunk,
+                score=float(score),
+                strategy="rerank",
                 matched_terms=[],
                 section_path=chunk.section_path.copy(),
             )

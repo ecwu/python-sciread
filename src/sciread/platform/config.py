@@ -85,6 +85,8 @@ class VectorStoreConfig(BaseModel):
     embedding_model: str = Field(default="siliconflow/BAAI/bge-m3", description="Model for embeddings")
     batch_size: int = Field(default=10, description="Embedding batch size")
     cache_embeddings: bool = Field(default=True, description="Cache embeddings for better performance")
+    rerank_model: str = Field(default="siliconflow/BAAI/bge-reranker-v2-m3", description="Model for reranking semantic candidates")
+    rerank_candidate_multiplier: int = Field(default=4, ge=1, description="How many semantic candidates to rerank per requested result")
 
 
 class DefaultConfig(BaseModel):

@@ -81,3 +81,7 @@ embedding_model = "siliconflow/BAAI/bge-m3"
 batch_size = 10
 # Cache embeddings for better performance
 cache_embeddings = true
+# Optional second-stage rerank model. Use retrieval strategy "rerank" to rerank
+# semantic candidates after vector search.
+rerank_model = "siliconflow/BAAI/bge-reranker-v2-m3"
+rerank_candidate_multiplier = 4

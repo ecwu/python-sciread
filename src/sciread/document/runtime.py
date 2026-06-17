@@ -16,5 +16,6 @@ class DocumentRuntimeState:
     """Holds non-serialized runtime-only dependencies for a document."""
 
     embedding_client: Any | None = None
+    rerank_client: Any | None = None
     vector_index: VectorIndex | None = None
     chunk_positions: dict[str, int] = field(default_factory=dict)

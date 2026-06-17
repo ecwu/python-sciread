@@ -7,6 +7,7 @@ from sciread.document.models import Chunk
 from sciread.document.retrieval.models import RetrievedChunk
 from sciread.document.retrieval.search import hybrid_search
 from sciread.document.retrieval.search import lexical_search
+from sciread.document.retrieval.search import rerank_chunk_search
 from sciread.document.retrieval.search import retrieve_chunks
 from sciread.document.retrieval.search import semantic_chunk_search
 from sciread.document.retrieval.search import tree_search
@@ -164,6 +165,45 @@ def test_semantic_chunk_search_filters_scope_and_wraps_query_failures(monkeypatc
 
     with pytest.raises(RuntimeError, match="Semantic retrieval failed: query failed"):
         semantic_chunk_search(doc, "method", top_k=1, neighbor_window=0, section_scope=None)
+
+
+def test_rerank_chunk_search_builds_index_lazily_and_returns_results(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Rerank retrieval should lazily build the vector index before reranking."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    chunk = Chunk(content="Chunk one", section_path=["intro"])
+    doc._set_chunks([chunk])
+    build_calls = {"count": 0}
+
+    def fake_build_vector_index() -> None:
+        build_calls["count"] += 1
+        doc.vector_index = object()
+
+    monkeypatch.setattr(doc, "build_vector_index", fake_build_vector_index)
+    monkeypatch.setattr(doc, "rerank_search", lambda query, top_k, return_scores: [(chunk, 0.96)])
+
+    results = rerank_chunk_search(
+        doc,
+        "intro",
+        top_k=1,
+        neighbor_window=0,
+        section_scope=None,
+    )
+
+    assert build_calls["count"] == 1
+    assert results[0].strategy == "rerank"
+    assert results[0].score == 0.96
+
+
+def test_retrieve_chunks_supports_rerank_strategy(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The public retrieval entrypoint should route the rerank strategy."""
+    doc = Document.from_text("placeholder", auto_split=False)
+    chunk = Chunk(content="Chunk one", section_path=["intro"])
+    doc._set_chunks([chunk])
+    expected = [RetrievedChunk(chunk=chunk, score=0.9, strategy="rerank")]
+
+    monkeypatch.setattr("sciread.document.retrieval.search.rerank_chunk_search", lambda *args, **kwargs: expected)
+
+    assert retrieve_chunks(doc, "intro", strategy="rerank", top_k=1, neighbor_window=0) == expected
 
 
 def test_hybrid_search_deduplicates_results(monkeypatch: pytest.MonkeyPatch) -> None:

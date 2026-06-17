@@ -13,6 +13,7 @@ from .models import ProcessingState
 from .retrieval.search import retrieve_chunks as retrieve_document_chunks
 from .retrieval.service import build_vector_index as build_document_vector_index
 from .retrieval.service import cosine_similarity
+from .retrieval.service import rerank_search as rerank_search_document
 from .retrieval.service import semantic_search as semantic_search_document
 from .retrieval.vector_index import VectorIndex
 from .state import attach_document_chunks
@@ -477,6 +478,26 @@ class Document:
             get_embedding_client_fn=get_embedding_client,
         )
 
+    def rerank_search(
+        self,
+        query: str,
+        top_k: int = 5,
+        candidate_top_k: int | None = None,
+        return_scores: bool = False,
+        rerank_client=None,
+    ) -> list[Chunk] | list[tuple[Chunk, float]]:
+        """Rerank semantic search candidates with the configured rerank provider."""
+        return rerank_search_document(
+            self,
+            query=query,
+            top_k=top_k,
+            candidate_top_k=candidate_top_k,
+            return_scores=return_scores,
+            rerank_client=rerank_client,
+            get_config_fn=get_config,
+            get_embedding_client_fn=get_embedding_client,
+        )
+
     def retrieve_chunks(
         self,
         query: str,
@@ -485,7 +506,7 @@ class Document:
         neighbor_window: int = 1,
         section_scope: str | None = None,
     ):
-        """Retrieve chunks using lexical, semantic, tree, or hybrid search."""
+        """Retrieve chunks using lexical, semantic, rerank, tree, or hybrid search."""
         return retrieve_document_chunks(
             self,
             query=query,

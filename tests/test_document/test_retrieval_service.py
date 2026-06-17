@@ -9,6 +9,7 @@ from sciread.document import Document
 from sciread.document.models import Chunk
 from sciread.document.retrieval.service import build_vector_index
 from sciread.document.retrieval.service import cosine_similarity
+from sciread.document.retrieval.service import rerank_search
 from sciread.document.retrieval.service import semantic_search
 from sciread.document.state import set_runtime_embedding_client
 
@@ -250,3 +251,79 @@ class TestDocumentRetrievalService:
         results = semantic_search(doc, query="intro")
 
         assert results == []
+
+    def test_rerank_search_reranks_semantic_candidates_and_caches_client(self):
+        """Rerank search should reorder semantic candidates using the rerank provider."""
+        doc = Document.from_text("placeholder", auto_split=False)
+        first = Chunk(content="Apple company", section_path=["intro"])
+        second = Chunk(content="Apple fruit", section_path=["methods"])
+        doc._set_chunks([first, second])
+        doc.vector_index = Mock()
+        doc.vector_index.search.return_value = [
+            {"id": first.chunk_id, "similarity": 0.8},
+            {"id": second.chunk_id, "similarity": 0.7},
+        ]
+
+        embedding_client = Mock()
+        embedding_client.get_embedding.return_value = [0.1, 0.2]
+        rerank_client = Mock()
+        rerank_client.rerank.return_value = [
+            SimpleNamespace(index=1, relevance_score=0.93),
+            SimpleNamespace(index=0, relevance_score=0.2),
+        ]
+        config = SimpleNamespace(
+            vector_store=SimpleNamespace(
+                embedding_model="dummy/model",
+                cache_embeddings=True,
+                rerank_model="dummy/reranker",
+                rerank_candidate_multiplier=3,
+            )
+        )
+
+        results = rerank_search(
+            doc,
+            query="apple as food",
+            top_k=1,
+            return_scores=True,
+            get_config_fn=Mock(return_value=config),
+            get_embedding_client_fn=Mock(return_value=embedding_client),
+            get_rerank_client_fn=Mock(return_value=rerank_client),
+        )
+
+        assert results == [(second, 0.93)]
+        assert doc._runtime.rerank_client is rerank_client
+        rerank_client.rerank.assert_called_once()
+        assert rerank_client.rerank.call_args.args[0] == "apple as food"
+        assert rerank_client.rerank.call_args.kwargs == {"top_n": 1}
+
+    def test_rerank_search_falls_back_to_semantic_order_when_rerank_returns_empty(self):
+        """Rerank search should keep semantic results when the rerank provider cannot score."""
+        doc = Document.from_text("placeholder", auto_split=False)
+        chunk = Chunk(content="Chunk one", chunk_name="intro")
+        doc._set_chunks([chunk])
+        doc.vector_index = Mock()
+        doc.vector_index.search.return_value = [{"id": chunk.chunk_id, "similarity": 0.88}]
+
+        embedding_client = Mock()
+        embedding_client.get_embedding.return_value = [0.1, 0.2]
+        rerank_client = Mock()
+        rerank_client.rerank.return_value = []
+        config = SimpleNamespace(
+            vector_store=SimpleNamespace(
+                embedding_model="dummy/model",
+                cache_embeddings=True,
+                rerank_model="dummy/reranker",
+                rerank_candidate_multiplier=4,
+            )
+        )
+
+        results = rerank_search(
+            doc,
+            query="intro",
+            top_k=1,
+            get_config_fn=Mock(return_value=config),
+            get_embedding_client_fn=Mock(return_value=embedding_client),
+            get_rerank_client_fn=Mock(return_value=rerank_client),
+        )
+
+        assert results == [chunk]
