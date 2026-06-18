@@ -69,7 +69,6 @@ def enrich_chunks(document: Document, chunks: list[Chunk]) -> None:
     for index, chunk in enumerate(chunks):
         chunk.doc_id = chunk.doc_id or doc_id
         chunk.para_index = index
-        chunk.position = index
 
         if not chunk.content_plain or chunk.content_plain == chunk.content:
             chunk.content_plain = to_plain_text(chunk.content)
@@ -83,11 +82,11 @@ def enrich_chunks(document: Document, chunks: list[Chunk]) -> None:
         if chunk.token_count is None:
             chunk.token_count = len(chunk.content_plain.split())
 
-        chunk.sync_page_range()
-        chunk.sync_section_metadata()
+        if chunk.parent_section_id is None and chunk.section_path:
+            chunk.parent_section_id = chunk.section_path[-1]
 
         if not chunk.citation_key or chunk.citation_key == chunk.chunk_id:
-            chunk.citation_key = f"{chunk.doc_id}:{chunk.position}"
+            chunk.citation_key = f"{chunk.doc_id}:{chunk.para_index}"
 
         chunk.metadata["section_label"] = " > ".join(chunk.section_path) if chunk.section_path else ""
 

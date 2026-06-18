@@ -7,7 +7,6 @@ using pydantic-ai framework and the existing LLM provider infrastructure.
 import asyncio
 from dataclasses import dataclass
 from dataclasses import field
-from pathlib import Path
 from typing import Any
 
 from pydantic_ai import Agent
@@ -47,22 +46,6 @@ class SimpleAnalysisDeps:
     additional_context: dict[str, Any] = field(default_factory=dict)
 
 
-def _validate_document_file(file_path: str | Path) -> None:
-    """Validate that the document file exists before processing.
-
-    DEPRECATED: Use application.use_cases.common.ensure_file_exists instead.
-    """
-    ensure_file_exists(str(file_path))
-
-
-def load_document_for_simple_analysis(file_path: str | Path, to_markdown: bool = False) -> Document:
-    """Load a document for simple-agent analysis.
-
-    DEPRECATED: Use application.use_cases.common.load_document instead.
-    """
-    return load_document(str(file_path), to_markdown=to_markdown)
-
-
 async def analyze_file_with_simple(
     file_path: str,
     task_prompt: str,
@@ -77,8 +60,8 @@ async def analyze_file_with_simple(
     logger = get_logger(__name__)
     logger.debug(f"Starting simple analysis for file: {file_path}")
 
-    _validate_document_file(file_path)
-    document = load_document_for_simple_analysis(file_path, to_markdown=to_markdown)
+    ensure_file_exists(file_path)
+    document = load_document(file_path, to_markdown=to_markdown)
     metadata = getattr(document, "metadata", None)
     document_title = getattr(metadata, "title", None) or getattr(document, "source_path", None) or file_path
     get_section_names = getattr(document, "get_section_names", None)

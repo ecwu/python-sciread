@@ -44,10 +44,10 @@ def sample_pdf_document() -> Document:
     )
     document._set_chunks(
         [
-            Chunk(content="This is the abstract section.", chunk_name="abstract"),
-            Chunk(content="Introduction content.", chunk_name="introduction"),
-            Chunk(content="Method details.", chunk_name="methodology"),
-            Chunk(content="Experiment results.", chunk_name="results"),
+            Chunk(content="This is the abstract section.", section_path=["abstract"]),
+            Chunk(content="Introduction content.", section_path=["introduction"]),
+            Chunk(content="Method details.", section_path=["methodology"]),
+            Chunk(content="Experiment results.", section_path=["results"]),
         ]
     )
     return document
@@ -63,9 +63,9 @@ def hierarchical_section_document() -> Document:
     )
     document._set_chunks(
         [
-            Chunk(content="Short bridge.", chunk_name="3. Method"),
-            Chunk(content="Detailed proposed method with architecture and training details.", chunk_name="3.1 Proposed Method"),
-            Chunk(content="Extensive quantitative evaluation with baselines and ablations.", chunk_name="4. Experiments"),
+            Chunk(content="Short bridge.", section_path=["3. Method"]),
+            Chunk(content="Detailed proposed method with architecture and training details.", section_path=["3.1 Proposed Method"]),
+            Chunk(content="Extensive quantitative evaluation with baselines and ablations.", section_path=["4. Experiments"]),
         ]
     )
     return document
@@ -85,7 +85,7 @@ def test_extract_abstract_falls_back_to_first_chunk_and_text() -> None:
         text="Fallback text",
         metadata=DocumentMetadata(title="Chunk fallback", source_path=Path("paper.pdf")),
     )
-    single_chunk_document._set_chunks([Chunk(content="Only chunk content.", chunk_name="body")])
+    single_chunk_document._set_chunks([Chunk(content="Only chunk content.", section_path=["body"])])
 
     text_only_document = Document(
         source_path=Path("paper.pdf"),
@@ -130,9 +130,9 @@ def test_select_sections_for_expert_falls_back_to_non_heading_sections(monkeypat
     )
     document._set_chunks(
         [
-            Chunk(content="Tiny", chunk_name="1. Heading"),
-            Chunk(content="Substantial introduction content for the paper.", chunk_name="2. Introduction"),
-            Chunk(content="Detailed experiment content with extensive findings.", chunk_name="3. Results"),
+            Chunk(content="Tiny", section_path=["1. Heading"]),
+            Chunk(content="Substantial introduction content for the paper.", section_path=["2. Introduction"]),
+            Chunk(content="Detailed experiment content with extensive findings.", section_path=["3. Results"]),
         ]
     )
 
@@ -152,9 +152,9 @@ def test_select_sections_for_expert_falls_back_to_available_sections_when_all_ar
     )
     document._set_chunks(
         [
-            Chunk(content="A", chunk_name="1. Intro"),
-            Chunk(content="B", chunk_name="2. Method"),
-            Chunk(content="C", chunk_name="3. Result"),
+            Chunk(content="A", section_path=["1. Intro"]),
+            Chunk(content="B", section_path=["2. Method"]),
+            Chunk(content="C", section_path=["3. Result"]),
         ]
     )
 
@@ -683,9 +683,9 @@ async def test_execute_sub_agents_collects_success_failures_and_sections(monkeyp
     )
     document._set_chunks(
         [
-            Chunk(content="Abstract text", chunk_name="abstract"),
-            Chunk(content="Methods text", chunk_name="methods"),
-            Chunk(content="Conclusion text", chunk_name="conclusion"),
+            Chunk(content="Abstract text", section_path=["abstract"]),
+            Chunk(content="Methods text", section_path=["methods"]),
+            Chunk(content="Conclusion text", section_path=["conclusion"]),
         ]
     )
     plan = AnalysisPlan(
@@ -768,7 +768,7 @@ async def test_coordinate_agent_analyze_uses_custom_plan_without_replanning() ->
         text="Abstract\nBody",
         metadata=DocumentMetadata(title="Paper", source_path=Path("paper.pdf")),
     )
-    document._set_chunks([Chunk(content="Abstract text", chunk_name="abstract")])
+    document._set_chunks([Chunk(content="Abstract text", section_path=["abstract"])])
 
     async def fail_if_called(_document: Document, _section_names: list[str]) -> AnalysisPlan:
         raise AssertionError("plan_analysis should not be called when custom_plan is provided")
@@ -826,7 +826,7 @@ async def test_coordinate_agent_analyze_reraises_execution_failures() -> None:
         text="Abstract\nBody",
         metadata=DocumentMetadata(title="Paper", source_path=Path("paper.pdf")),
     )
-    document._set_chunks([Chunk(content="Abstract text", chunk_name="abstract")])
+    document._set_chunks([Chunk(content="Abstract text", section_path=["abstract"])])
 
     async def fake_execute(_document: Document, analysis_plan: AnalysisPlan) -> dict[str, object]:
         raise RuntimeError("sub-agent failure")

@@ -36,13 +36,6 @@ class Chunk:
     retrievable: bool = True
     metadata: dict[str, Any] = field(default_factory=dict)
 
-    # Legacy compatibility fields (kept to avoid breaking current APIs/tests)
-    chunk_name: str = "unknown"  # abstract, introduction, methods, etc.
-    position: int = 0  # Sequential position in document
-    page_range: tuple[int, int] | None = None  # (start_page, end_page)
-    word_count: int = 0
-    confidence: float = 1.0  # Confidence in classification (0.0-1.0)
-
     def __post_init__(self):
         """Validate and initialize derived fields."""
         if not self.display_text:
@@ -54,60 +47,18 @@ class Chunk:
         if not self.retrieval_text:
             self.retrieval_text = self.content_plain
 
-        if self.word_count == 0:
-            self.word_count = len(self.content.split())
-
         if self.token_count is None:
             # Approximate token count fallback when no tokenizer is provided.
             self.token_count = len(self.content_plain.split())
 
-        if self.confidence < 0.0 or self.confidence > 1.0:
-            raise ValueError("Confidence must be between 0.0 and 1.0")
-
         if self.overlap_prev_chars < 0 or self.overlap_next_chars < 0:
             raise ValueError("Chunk overlap values must be >= 0")
 
-        self.sync_page_range()
-
-        if self.para_index is None:
-            self.para_index = self.position
-
-        self.sync_section_metadata()
+        if self.parent_section_id is None and self.section_path:
+            self.parent_section_id = self.section_path[-1]
 
         if not self.citation_key:
             self.citation_key = self.chunk_id
-
-    @property
-    def id(self) -> str:
-        """Backward-compatible chunk identifier alias."""
-        return self.chunk_id
-
-    @id.setter
-    def id(self, value: str) -> None:
-        """Backward-compatible chunk identifier alias."""
-        self.chunk_id = value
-
-    def sync_page_range(self) -> None:
-        """Keep page range fields synchronized."""
-        if self.page_range is not None:
-            if self.page_start is None:
-                self.page_start = self.page_range[0]
-            if self.page_end is None:
-                self.page_end = self.page_range[1]
-            return
-
-        if self.page_start is not None and self.page_end is not None:
-            self.page_range = (self.page_start, self.page_end)
-
-    def sync_section_metadata(self) -> None:
-        """Keep section fields synchronized across legacy and normalized metadata."""
-        if not self.section_path and self.chunk_name and self.chunk_name != "unknown":
-            self.section_path = [self.chunk_name]
-        elif self.chunk_name == "unknown" and self.section_path:
-            self.chunk_name = self.section_path[-1]
-
-        if not self.parent_section_id and self.section_path:
-            self.parent_section_id = self.section_path[-1]
 
     @property
     def has_overlap(self) -> bool:

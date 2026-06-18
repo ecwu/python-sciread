@@ -161,21 +161,15 @@ class Document:
 
     def get_chunks(
         self,
-        chunk_name: str | None = None,
         limit: int | None = None,
-        confidence_threshold: float | None = None,
         min_length: int | None = None,
-        exclude_types: set[str] | None = None,
     ) -> list[Chunk]:
         """
         Get chunks with flexible filtering criteria.
 
         Args:
-            chunk_name: Filter by specific chunk name (section name).
             limit: Maximum number of chunks to return.
-            confidence_threshold: Minimum confidence score (0.0-1.0).
             min_length: Minimum character length for chunks.
-            exclude_types: Set of chunk types to exclude.
 
         Returns:
             List of chunks matching the specified criteria.
@@ -183,11 +177,8 @@ class Document:
         """
         return get_document_chunks(
             self,
-            chunk_name=chunk_name,
             limit=limit,
-            confidence_threshold=confidence_threshold,
             min_length=min_length,
-            exclude_types=exclude_types,
         )
 
     def get_chunk_by_id(self, chunk_id: str) -> Chunk | None:

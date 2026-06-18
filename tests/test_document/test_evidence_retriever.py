@@ -14,10 +14,10 @@ def test_evidence_retriever_returns_expanded_agent_facing_evidence(monkeypatch) 
     """Evidence retrieval should hide chunk internals and expand same-section neighbors."""
     document = Document.from_text("placeholder", auto_split=False)
     chunks = [
-        Chunk(content="Previous context.", section_path=["methods"], page_range=(1, 1)),
-        Chunk(content="The retrieved method uses contrastive training.", section_path=["methods"], page_range=(2, 2)),
-        Chunk(content="Next context.", section_path=["methods"], page_range=(3, 3)),
-        Chunk(content="Different section.", section_path=["results"], page_range=(4, 4)),
+        Chunk(content="Previous context.", section_path=["methods"], page_start=1, page_end=1),
+        Chunk(content="The retrieved method uses contrastive training.", section_path=["methods"], page_start=2, page_end=2),
+        Chunk(content="Next context.", section_path=["methods"], page_start=3, page_end=3),
+        Chunk(content="Different section.", section_path=["results"], page_start=4, page_end=4),
     ]
     document._set_chunks(chunks)
 

@@ -128,10 +128,6 @@ class BaseEmbeddingClient(ABC):
     def _get_single_embedding(self, text: str) -> list[float] | None:
         """Fetch one embedding from the backing provider."""
 
-    def cosine_similarity(self, vec1: list[float], vec2: list[float]) -> float:
-        """Proxy shared cosine similarity for backwards compatibility."""
-        return cosine_similarity(vec1, vec2)
-
     def calculate_centroid(self, embeddings: list[list[float]]) -> list[float]:
         """Calculate centroid of embeddings."""
         if not embeddings:

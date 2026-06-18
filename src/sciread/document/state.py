@@ -58,8 +58,8 @@ def attach_document_chunks(document: Document, chunks: list[Chunk]) -> None:
 
 def update_chunk_index(document: Document) -> None:
     """Refresh the chunk-id lookup table."""
-    document._chunks_by_id = {chunk.id: chunk for chunk in document._chunks}
-    document._runtime.chunk_positions = {chunk.id: index for index, chunk in enumerate(document._chunks)}
+    document._chunks_by_id = {chunk.chunk_id: chunk for chunk in document._chunks}
+    document._runtime.chunk_positions = {chunk.chunk_id: index for index, chunk in enumerate(document._chunks)}
 
 
 def get_chunk_map(document: Document) -> dict[str, Chunk]:
@@ -72,26 +72,14 @@ def get_chunk_map(document: Document) -> dict[str, Chunk]:
 def get_chunks(
     document: Document,
     *,
-    chunk_name: str | None = None,
     limit: int | None = None,
-    confidence_threshold: float | None = None,
     min_length: int | None = None,
-    exclude_types: set[str] | None = None,
 ) -> list[Chunk]:
     """Filter chunks using the current document state."""
     chunks = document._chunks
 
-    if chunk_name is not None:
-        chunks = [chunk for chunk in chunks if chunk.chunk_name == chunk_name]
-
-    if confidence_threshold is not None:
-        chunks = [chunk for chunk in chunks if (chunk.confidence or 0.0) >= confidence_threshold]
-
     if min_length is not None:
         chunks = [chunk for chunk in chunks if len(chunk.content) >= min_length]
-
-    if exclude_types:
-        chunks = [chunk for chunk in chunks if chunk.chunk_name not in exclude_types]
 
     if limit is not None:
         chunks = chunks[:limit]
@@ -109,8 +97,6 @@ def get_section_parts(chunk: Chunk) -> list[str]:
     section_parts = [part.strip() for part in chunk.section_path if part.strip()]
     if section_parts:
         return section_parts
-    if chunk.chunk_name and chunk.chunk_name != "unknown":
-        return [chunk.chunk_name]
     return []
 
 
@@ -194,8 +180,8 @@ def get_section_names(document: Document) -> list[str]:
     """Return section names in document order."""
     section_names: list[str] = []
     for chunk in document._chunks:
-        if chunk.chunk_name and chunk.chunk_name != "unknown":
-            section_name = chunk.chunk_name
+        if chunk.section_path:
+            section_name = " > ".join(chunk.section_path)
             if section_name not in section_names:
                 section_names.append(section_name)
         elif chunk.metadata.get("splitter") and chunk.metadata["splitter"] != "unknown":
@@ -207,7 +193,8 @@ def get_section_names(document: Document) -> list[str]:
 
 def get_sections_by_name(document: Document, section_names: list[str]) -> list[Chunk]:
     """Return chunks matching the requested section names."""
-    return [chunk for chunk in document._chunks if chunk.chunk_name in section_names]
+    requested_sections = set(section_names)
+    return [chunk for chunk in document._chunks if " > ".join(chunk.section_path) in requested_sections]
 
 
 def get_runtime_embedding_client(document: Document):

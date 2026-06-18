@@ -114,9 +114,9 @@ class MarkdownSplitter(BaseSplitter):
         if self.preserve_code_blocks and code_blocks:
             chunks = self._restore_code_blocks(chunks, code_blocks)
 
-        # Ensure continuity by reassigning positions
+        # Ensure continuity by reassigning paragraph indexes
         for i, chunk in enumerate(chunks):
-            chunk.position = i
+            chunk.para_index = i
 
         return chunks
 
@@ -227,10 +227,8 @@ class MarkdownSplitter(BaseSplitter):
 
         if isinstance(section_name, list):
             section_path = [part for part in section_name if part]
-            section_value = section_path[-1] if section_path else "unknown"
         else:
-            section_value = section_name if section_name else "unknown"
-            section_path = [section_value] if section_value != "unknown" else []
+            section_path = [section_name] if section_name else []
         chunk_id = str(uuid.uuid4())
 
         chunk = Chunk(
@@ -242,8 +240,6 @@ class MarkdownSplitter(BaseSplitter):
             page_start=None,
             page_end=None,
             para_index=0,
-            chunk_name=section_value,
-            position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
             token_count=len(content.split()),
             prev_chunk_id=None,
@@ -251,8 +247,7 @@ class MarkdownSplitter(BaseSplitter):
             parent_section_id=get_parent_section_id(section_path),
             citation_key=chunk_id,
             retrievable=True,
-            confidence=confidence,
-            metadata={"splitter": chunk_type},
+            metadata={"splitter": chunk_type, "splitter_confidence": confidence},
         )
 
         return chunk
@@ -333,8 +328,6 @@ class MarkdownSplitter(BaseSplitter):
             page_start=None,
             page_end=None,
             para_index=0,
-            chunk_name="unknown",
-            position=0,  # Will be assigned later
             char_range=(start_pos, end_pos),
             token_count=len(content.split()),
             prev_chunk_id=None,
@@ -342,8 +335,7 @@ class MarkdownSplitter(BaseSplitter):
             parent_section_id=None,
             citation_key=chunk_id,
             retrievable=True,
-            confidence=confidence,
-            metadata={"splitter": chunk_type},
+            metadata={"splitter": chunk_type, "splitter_confidence": confidence},
         )
 
     def _restore_code_blocks(self, chunks: list[Chunk], code_blocks: list[dict]) -> list[Chunk]:

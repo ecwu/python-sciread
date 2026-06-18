@@ -28,7 +28,7 @@ def test_split_without_headers_returns_single_content_chunk() -> None:
     assert len(chunks) == 1
     assert chunks[0].content == "Plain body text without markdown headers."
     assert chunks[0].metadata["splitter"] == "no_structure"
-    assert chunks[0].position == 0
+    assert chunks[0].para_index == 0
 
 
 def test_split_with_preamble_and_headers_assigns_sections_and_positions() -> None:
@@ -46,8 +46,8 @@ def test_split_with_preamble_and_headers_assigns_sections_and_positions() -> Non
 
     chunks = splitter.split(text)
 
-    assert [chunk.chunk_name for chunk in chunks] == ["preamble", "introduction", "results"]
-    assert [chunk.position for chunk in chunks] == [0, 1, 2]
+    assert [chunk.section_path for chunk in chunks] == [["preamble"], ["introduction"], ["introduction", "results"]]
+    assert [chunk.para_index for chunk in chunks] == [0, 1, 2]
     assert chunks[1].section_path == ["introduction"]
     assert chunks[2].section_path == ["introduction", "results"]
 

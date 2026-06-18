@@ -76,7 +76,6 @@ from .react import ReActAgent
 from .react import ReActIterationOutput
 from .react import analyze_file_with_react
 from .react import analyze_file_with_react_sync
-from .react import load_and_process_document
 from .search_react import SearchReactAgent
 from .search_react import SearchReactAnalysisResult
 from .search_react import SearchReactIterationOutput
@@ -88,7 +87,6 @@ from .simple import SimpleAgent
 from .simple import SimpleAnalysisResult
 from .simple import analyze_file_with_simple
 from .simple import analyze_file_with_simple_sync
-from .simple import load_document_for_simple_analysis
 
 __all__ = [
     "AgentInsight",
@@ -133,8 +131,6 @@ __all__ = [
     "analyze_file_with_simple",
     "analyze_file_with_simple_sync",
     "create_personality_agent",
-    "load_and_process_document",
-    "load_document_for_simple_analysis",
     "remove_references",
 ]
 

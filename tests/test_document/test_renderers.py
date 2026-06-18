@@ -22,27 +22,27 @@ def sample_document():
     chunks = [
         Chunk(
             content="This is the abstract of the paper with enough content.",
-            chunk_name="abstract",
-            position=0,
-            confidence=0.9,
+            section_path=["abstract"],
+            para_index=0,
+            metadata={"splitter_confidence": 0.9},
         ),
         Chunk(
             content="This is the introduction section with background and motivation.",
-            chunk_name="introduction",
-            position=1,
-            confidence=0.8,
+            section_path=["introduction"],
+            para_index=1,
+            metadata={"splitter_confidence": 0.8},
         ),
         Chunk(
             content="This describes the methodology in detail with sufficient length.",
-            chunk_name="methodology",
-            position=2,
-            confidence=0.85,
+            section_path=["methodology"],
+            para_index=2,
+            metadata={"splitter_confidence": 0.85},
         ),
         Chunk(
             content="Short.",
-            chunk_name="empty_transition",
-            position=3,
-            confidence=0.4,
+            section_path=["empty_transition"],
+            para_index=3,
+            metadata={"splitter_confidence": 0.4},
         ),
     ]
     doc = Document(
@@ -114,8 +114,8 @@ def test_format_for_llm_truncates_oversized_section():
     """LLM formatting should truncate a section that exceeds the token budget."""
     long_content = "word " * 500
     chunks = [
-        Chunk(content=long_content, chunk_name="abstract", position=0, confidence=0.9),
-        Chunk(content="Second section.", chunk_name="introduction", position=1, confidence=0.8),
+        Chunk(content=long_content, section_path=["abstract"], para_index=0, metadata={"splitter_confidence": 0.9}),
+        Chunk(content="Second section.", section_path=["introduction"], para_index=1, metadata={"splitter_confidence": 0.8}),
     ]
     doc = Document(text="Full text", metadata=DocumentMetadata(title="Paper"))
     doc._set_chunks(chunks)

@@ -35,7 +35,7 @@ def test_create_semantic_chunks_without_structure_returns_single_chunk() -> None
     assert len(chunks) == 1
     assert chunks[0].content == "Plain body text only."
     assert chunks[0].metadata["splitter"] == "no_structure"
-    assert chunks[0].chunk_name == "unknown"
+    assert chunks[0].section_path == []
 
 
 def test_split_builds_numbered_paths_restores_code_blocks_and_overlap() -> None:

@@ -34,9 +34,9 @@ def test_get_closest_section_name_supports_case_sensitive_and_fuzzy_matching() -
     doc = Document.from_text("placeholder", auto_split=False)
     doc._set_chunks(
         [
-            Chunk(content="a", chunk_name="Introduction"),
-            Chunk(content="b", chunk_name="Methodology"),
-            Chunk(content="c", chunk_name="Results"),
+            Chunk(content="a", section_path=["Introduction"]),
+            Chunk(content="b", section_path=["Methodology"]),
+            Chunk(content="c", section_path=["Results"]),
         ]
     )
 
@@ -50,8 +50,8 @@ def test_get_closest_section_name_can_use_embeddings() -> None:
     doc = Document.from_text("placeholder", auto_split=False)
     doc._set_chunks(
         [
-            Chunk(content="a", chunk_name="Alpha"),
-            Chunk(content="b", chunk_name="Beta"),
+            Chunk(content="a", section_path=["Alpha"]),
+            Chunk(content="b", section_path=["Beta"]),
         ]
     )
     embedding_client = Mock()

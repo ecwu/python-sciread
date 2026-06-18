@@ -45,7 +45,7 @@ class TestVectorIndex:
     def test_add_chunks_success(self):
         """Test successfully adding chunks with embeddings."""
         vector_index = VectorIndex("test_collection")
-        chunks = [Chunk(content="First chunk", chunk_name="introduction"), Chunk(content="Second chunk", chunk_name="methods")]
+        chunks = [Chunk(content="First chunk", section_path=["introduction"]), Chunk(content="Second chunk", section_path=["methods"])]
         embeddings = [[0.1, 0.2, 0.3], [0.4, 0.5, 0.6]]
 
         # Mock the collection.upsert method to avoid actual ChromaDB dependency in tests
@@ -57,10 +57,10 @@ class TestVectorIndex:
             embeddings=embeddings,
             documents=["First chunk", "Second chunk"],
             metadatas=[
-                {"source": "introduction", "position": 0, "word_count": 2, "confidence": 1.0},
-                {"source": "methods", "position": 0, "word_count": 2, "confidence": 1.0},
+                {"section_label": "introduction", "para_index": -1, "token_count": 2, "splitter_confidence": 0.0},
+                {"section_label": "methods", "para_index": -1, "token_count": 2, "splitter_confidence": 0.0},
             ],
-            ids=[chunks[0].id, chunks[1].id],
+            ids=[chunks[0].chunk_id, chunks[1].chunk_id],
         )
 
     def test_vector_index_init_can_reset_collection(self):

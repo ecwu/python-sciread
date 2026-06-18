@@ -3,7 +3,6 @@
 import asyncio
 import json
 import traceback
-from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
@@ -105,14 +104,6 @@ def _get_iteration_state(ctx: RunContext[ReActIterationDeps]) -> ReActIterationS
     return state
 
 
-def _validate_document_file(document_file: str | Path) -> None:
-    """Validate that the document file exists before processing.
-
-    DEPRECATED: Use application.use_cases.common.ensure_file_exists instead.
-    """
-    ensure_file_exists(str(document_file))
-
-
 def _clean_section_names(section_names: list[object]) -> list[str] | None:
     """Normalize a mixed list into a deduplicated section-name list."""
     cleaned_names: list[str] = []
@@ -136,28 +127,6 @@ def _resolve_sections(document: Document, requested_sections: list[str], availab
             resolved_sections.append(resolved_section)
 
     return resolved_sections
-
-
-def load_and_process_document(file_path: str | Path, to_markdown: bool = True) -> Document:
-    """Load and process a document using markdown conversion and natural section splitting.
-
-    DEPRECATED: Use application.use_cases.common.load_document instead.
-
-    Args:
-        file_path: Path to the PDF file
-        to_markdown: Whether to convert PDF to markdown using Mineru API
-
-    Returns:
-        Document instance with processed chunks using natural markdown sections
-    """
-    logger.debug(f"Loading document from {file_path} (to_markdown={to_markdown})")
-
-    document = load_document(str(file_path), to_markdown=to_markdown)
-
-    logger.debug(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
-    logger.debug(f"Available sections: {document.get_section_names()}")
-
-    return document
 
 
 def get_section_content(document: Document, section_names: list[str]) -> str:
@@ -258,9 +227,12 @@ async def analyze_file_with_react(
     logger.debug(f"Task: {task[:100]}...")
     logger.debug(f"Configuration: model={model}, max_loops={max_loops}, to_markdown={to_markdown}, show_progress={show_progress}")
 
-    _validate_document_file(file_path)
+    ensure_file_exists(file_path)
 
-    document = load_and_process_document(file_path, to_markdown=to_markdown)
+    logger.debug(f"Loading document from {file_path} (to_markdown={to_markdown})")
+    document = load_document(file_path, to_markdown=to_markdown)
+    logger.debug(f"Document processed into {len(document.chunks)} chunks with natural markdown sections")
+    logger.debug(f"Available sections: {document.get_section_names()}")
     metadata = getattr(document, "metadata", None)
     document_title = getattr(metadata, "title", None) or getattr(document, "source_path", None) or file_path
     get_section_names = getattr(document, "get_section_names", None)

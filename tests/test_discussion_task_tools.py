@@ -155,8 +155,8 @@ async def test_generate_insights_tool_returns_failure_result_for_missing_paramet
 
 
 @pytest.mark.asyncio
-async def test_question_and_answer_tools_support_batch_and_single_fallbacks(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Question and answer tools should support both batch inputs and legacy single-item inputs."""
+async def test_question_and_answer_tools_require_batch_inputs(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Question and answer tools should use the batch parameter schema."""
     monkeypatch.setattr(task_tools, "get_cached_agent", lambda *_args, **_kwargs: FakePersonalityAgent())
     insight = _build_insight()
     question = _build_question()
@@ -166,7 +166,7 @@ async def test_question_and_answer_tools_support_batch_and_single_fallbacks(monk
         task_type=TaskType.ASK_QUESTION,
         parameters={
             "from_agent": AgentPersonality.CRITICAL_EVALUATOR.value,
-            "target_insight": insight,
+            "target_insights": [insight],
         },
     )
     ask_result = await task_tools.ask_question_tool(ask_task)
@@ -179,7 +179,7 @@ async def test_question_and_answer_tools_support_batch_and_single_fallbacks(monk
         task_id="answer-1",
         task_type=TaskType.ANSWER_QUESTION,
         parameters={
-            "question": question,
+            "questions": [question],
             "my_insights": [insight],
         },
     )
@@ -188,6 +188,40 @@ async def test_question_and_answer_tools_support_batch_and_single_fallbacks(monk
     assert answer_result.success is True
     assert len(answer_result.responses) == 1
     assert answer_result.metadata["personality"] == AgentPersonality.INNOVATIVE_INSIGHTER.value
+
+
+@pytest.mark.asyncio
+async def test_question_and_answer_tools_reject_single_item_parameters(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Legacy single-item task parameters should no longer be accepted."""
+    monkeypatch.setattr(task_tools, "get_cached_agent", lambda *_args, **_kwargs: FakePersonalityAgent())
+    insight = _build_insight()
+    question = _build_question()
+
+    ask_task = Task(
+        task_id="ask-legacy",
+        task_type=TaskType.ASK_QUESTION,
+        parameters={
+            "from_agent": AgentPersonality.CRITICAL_EVALUATOR.value,
+            "target_insight": insight,
+        },
+    )
+    ask_result = await task_tools.ask_question_tool(ask_task)
+
+    assert ask_result.success is False
+    assert "target_insights" in (ask_result.error_message or "")
+
+    answer_task = Task(
+        task_id="answer-legacy",
+        task_type=TaskType.ANSWER_QUESTION,
+        parameters={
+            "question": question,
+            "my_insights": [insight],
+        },
+    )
+    answer_result = await task_tools.answer_question_tool(answer_task)
+
+    assert answer_result.success is False
+    assert "questions" in (answer_result.error_message or "")
 
 
 @pytest.mark.asyncio

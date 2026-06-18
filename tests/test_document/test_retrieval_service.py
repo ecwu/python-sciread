@@ -67,7 +67,7 @@ class TestDocumentRetrievalService:
     def test_build_vector_index_caches_runtime_embedding_client(self):
         """Vector index construction should cache the runtime embedding client."""
         doc = Document.from_text("placeholder", auto_split=False)
-        doc._set_chunks([Chunk(content="Chunk one", chunk_name="intro")])
+        doc._set_chunks([Chunk(content="Chunk one", section_path=["intro"])])
 
         embedding_client = Mock()
         embedding_client.embedding_batch_size = 4
@@ -94,7 +94,7 @@ class TestDocumentRetrievalService:
     def test_build_vector_index_can_create_persisted_index_from_config(self, tmp_path):
         """Persisted indexes should derive their client and storage path from config."""
         doc = Document.from_text("placeholder", auto_split=False)
-        doc._set_chunks([Chunk(content="Chunk one", chunk_name="intro")])
+        doc._set_chunks([Chunk(content="Chunk one", section_path=["intro"])])
 
         embedding_client = Mock()
         embedding_client.get_embeddings.return_value = [[0.1, 0.2]]
@@ -124,8 +124,8 @@ class TestDocumentRetrievalService:
         doc = Document.from_text("placeholder", auto_split=False)
         doc._set_chunks(
             [
-                Chunk(content="keep", chunk_name="intro", retrievable=True),
-                Chunk(content="skip", chunk_name="appendix", retrievable=False),
+                Chunk(content="keep", section_path=["intro"], retrievable=True),
+                Chunk(content="skip", section_path=["appendix"], retrievable=False),
             ]
         )
 
@@ -151,7 +151,7 @@ class TestDocumentRetrievalService:
     def test_build_vector_index_wraps_failures(self):
         """Unexpected indexing failures should be wrapped in a RuntimeError."""
         doc = Document.from_text("placeholder", auto_split=False)
-        doc._set_chunks([Chunk(content="Chunk one", chunk_name="intro")])
+        doc._set_chunks([Chunk(content="Chunk one", section_path=["intro"])])
 
         embedding_client = Mock()
         embedding_client.get_embeddings.side_effect = ValueError("embedding failed")
@@ -162,7 +162,7 @@ class TestDocumentRetrievalService:
     def test_semantic_search_reuses_cached_runtime_embedding_client(self):
         """Semantic search should reuse the cached embedding client when available."""
         doc = Document.from_text("placeholder", auto_split=False)
-        chunk = Chunk(content="Chunk one", chunk_name="intro")
+        chunk = Chunk(content="Chunk one", section_path=["intro"])
         doc._set_chunks([chunk])
 
         embedding_client = Mock()
@@ -200,7 +200,7 @@ class TestDocumentRetrievalService:
     def test_semantic_search_builds_runtime_client_and_returns_chunks(self):
         """Semantic search should create and cache an embedding client when needed."""
         doc = Document.from_text("placeholder", auto_split=False)
-        chunk = Chunk(content="Chunk one", chunk_name="intro")
+        chunk = Chunk(content="Chunk one", section_path=["intro"])
         doc._set_chunks([chunk])
         doc.vector_index = Mock()
         doc.vector_index.search.return_value = [
@@ -225,7 +225,7 @@ class TestDocumentRetrievalService:
     def test_semantic_search_returns_empty_when_query_embedding_is_missing(self):
         """Missing query embeddings should return an empty result set."""
         doc = Document.from_text("placeholder", auto_split=False)
-        doc._set_chunks([Chunk(content="Chunk one", chunk_name="intro")])
+        doc._set_chunks([Chunk(content="Chunk one", section_path=["intro"])])
         doc.vector_index = Mock()
 
         embedding_client = Mock()
@@ -240,8 +240,8 @@ class TestDocumentRetrievalService:
     def test_semantic_search_filters_non_retrievable_chunks(self):
         """Semantic search should not surface chunks marked as non-retrievable."""
         doc = Document.from_text("placeholder", auto_split=False)
-        retrievable_chunk = Chunk(content="Chunk one", chunk_name="intro")
-        hidden_chunk = Chunk(content="Chunk two", chunk_name="appendix", retrievable=False)
+        retrievable_chunk = Chunk(content="Chunk one", section_path=["intro"])
+        hidden_chunk = Chunk(content="Chunk two", section_path=["appendix"], retrievable=False)
         doc._set_chunks([retrievable_chunk, hidden_chunk])
         doc.vector_index = Mock()
         doc.vector_index.search.return_value = [
@@ -260,7 +260,7 @@ class TestDocumentRetrievalService:
     def test_semantic_search_returns_empty_when_search_raises(self):
         """Unexpected search failures should be swallowed and logged as empty results."""
         doc = Document.from_text("placeholder", auto_split=False)
-        doc._set_chunks([Chunk(content="Chunk one", chunk_name="intro")])
+        doc._set_chunks([Chunk(content="Chunk one", section_path=["intro"])])
         doc.vector_index = Mock()
         doc.vector_index.search.side_effect = RuntimeError("search failed")
 
@@ -312,7 +312,7 @@ class TestDocumentRetrievalService:
     def test_rerank_search_falls_back_to_semantic_order_when_rerank_returns_empty(self):
         """Rerank search should keep semantic results when the rerank provider cannot score."""
         doc = Document.from_text("placeholder", auto_split=False)
-        chunk = Chunk(content="Chunk one", chunk_name="intro")
+        chunk = Chunk(content="Chunk one", section_path=["intro"])
         doc._set_chunks([chunk])
         doc.vector_index = Mock()
         doc.vector_index.search.return_value = [{"id": chunk.chunk_id, "similarity": 0.88}]

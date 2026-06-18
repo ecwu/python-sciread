@@ -135,7 +135,7 @@ async def test_search_react_compare_runs_strategies_sequentially(monkeypatch: py
         return run
 
     monkeypatch.setattr("sciread.agent.search_react.agent.load_document", lambda *args, **kwargs: SimpleNamespace(chunks=[], metadata=None))
-    monkeypatch.setattr("sciread.agent.search_react.agent._validate_document_file", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("sciread.agent.search_react.agent.ensure_file_exists", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("sciread.agent.search_react.agent._render_analysis_overview", lambda *args, **kwargs: None)
     monkeypatch.setattr("sciread.agent.search_react.agent.console.print", lambda *args, **kwargs: None)
     monkeypatch.setattr(SearchReactAgent, "run_analysis", fake_run_analysis)
@@ -198,7 +198,7 @@ async def test_search_react_run_iteration_falls_back_when_agent_run_raises() -> 
 async def test_search_react_compare_keeps_failures_without_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Compare mode should keep failed strategies in the result while returning successful ones."""
     monkeypatch.setattr("sciread.agent.search_react.agent.load_document", lambda *args, **kwargs: SimpleNamespace(chunks=[], metadata=None))
-    monkeypatch.setattr("sciread.agent.search_react.agent._validate_document_file", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr("sciread.agent.search_react.agent.ensure_file_exists", lambda *_args, **_kwargs: None)
     monkeypatch.setattr("sciread.agent.search_react.agent._render_analysis_overview", lambda *args, **kwargs: None)
     monkeypatch.setattr("sciread.agent.search_react.agent._render_compare_summary", lambda *args, **kwargs: None)
     monkeypatch.setattr("sciread.agent.search_react.agent.console.print", lambda *args, **kwargs: None)
@@ -240,7 +240,7 @@ async def test_search_react_run_analysis_stops_after_completed_iteration(monkeyp
     agent.model_identifier = "mock-model"
     agent.agent = object()
 
-    chunk = Chunk(content="Body", chunk_name="intro")
+    chunk = Chunk(content="Body", section_path=["intro"])
     retrieved = Evidence(
         evidence_id="E1",
         chunk_id=chunk.chunk_id,

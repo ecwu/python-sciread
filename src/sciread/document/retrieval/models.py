@@ -22,7 +22,7 @@ class RetrievedChunk:
     @property
     def section_path_text(self) -> str:
         """Return a readable section path."""
-        return " > ".join(self.section_path) if self.section_path else self.chunk.chunk_name
+        return " > ".join(self.section_path)
 
 
 @dataclass(slots=True)

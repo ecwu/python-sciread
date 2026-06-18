@@ -78,7 +78,7 @@ class TestDocument:
         for chunk in doc.chunks:
             assert isinstance(chunk, Chunk)
             assert len(chunk.content) > 0
-            assert isinstance(chunk.position, int)
+            assert isinstance(chunk.para_index, int)
 
     def test_document_auto_splitting(self, sample_txt_file):
         """Test that document is automatically loaded and split by from_file()."""
@@ -111,9 +111,9 @@ class TestDocument:
         all_chunks = doc.get_chunks()
         assert len(all_chunks) > 0
 
-        # Get chunks by name
-        abstract_chunks = doc.get_chunks(chunk_name="abstract")
-        assert all(chunk.chunk_name == "abstract" for chunk in abstract_chunks)
+        # Get chunks by section path
+        abstract_chunks = doc.get_chunks_by_section("abstract")
+        assert all(chunk.section_path == ["abstract"] for chunk in abstract_chunks)
         assert len(abstract_chunks) >= 1
 
     def test_iteration(self, sample_txt_file):
@@ -171,9 +171,9 @@ class TestDocument:
         """Test document chunk enrichment populates doc_id, citation, and neighbor links."""
         doc = Document.from_text("placeholder")
         chunks = [
-            Chunk(content="Chunk one", chunk_name="intro"),
-            Chunk(content="Chunk two", chunk_name="methods"),
-            Chunk(content="Chunk three", chunk_name="results"),
+            Chunk(content="Chunk one", section_path=["intro"]),
+            Chunk(content="Chunk two", section_path=["methods"]),
+            Chunk(content="Chunk three", section_path=["results"]),
         ]
 
         doc._set_chunks(chunks)
@@ -196,7 +196,7 @@ class TestDocument:
     def test_chunk_enrichment_preserves_custom_citation_key(self):
         """Test custom citation keys are preserved during enrichment."""
         doc = Document.from_text("placeholder")
-        chunk = Chunk(content="Chunk one", chunk_name="intro", citation_key="custom:cite")
+        chunk = Chunk(content="Chunk one", section_path=["intro"], citation_key="custom:cite")
 
         doc._set_chunks([chunk])
 
@@ -207,7 +207,7 @@ class TestDocument:
         doc = Document.from_text("placeholder")
         chunk = Chunk(
             content="# Intro\n\nThis is **bold** and [linked](https://example.com).",
-            chunk_name="intro",
+            section_path=["intro"],
         )
 
         doc._set_chunks([chunk])
@@ -222,8 +222,8 @@ class TestDocument:
         """Test document chunk enrichment records overlap metadata from source ranges."""
         doc = Document.from_text("abcdefghij", auto_split=False)
         chunks = [
-            Chunk(content="abcdef", char_range=(0, 6), chunk_name="intro"),
-            Chunk(content="efghij", char_range=(4, 10), chunk_name="intro"),
+            Chunk(content="abcdef", char_range=(0, 6), section_path=["intro"]),
+            Chunk(content="efghij", char_range=(4, 10), section_path=["intro"]),
         ]
 
         doc._set_chunks(chunks)
@@ -244,8 +244,8 @@ class TestDocument:
         """Test retrieving chunk by chunk_id."""
         doc = Document.from_text("placeholder")
         chunks = [
-            Chunk(content="A", chunk_name="intro"),
-            Chunk(content="B", chunk_name="methods"),
+            Chunk(content="A", section_path=["intro"]),
+            Chunk(content="B", section_path=["methods"]),
         ]
         doc._set_chunks(chunks)
 
@@ -277,10 +277,10 @@ class TestDocument:
         """Test retrieving neighboring chunks around a center chunk."""
         doc = Document.from_text("placeholder")
         chunks = [
-            Chunk(content="C0", chunk_name="s"),
-            Chunk(content="C1", chunk_name="s"),
-            Chunk(content="C2", chunk_name="s"),
-            Chunk(content="C3", chunk_name="s"),
+            Chunk(content="C0", section_path=["s"]),
+            Chunk(content="C1", section_path=["s"]),
+            Chunk(content="C2", section_path=["s"]),
+            Chunk(content="C3", section_path=["s"]),
         ]
         doc._set_chunks(chunks)
 

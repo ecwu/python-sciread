@@ -354,7 +354,7 @@ async def test_run_analysis_stops_when_all_sections_are_processed(monkeypatch: p
 
     document = SimpleNamespace(
         get_section_names=lambda: ["Abstract"],
-        chunks=[Chunk(content="Abstract body", chunk_name="abstract")],
+        chunks=[Chunk(content="Abstract body", section_path=["abstract"])],
     )
 
     result = await agent.run_analysis(document, "Summarize", max_loops=3, show_progress=False)
@@ -396,7 +396,7 @@ async def test_run_analysis_reaches_final_loop_and_forces_completion(monkeypatch
 
     document = SimpleNamespace(
         get_section_names=lambda: ["Abstract", "Methods"],
-        chunks=[Chunk(content="x", chunk_name="Abstract"), Chunk(content="y", chunk_name="Methods")],
+        chunks=[Chunk(content="x", section_path=["Abstract"]), Chunk(content="y", section_path=["Methods"])],
     )
 
     result = await agent.run_analysis(document, "Summarize", max_loops=2, show_progress=False)

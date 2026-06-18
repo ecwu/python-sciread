@@ -43,8 +43,8 @@ async def test_analyze_file_with_simple_delegates_to_run_analysis(monkeypatch: p
             captured["run_analysis_kwargs"] = kwargs
             return "simple result"
 
-    monkeypatch.setattr("sciread.agent.simple.agent._validate_document_file", fake_validate)
-    monkeypatch.setattr("sciread.agent.simple.agent.load_document_for_simple_analysis", fake_load)
+    monkeypatch.setattr("sciread.agent.simple.agent.ensure_file_exists", fake_validate)
+    monkeypatch.setattr("sciread.agent.simple.agent.load_document", fake_load)
     monkeypatch.setattr("sciread.agent.simple.agent.SimpleAgent", FakeSimpleAgent)
 
     result = await analyze_file_with_simple(

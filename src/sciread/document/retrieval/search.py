@@ -95,7 +95,6 @@ def lexical_search(
     for chunk in candidates:
         search_text = f"{chunk.retrieval_text}\n{chunk.content_plain}".lower()
         section_label = " > ".join(chunk.section_path).lower()
-        section_name = (chunk.chunk_name or "").lower()
         matched_terms: list[str] = []
         score = 0.0
 
@@ -109,13 +108,13 @@ def lexical_search(
                 matched_terms.append(token)
             if token in section_label:
                 score += 3.0
-            if token == section_name or token == section_label:
+            if token == section_label:
                 score += 4.0
 
         if section_scope and _chunk_in_scope(chunk, section_scope):
             score += 2.0
 
-        score += _position_bonus(chunk.position)
+        score += _position_bonus(chunk.para_index)
         if score <= 0:
             continue
 
@@ -258,7 +257,7 @@ def tree_search(
             continue
 
         for chunk in iter_descendant_chunks(node, chunk_map):
-            chunk_scores[chunk.chunk_id] = max(chunk_scores[chunk.chunk_id], node_score + _position_bonus(chunk.position))
+            chunk_scores[chunk.chunk_id] = max(chunk_scores[chunk.chunk_id], node_score + _position_bonus(chunk.para_index))
             for token in tokens:
                 if token and token in node_path_text:
                     matched_terms_map[chunk.chunk_id].add(token)
@@ -386,8 +385,10 @@ def _tokenize_query(query: str) -> list[str]:
     return [match.group(0).lower() for match in QUERY_TOKEN_PATTERN.finditer(query)]
 
 
-def _position_bonus(position: int) -> float:
+def _position_bonus(position: int | None) -> float:
     """Prefer earlier chunks slightly without dominating other scores."""
+    if position is None:
+        return 0.0
     return 1.0 / math.sqrt(position + 1)
 
 
@@ -404,7 +405,7 @@ def _build_expanded_context(document: Document, chunk: Chunk, neighbor_window: i
 
     parts: list[str] = []
     for neighbor in neighbors:
-        section_label = " > ".join(neighbor.section_path) if neighbor.section_path else (neighbor.chunk_name or "unknown")
+        section_label = " > ".join(neighbor.section_path) if neighbor.section_path else "unknown"
         parts.append(f"[{neighbor.citation_key}] {section_label}\n{(neighbor.content_plain or neighbor.content).strip()}")
     return "\n\n".join(parts)
 
@@ -423,7 +424,7 @@ def _score_tree_node(query_text: str, tokens: list[str], node_path_text: str) ->
 def _limit_results(results: list[RetrievedChunk], top_k: int) -> list[RetrievedChunk]:
     """Sort, deduplicate, and trim retrieval results."""
     deduplicated: dict[str, RetrievedChunk] = {}
-    for result in sorted(results, key=lambda item: (-item.score, item.chunk.position)):
+    for result in sorted(results, key=lambda item: (-item.score, item.chunk.para_index if item.chunk.para_index is not None else 10**9)):
         existing = deduplicated.get(result.chunk.chunk_id)
         if existing is None or result.score > existing.score:
             deduplicated[result.chunk.chunk_id] = result

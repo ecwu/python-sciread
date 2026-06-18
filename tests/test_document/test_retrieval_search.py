@@ -234,8 +234,8 @@ def test_hybrid_search_builds_context_only_for_final_results(monkeypatch: pytest
     """Hybrid search should defer context expansion until after fusion and truncation."""
     doc = Document.from_text("placeholder", auto_split=False)
     chunks = [
-        Chunk(content="Chunk one", section_path=["intro"], position=0),
-        Chunk(content="Chunk two", section_path=["intro"], position=1),
+        Chunk(content="Chunk one", section_path=["intro"], para_index=0),
+        Chunk(content="Chunk two", section_path=["intro"], para_index=1),
     ]
     doc._set_chunks(chunks)
 

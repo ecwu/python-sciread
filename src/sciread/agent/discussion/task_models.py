@@ -103,6 +103,7 @@ class TaskResult(BaseModel):
 
     # Metadata
     metadata: dict[str, Any] = Field(default_factory=dict, description="Additional result metadata")
+    error_message: str | None = Field(None, description="Error message if task failed")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence in the result")
     notes: list[str] = Field(default_factory=list, description="Additional notes about the result")
     timestamp: datetime = Field(default_factory=datetime.now, description="Result timestamp")

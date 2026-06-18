@@ -18,39 +18,39 @@ class TestUnifiedSectionHandling:
         chunks = [
             Chunk(
                 content="This is the abstract of the paper with enough content to meet minimum length requirements.",
-                chunk_name="abstract",
-                position=0,
-                confidence=0.9,
+                section_path=["abstract"],
+                para_index=0,
+                metadata={"splitter_confidence": 0.9},
             ),
             Chunk(
                 content="This is the introduction section that is also sufficiently long to pass the minimum length check.",
-                chunk_name="introduction",
-                position=1,
-                confidence=0.8,
+                section_path=["introduction"],
+                para_index=1,
+                metadata={"splitter_confidence": 0.8},
             ),
             Chunk(
                 content="This describes our methodology in detail with sufficient length.",
-                chunk_name="methodology",
-                position=2,
-                confidence=0.85,
+                section_path=["methodology"],
+                para_index=2,
+                metadata={"splitter_confidence": 0.85},
             ),
             Chunk(
                 content="These are our experimental results with detailed findings.",
-                chunk_name="results",
-                position=3,
-                confidence=0.9,
+                section_path=["results"],
+                para_index=3,
+                metadata={"splitter_confidence": 0.9},
             ),
             Chunk(
                 content="Here we discuss the findings and their implications.",
-                chunk_name="discussion",
-                position=4,
-                confidence=0.8,
+                section_path=["discussion"],
+                para_index=4,
+                metadata={"splitter_confidence": 0.8},
             ),
             Chunk(
                 content="We conclude the paper and summarize our contributions.",
-                chunk_name="conclusion",
-                position=5,
-                confidence=0.85,
+                section_path=["conclusion"],
+                para_index=5,
+                metadata={"splitter_confidence": 0.85},
             ),
         ]
 
@@ -79,7 +79,7 @@ class TestUnifiedSectionHandling:
 
         intro_chunks = doc.get_sections_by_name(["introduction"])
         assert len(intro_chunks) == 1
-        assert intro_chunks[0].chunk_name == "introduction"
+        assert intro_chunks[0].section_path == ["introduction"]
         assert (
             "This is the introduction section that is also sufficiently long to pass the minimum length check." in intro_chunks[0].content
         )
@@ -131,7 +131,7 @@ class TestUnifiedSectionHandling:
 
         # Create chunk with cleaning artifacts
         dirty_content = "This  has    extra  spaces\n\n\nand newlines."
-        chunk = Chunk(content=dirty_content, chunk_name="test_section", position=0, confidence=0.9)
+        chunk = Chunk(content=dirty_content, section_path=["test_section"], para_index=0, metadata={"splitter_confidence": 0.9})
         doc._set_chunks([chunk])
 
         content = doc.get_for_llm(clean_text=True)
@@ -144,8 +144,8 @@ class TestUnifiedSectionHandling:
         """Test token limiting functionality truncates an oversized section."""
         long_content = "word " * 400  # ~2400 chars, far above a small token budget
         chunks = [
-            Chunk(content=long_content, chunk_name="abstract", position=0, confidence=0.9),
-            Chunk(content="Short section two.", chunk_name="introduction", position=1, confidence=0.8),
+            Chunk(content=long_content, section_path=["abstract"], para_index=0, metadata={"splitter_confidence": 0.9}),
+            Chunk(content="Short section two.", section_path=["introduction"], para_index=1, metadata={"splitter_confidence": 0.8}),
         ]
         doc = Document(text="Full document text...", metadata=DocumentMetadata(title="Sample Paper"))
         doc._set_chunks(chunks)

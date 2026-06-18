@@ -78,9 +78,9 @@ def collect_sections(
     allowed_names = set(names)
     grouped_chunks: dict[str, list[Chunk]] = {}
     for chunk in chunks:
-        chunk_name = chunk.chunk_name
-        if chunk_name in allowed_names:
-            grouped_chunks.setdefault(chunk_name, []).append(chunk)
+        section_label = _section_label(chunk)
+        if section_label in allowed_names:
+            grouped_chunks.setdefault(section_label, []).append(chunk)
 
     sections: list[dict] = []
     for name in names:
@@ -94,7 +94,7 @@ def collect_sections(
         if max_chars_per_section and len(content) > max_chars_per_section:
             content = content[:max_chars_per_section] + "...[truncated]"
 
-        avg_confidence = sum(chunk.confidence or 0.0 for chunk in chunks) / len(chunks)
+        avg_confidence = sum(float(chunk.metadata.get("splitter_confidence", 0.0)) for chunk in chunks) / len(chunks)
 
         sections.append(
             {
@@ -107,6 +107,11 @@ def collect_sections(
         )
 
     return sections
+
+
+def _section_label(chunk: Chunk) -> str:
+    """Return the normalized section label for a chunk."""
+    return " > ".join(chunk.section_path) if chunk.section_path else ""
 
 
 def get_sections_content(

@@ -115,12 +115,7 @@ async def ask_question_tool(task: Task) -> TaskResult:
         discussion_context = task.parameters.get("discussion_context", {})
 
         if not from_agent or not target_insights:
-            # Fallback for old single-question tasks if they exist
-            target_insight = task.parameters.get("target_insight")
-            if target_insight:
-                target_insights = [target_insight]
-            else:
-                raise ValueError("Missing required parameters: from_agent and target_insights")
+            raise ValueError("Missing required parameters: from_agent and target_insights")
 
         # Convert to proper types
         if isinstance(from_agent, str):
@@ -175,12 +170,7 @@ async def answer_question_tool(task: Task) -> TaskResult:
         assigned_to = task.assigned_to
 
         if not questions:
-            # Fallback for old single-answer tasks
-            question = task.parameters.get("question")
-            if question:
-                questions = [question]
-            else:
-                raise ValueError("Missing required parameter: questions")
+            raise ValueError("Missing required parameter: questions")
 
         if not assigned_to:
             # Extract personality from first question's to_agent if not assigned

@@ -58,14 +58,14 @@ class VectorIndex:
             documents=[chunk.retrieval_text or chunk.content for chunk in chunks],
             metadatas=[
                 {
-                    "source": chunk.chunk_name,
-                    "position": chunk.position,
-                    "word_count": chunk.word_count,
-                    "confidence": chunk.confidence,
+                    "section_label": " > ".join(chunk.section_path) if chunk.section_path else "",
+                    "para_index": chunk.para_index if chunk.para_index is not None else -1,
+                    "token_count": chunk.token_count or 0,
+                    "splitter_confidence": float(chunk.metadata.get("splitter_confidence", 0.0)),
                 }
                 for chunk in chunks
             ],
-            ids=[chunk.id for chunk in chunks],
+            ids=[chunk.chunk_id for chunk in chunks],
         )
 
     def search(self, query_embedding: list[float], top_k: int = 5) -> list[dict[str, Any]]:

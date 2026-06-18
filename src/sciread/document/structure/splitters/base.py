@@ -86,8 +86,7 @@ class BaseSplitter(ABC):
             chunk.display_text = overlapped_content
             chunk.retrieval_text = overlapped_content
             chunk.char_range = overlapped_range
-            chunk.word_count = len(overlapped_content.split())
-            chunk.token_count = chunk.word_count
+            chunk.token_count = len(overlapped_content.split())
 
         self._sync_chunk_overlap_metadata(chunks)
         return chunks

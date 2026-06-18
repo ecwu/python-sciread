@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import time
 import traceback
-from pathlib import Path
 
 from pydantic_ai import Agent
 from pydantic_ai import RunContext
@@ -397,11 +396,6 @@ class SearchReactAgent:
         )
 
 
-def _validate_document_file(document_file: str | Path) -> None:
-    """Validate that the input file exists."""
-    ensure_file_exists(str(document_file))
-
-
 def _render_analysis_overview(document: Document, task: str, strategy: str, max_loops: int, top_k: int, neighbor_window: int) -> None:
     """Render the top-level search-react analysis overview."""
     metadata = getattr(document, "metadata", None)
@@ -443,8 +437,8 @@ async def analyze_file_with_search_react(
     neighbor_window: int = 1,
 ) -> SearchReactAnalysisResult:
     """Analyze one file with search-react, optionally comparing multiple retrievers."""
-    _validate_document_file(file_path)
-    document = load_document(str(file_path), to_markdown=to_markdown)
+    ensure_file_exists(file_path)
+    document = load_document(file_path, to_markdown=to_markdown)
     _render_analysis_overview(document, task, retriever, max_loops, top_k, neighbor_window)
 
     strategies = compare or [retriever]

@@ -18,47 +18,34 @@ class TestChunk:
         """Test basic chunk creation."""
         chunk = Chunk(
             content="This is a test chunk.",
-            chunk_name="test",
-            position=0,
-            word_count=5,
-            confidence=0.9,
+            section_path=["test"],
+            para_index=0,
+            token_count=5,
+            metadata={"splitter_confidence": 0.9},
         )
 
         assert chunk.content == "This is a test chunk."
-        assert chunk.chunk_name == "test"
-        assert chunk.position == 0
-        assert chunk.word_count == 5
-        assert chunk.confidence == 0.9
+        assert chunk.section_path == ["test"]
+        assert chunk.para_index == 0
+        assert chunk.token_count == 5
+        assert chunk.metadata["splitter_confidence"] == 0.9
 
-    def test_chunk_word_count_auto_calculation(self):
-        """Test automatic word count calculation."""
+    def test_chunk_token_count_auto_calculation(self):
+        """Test automatic token count calculation."""
         chunk = Chunk(content="This has five words exactly.")
-        assert chunk.word_count == 5
-
-    def test_chunk_confidence_validation(self):
-        """Test confidence value validation."""
-        # Valid confidence values
-        Chunk(content="test", confidence=0.0)
-        Chunk(content="test", confidence=0.5)
-        Chunk(content="test", confidence=1.0)
-
-        # Invalid confidence values
-        with pytest.raises(ValueError, match="Confidence must be between"):
-            Chunk(content="test", confidence=-0.1)
-        with pytest.raises(ValueError, match="Confidence must be between"):
-            Chunk(content="test", confidence=1.1)
+        assert chunk.token_count == 5
 
     def test_chunk_new_metadata_defaults(self):
         """Test default initialization for expanded chunk metadata fields."""
         chunk = Chunk(
             content="This is a test chunk.",
-            chunk_name="introduction",
-            position=3,
-            page_range=(1, 2),
+            section_path=["introduction"],
+            para_index=3,
+            page_start=1,
+            page_end=2,
         )
 
         assert chunk.chunk_id
-        assert chunk.id == chunk.chunk_id
         assert chunk.content_plain == chunk.content
         assert chunk.retrieval_text == chunk.content_plain
         assert chunk.display_text == chunk.content
@@ -67,7 +54,7 @@ class TestChunk:
         assert chunk.page_start == 1
         assert chunk.page_end == 2
         assert chunk.para_index == 3
-        assert chunk.token_count == chunk.word_count
+        assert chunk.token_count == len(chunk.content_plain.split())
         assert chunk.prev_chunk_id is None
         assert chunk.next_chunk_id is None
         assert chunk.parent_section_id == "introduction"

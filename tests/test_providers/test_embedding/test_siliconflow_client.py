@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from sciread.document import SiliconFlowClient
+from sciread.providers.embedding.base import cosine_similarity
 
 
 class TestSiliconFlowClient:
@@ -80,27 +81,25 @@ class TestSiliconFlowClient:
 
     def test_cosine_similarity(self):
         """Test cosine similarity calculation."""
-        client = SiliconFlowClient()
-
         # Identical vectors
         vec1 = [1.0, 0.0, 0.0]
         vec2 = [1.0, 0.0, 0.0]
-        assert abs(client.cosine_similarity(vec1, vec2) - 1.0) < 1e-6
+        assert abs(cosine_similarity(vec1, vec2) - 1.0) < 1e-6
 
         # Orthogonal vectors
         vec1 = [1.0, 0.0, 0.0]
         vec2 = [0.0, 1.0, 0.0]
-        assert abs(client.cosine_similarity(vec1, vec2)) < 1e-6
+        assert abs(cosine_similarity(vec1, vec2)) < 1e-6
 
         # Opposite vectors
         vec1 = [1.0, 0.0, 0.0]
         vec2 = [-1.0, 0.0, 0.0]
-        assert abs(client.cosine_similarity(vec1, vec2) - (-1.0)) < 1e-6
+        assert abs(cosine_similarity(vec1, vec2) - (-1.0)) < 1e-6
 
         # Different lengths (should return 0)
         vec1 = [1.0, 0.0]
         vec2 = [1.0, 0.0, 0.0]
-        assert client.cosine_similarity(vec1, vec2) == 0.0
+        assert cosine_similarity(vec1, vec2) == 0.0
 
     def test_calculate_centroid(self):
         """Test centroid calculation."""

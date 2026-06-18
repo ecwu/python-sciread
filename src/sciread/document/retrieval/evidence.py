@@ -208,7 +208,7 @@ def _trim_to_token_budget(text: str, max_tokens: int) -> str:
 
 def _merge_page_ranges(chunks: list[Chunk]) -> tuple[int, int] | None:
     """Merge available page ranges from included evidence chunks."""
-    ranges = [chunk.page_range for chunk in chunks if chunk.page_range is not None]
+    ranges = [(chunk.page_start, chunk.page_end) for chunk in chunks if chunk.page_start is not None and chunk.page_end is not None]
     if not ranges:
         return None
     return (min(page_range[0] for page_range in ranges), max(page_range[1] for page_range in ranges))
@@ -218,4 +218,4 @@ def _section_label(chunk: Chunk) -> str:
     """Return a readable section label for one chunk."""
     if chunk.section_path:
         return " > ".join(chunk.section_path)
-    return chunk.chunk_name if chunk.chunk_name != "unknown" else ""
+    return ""
