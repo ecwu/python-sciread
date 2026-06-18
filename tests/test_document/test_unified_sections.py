@@ -61,27 +61,6 @@ class TestUnifiedSectionHandling:
         doc._set_chunks(chunks)
         return doc
 
-    def test_print_for_human(self, sample_document_with_sections):
-        """Test the print_for_human method."""
-        doc = sample_document_with_sections
-
-        rendered = doc.print_for_human()
-
-        assert "Sample Paper" in rendered
-        assert "Section 1: abstract" in rendered
-        assert "Section 2: introduction" in rendered
-        assert "Confidence:" in rendered
-
-    def test_print_for_human_with_specific_sections(self, sample_document_with_sections):
-        """Test print_for_human with specific sections."""
-        doc = sample_document_with_sections
-
-        rendered = doc.print_for_human(section_names=["abstract", "introduction"])
-
-        assert "Section 1: abstract" in rendered
-        assert "Section 2: introduction" in rendered
-        assert "methodology" not in rendered.lower()  # Should not be included
-
     def test_get_for_llm_basic(self, sample_document_with_sections):
         """Test basic get_for_llm functionality."""
         doc = sample_document_with_sections
@@ -146,40 +125,6 @@ class TestUnifiedSectionHandling:
         match = doc.get_closest_section_name("findings", threshold=0.7)
         assert match == "results"
 
-    def test_get_section_overview(self, sample_document_with_sections):
-        """Test get_section_overview method."""
-        doc = sample_document_with_sections
-
-        overview = doc.get_section_overview()
-
-        assert overview["document_title"] == "Sample Paper"
-        assert overview["total_sections"] == 6
-        assert overview["total_chunks"] == 6
-        assert len(overview["sections"]) == 6
-
-        # Check specific section info
-        abstract_info = overview["sections"][0]
-        assert abstract_info["name"] == "abstract"
-        assert abstract_info["chunk_count"] == 1
-        assert abstract_info["character_count"] > 0
-
-    def test_get_sections_with_confidence(self, sample_document_with_sections):
-        """Test get_sections_with_confidence method."""
-        doc = sample_document_with_sections
-
-        # Test with reasonable confidence threshold
-        sections = doc.get_sections_with_confidence(min_confidence=0.7)
-
-        assert len(sections) == 6  # All fixture sections meet the threshold
-        section_names = [name for name, _ in sections]
-        assert section_names == ["abstract", "introduction", "methodology", "results", "discussion", "conclusion"]
-
-        # Check structure of returned data
-        for section_name, content in sections:
-            assert isinstance(section_name, str)
-            assert isinstance(content, str)
-            assert len(content) > 0
-
     def test_content_cleaning(self, sample_document_with_sections):
         """Test content cleaning functionality."""
         doc = sample_document_with_sections
@@ -217,10 +162,6 @@ class TestUnifiedSectionHandling:
 
         # Test with empty document
         empty_doc = Document(text="")
-
-        # Should not crash
-        overview = empty_doc.get_section_overview()
-        assert overview["total_sections"] == 0
 
         # Should handle gracefully
         result = empty_doc.get_sections_by_name(["abstract"])

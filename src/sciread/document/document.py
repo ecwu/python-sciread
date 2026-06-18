@@ -26,24 +26,15 @@ from .state import get_section_names as get_document_section_names
 from .state import get_section_parts as get_document_section_parts
 from .state import get_sections_by_name as get_document_sections_by_name
 from .state import initialize_document
-from .state import mark_all_processed as mark_document_all_processed
-from .state import mark_all_unprocessed as mark_document_all_unprocessed
-from .state import mark_chunks_processed as mark_document_chunks_processed
-from .state import next_unprocessed_chunk
 from .state import update_chunk_index
 from .structure.chunking import build_doc_id
 from .structure.chunking import build_retrieval_text
 from .structure.chunking import calculate_file_hash
 from .structure.chunking import enrich_chunks
 from .structure.chunking import to_plain_text
-from .structure.persistence import load_document
-from .structure.persistence import save_document
 from .structure.renderers import clean_section_content
 from .structure.renderers import collect_sections as collect_document_sections
-from .structure.renderers import format_for_human
 from .structure.renderers import format_for_llm
-from .structure.renderers import get_section_overview as build_section_overview
-from .structure.renderers import get_sections_with_confidence as collect_sections_with_confidence
 from .structure.renderers import remove_references_section
 from .structure.renderers import resolve_section_names
 from .structure.sections import get_closest_section_name as resolve_closest_section_name
@@ -170,7 +161,6 @@ class Document:
 
     def get_chunks(
         self,
-        processed: bool | None = None,
         chunk_name: str | None = None,
         limit: int | None = None,
         confidence_threshold: float | None = None,
@@ -180,12 +170,7 @@ class Document:
         """
         Get chunks with flexible filtering criteria.
 
-        This is the unified method for accessing chunks with any combination of filters.
-        It replaces the previous multiple specialized methods (get_unprocessed_chunks,
-        get_quality_chunks, filter_chunks, etc.).
-
         Args:
-            processed: Filter by processing status (True for processed, False for unprocessed).
             chunk_name: Filter by specific chunk name (section name).
             limit: Maximum number of chunks to return.
             confidence_threshold: Minimum confidence score (0.0-1.0).
@@ -195,51 +180,15 @@ class Document:
         Returns:
             List of chunks matching the specified criteria.
 
-        Examples:
-            # Get all unprocessed chunks
-            doc.get_chunks(processed=False)
-
-            # Get high-quality chunks
-            doc.get_chunks(confidence_threshold=0.7, min_length=100)
-
-            # Get abstract chunks that haven't been processed yet
-            doc.get_chunks(chunk_name="abstract", processed=False)
-
-            # Get first 5 chunks with high confidence
-            doc.get_chunks(confidence_threshold=0.8, limit=5)
         """
         return get_document_chunks(
             self,
-            processed=processed,
             chunk_name=chunk_name,
             limit=limit,
             confidence_threshold=confidence_threshold,
             min_length=min_length,
             exclude_types=exclude_types,
         )
-
-    def get_unprocessed_chunks(self, limit: int | None = None) -> list[Chunk]:
-        """Get unprocessed chunks. Convenience method for get_chunks(processed=False)."""
-        return self.get_chunks(processed=False, limit=limit)
-
-    def get_quality_chunks(
-        self,
-        confidence_threshold: float = 0.5,
-        min_length: int = 50,
-        exclude_types: set[str] | None = None,
-        processed: bool | None = None,
-    ) -> list[Chunk]:
-        """Get high-quality chunks based on quality criteria. Convenience method."""
-        return self.get_chunks(
-            confidence_threshold=confidence_threshold,
-            min_length=min_length,
-            exclude_types=exclude_types,
-            processed=processed,
-        )
-
-    def filter_chunks(self, **filter_kwargs) -> list[Chunk]:
-        """Filter chunks using any combination of criteria. Alias for get_chunks()."""
-        return self.get_chunks(**filter_kwargs)
 
     def get_chunk_by_id(self, chunk_id: str) -> Chunk | None:
         """Get a chunk by chunk ID.
@@ -303,44 +252,6 @@ class Document:
             after=after,
             include_self=include_self,
         )
-
-    def mark_chunks_processed(
-        self,
-        confidence_threshold: float | None = None,
-        min_length: int | None = None,
-        exclude_types: set[str] | None = None,
-    ) -> int:
-        """
-        Mark chunks as processed based on filtering criteria.
-
-        This replaces the old deactivate_low_quality_chunks method with clearer semantics.
-
-        Args:
-            confidence_threshold: Mark chunks below this threshold as processed.
-            min_length: Mark chunks shorter than this as processed.
-            exclude_types: Don't mark these chunk types as processed.
-
-        Returns:
-            Number of chunks marked as processed.
-        """
-        return mark_document_chunks_processed(
-            self,
-            confidence_threshold=confidence_threshold,
-            min_length=min_length,
-            exclude_types=exclude_types,
-        )
-
-    def next_unprocessed(self) -> Chunk | None:
-        """Get the next unprocessed chunk."""
-        return next_unprocessed_chunk(self)
-
-    def mark_all_processed(self) -> None:
-        """Mark all chunks as processed."""
-        mark_document_all_processed(self)
-
-    def mark_all_unprocessed(self) -> None:
-        """Mark all chunks as unprocessed."""
-        mark_document_all_unprocessed(self)
 
     def get_full_text(self, separator: str = "\n\n") -> str:
         """Get the full text by joining all chunks with separator."""
@@ -516,42 +427,6 @@ class Document:
             section_scope=section_scope,
         )
 
-    # ========== Unified Section Handling Methods ==========
-
-    def print_for_human(
-        self,
-        section_names: list[str] | None = None,
-        max_sections: int | None = None,
-        show_metadata: bool = True,
-        show_confidence: bool = True,
-        use_colors: bool = True,
-    ) -> str:
-        """Render formatted document sections for human reading.
-
-        Args:
-            section_names: Specific section names to display. If None, shows all sections.
-            max_sections: Maximum number of sections to display.
-            show_metadata: Whether to show document metadata (title, author, etc.).
-            show_confidence: Whether to show confidence scores for each section.
-            use_colors: Whether to use colored output (if terminal supports it).
-
-        Returns:
-            Rendered human-readable content.
-        """
-        try:
-            return format_for_human(
-                self,
-                section_names=section_names,
-                max_sections=max_sections,
-                show_metadata=show_metadata,
-                show_confidence=show_confidence,
-                use_colors=use_colors,
-            )
-
-        except Exception as e:
-            self.logger.error(f"Failed to print document for human: {e}")
-            return f"Error rendering document: {e}"
-
     def get_for_llm(
         self,
         section_names: list[str] | None = None,
@@ -622,38 +497,6 @@ class Document:
         """Calculate prefix similarity between two strings."""
         return prefix_similarity(str1, str2)
 
-    def get_section_overview(self, include_stats: bool = True, include_quality: bool = True) -> dict:
-        """Get comprehensive overview of all sections.
-
-        Args:
-            include_stats: Whether to include section statistics.
-            include_quality: Whether to include quality metrics.
-
-        Returns:
-            Dictionary with section information.
-        """
-        return build_section_overview(
-            self,
-            include_stats=include_stats,
-            include_quality=include_quality,
-        )
-
-    def get_sections_with_confidence(self, min_confidence: float = 0.5, min_length: int = 50) -> list[tuple[str, str]]:
-        """Get sections that meet minimum quality criteria.
-
-        Args:
-            min_confidence: Minimum confidence threshold (0.0-1.0).
-            min_length: Minimum character length per section.
-
-        Returns:
-            List of (section_name, content) tuples that meet criteria.
-        """
-        return collect_sections_with_confidence(
-            self,
-            min_confidence=min_confidence,
-            min_length=min_length,
-        )
-
     def build_section_tree(self) -> SectionTree:
         """Build a runtime section tree derived from the current chunk paths."""
         return build_document_section_tree(self)
@@ -668,17 +511,6 @@ class Document:
         """Calculate cosine similarity between two vectors."""
         return cosine_similarity(vec1, vec2)
 
-    # ========== Agent-Specific Optimization Methods ==========
-
     def _remove_references_section(self, text: str) -> str:
         """Remove references and bibliography sections from text."""
         return remove_references_section(text)
-
-    def save(self, output_path: Path) -> None:
-        """Saves the document's state and its vector index path to a JSON file."""
-        save_document(self, output_path)
-
-    @classmethod
-    def load(cls, state_path: Path) -> "Document":
-        """Loads a document from a state file, re-linking its vector index."""
-        return load_document(cls, state_path)

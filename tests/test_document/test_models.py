@@ -29,7 +29,6 @@ class TestChunk:
         assert chunk.position == 0
         assert chunk.word_count == 5
         assert chunk.confidence == 0.9
-        assert chunk.processed is False
 
     def test_chunk_word_count_auto_calculation(self):
         """Test automatic word count calculation."""
@@ -48,30 +47,6 @@ class TestChunk:
             Chunk(content="test", confidence=-0.1)
         with pytest.raises(ValueError, match="Confidence must be between"):
             Chunk(content="test", confidence=1.1)
-
-    def test_chunk_toggle_processed(self):
-        """Test toggling processed status."""
-        chunk = Chunk(content="test", processed=False)
-        assert chunk.processed is False
-
-        chunk.toggle_processed()
-        assert chunk.processed is True
-
-        chunk.toggle_processed()
-        assert chunk.processed is False
-
-    def test_chunk_mark_methods(self):
-        """Test marking processed/unprocessed."""
-        chunk = Chunk(content="test")
-        assert chunk.processed is False
-
-        chunk.mark_processed()
-        assert chunk.processed is True
-        assert chunk.is_processed is True
-
-        chunk.mark_unprocessed()
-        assert chunk.processed is False
-        assert chunk.is_processed is False
 
     def test_chunk_new_metadata_defaults(self):
         """Test default initialization for expanded chunk metadata fields."""
@@ -98,23 +73,6 @@ class TestChunk:
         assert chunk.parent_section_id == "introduction"
         assert chunk.citation_key == chunk.chunk_id
         assert chunk.retrievable is True
-
-    def test_chunk_retrievable_sync_with_processed(self):
-        """Test retrievable flag syncs with processed state transitions."""
-        chunk = Chunk(content="test")
-        assert chunk.retrievable is True
-
-        chunk.mark_processed()
-        assert chunk.processed is True
-        assert chunk.retrievable is False
-
-        chunk.mark_unprocessed()
-        assert chunk.processed is False
-        assert chunk.retrievable is True
-
-        chunk.toggle_processed()
-        assert chunk.processed is True
-        assert chunk.retrievable is False
 
     def test_chunk_overlap_metadata_defaults_and_validation(self):
         """Test overlap metadata defaults and validation."""
@@ -174,7 +132,6 @@ class TestProcessingState:
         assert state.processing_version == "1.0"
         assert state.loaded_at is None
         assert state.split_at is None
-        assert state.last_processed_at is None
         assert state.notes == []
 
     def test_add_note(self):
@@ -190,11 +147,9 @@ class TestProcessingState:
         state = ProcessingState()
         state.update_timestamp("loaded")
         state.update_timestamp("split")
-        state.update_timestamp("processed")
 
         assert state.loaded_at is not None
         assert state.split_at is not None
-        assert state.last_processed_at is not None
 
     def test_update_timestamp_invalid_operation(self):
         """Test timestamp update with invalid operation."""
@@ -204,4 +159,3 @@ class TestProcessingState:
         # All timestamps should remain None
         assert state.loaded_at is None
         assert state.split_at is None
-        assert state.last_processed_at is None

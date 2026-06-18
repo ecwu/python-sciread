@@ -136,7 +136,7 @@ The package is organized by subsystem:
 - ``src/sciread/agent``: agent implementations, prompts, and agent-local models
 - ``src/sciread/document``: canonical document subsystem root and public entrypoints
 - ``src/sciread/document/ingestion``: loaders, external document clients, and ingestion cache helpers
-- ``src/sciread/document/structure``: chunking, section resolution, rendering, persistence, and splitters
+- ``src/sciread/document/structure``: chunking, section resolution, rendering, and splitters
 - ``src/sciread/document/retrieval``: vector indexing, semantic search, and evidence retrieval
 - ``src/sciread/platform``: config and logging
 - ``src/sciread/application``: top-level analysis workflows

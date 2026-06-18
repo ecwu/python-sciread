@@ -42,7 +42,6 @@ class Chunk:
     page_range: tuple[int, int] | None = None  # (start_page, end_page)
     word_count: int = 0
     confidence: float = 1.0  # Confidence in classification (0.0-1.0)
-    processed: bool = False  # Processing status
 
     def __post_init__(self):
         """Validate and initialize derived fields."""
@@ -78,9 +77,6 @@ class Chunk:
         if not self.citation_key:
             self.citation_key = self.chunk_id
 
-        if self.processed:
-            self.retrievable = False
-
     @property
     def id(self) -> str:
         """Backward-compatible chunk identifier alias."""
@@ -112,28 +108,6 @@ class Chunk:
 
         if not self.parent_section_id and self.section_path:
             self.parent_section_id = self.section_path[-1]
-
-    def _set_processed_state(self, processed: bool) -> None:
-        """Update processed state and the derived retrievable flag together."""
-        self.processed = processed
-        self.retrievable = not processed
-
-    def toggle_processed(self) -> None:
-        """Toggle the processed status of this chunk."""
-        self._set_processed_state(not self.processed)
-
-    def mark_processed(self) -> None:
-        """Mark this chunk as processed."""
-        self._set_processed_state(True)
-
-    def mark_unprocessed(self) -> None:
-        """Mark this chunk as unprocessed."""
-        self._set_processed_state(False)
-
-    @property
-    def is_processed(self) -> bool:
-        """Check if this chunk is processed."""
-        return self.processed
 
     @property
     def has_overlap(self) -> bool:
@@ -170,7 +144,6 @@ class ProcessingState:
 
     loaded_at: datetime | None = None
     split_at: datetime | None = None
-    last_processed_at: datetime | None = None
     processing_version: str = "1.0"
     notes: list[str] = field(default_factory=list)
 
@@ -185,5 +158,3 @@ class ProcessingState:
             self.loaded_at = timestamp
         elif operation == "split":
             self.split_at = timestamp
-        elif operation == "processed":
-            self.last_processed_at = timestamp

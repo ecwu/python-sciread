@@ -72,7 +72,6 @@ def get_chunk_map(document: Document) -> dict[str, Chunk]:
 def get_chunks(
     document: Document,
     *,
-    processed: bool | None = None,
     chunk_name: str | None = None,
     limit: int | None = None,
     confidence_threshold: float | None = None,
@@ -81,9 +80,6 @@ def get_chunks(
 ) -> list[Chunk]:
     """Filter chunks using the current document state."""
     chunks = document._chunks
-
-    if processed is not None:
-        chunks = [chunk for chunk in chunks if chunk.processed == processed]
 
     if chunk_name is not None:
         chunks = [chunk for chunk in chunks if chunk.chunk_name == chunk_name]
@@ -181,52 +177,6 @@ def get_neighbor_chunks(
         return neighbors
 
     return [chunk for chunk in neighbors if chunk.chunk_id != chunk_id]
-
-
-def mark_chunks_processed(
-    document: Document,
-    *,
-    confidence_threshold: float | None = None,
-    min_length: int | None = None,
-    exclude_types: set[str] | None = None,
-) -> int:
-    """Mark matching chunks as processed."""
-    chunks_to_mark = get_chunks(
-        document,
-        processed=False,
-        confidence_threshold=confidence_threshold,
-        min_length=min_length,
-        exclude_types=exclude_types,
-    )
-
-    for chunk in chunks_to_mark:
-        chunk.mark_processed()
-
-    if chunks_to_mark:
-        document.processing_state.add_note(f"Marked {len(chunks_to_mark)} chunks as processed")
-        document.logger.info(f"Marked {len(chunks_to_mark)} chunks as processed")
-
-    return len(chunks_to_mark)
-
-
-def next_unprocessed_chunk(document: Document) -> Chunk | None:
-    """Return the next unprocessed chunk in document order."""
-    unprocessed = get_chunks(document, processed=False, limit=1)
-    return unprocessed[0] if unprocessed else None
-
-
-def mark_all_processed(document: Document) -> None:
-    """Mark every chunk as processed."""
-    for chunk in document._chunks:
-        chunk.mark_processed()
-    document.processing_state.update_timestamp("processed")
-    document.processing_state.add_note("All chunks marked as processed")
-
-
-def mark_all_unprocessed(document: Document) -> None:
-    """Mark every chunk as unprocessed."""
-    for chunk in document._chunks:
-        chunk.mark_unprocessed()
 
 
 def get_full_text(document: Document, separator: str = "\n\n") -> str:

@@ -7,13 +7,10 @@ from sciread.document.models import Chunk
 from sciread.document.models import DocumentMetadata
 from sciread.document.structure.renderers import choose_best_section_match
 from sciread.document.structure.renderers import clean_section_content
-from sciread.document.structure.renderers import format_for_human
 from sciread.document.structure.renderers import format_for_llm
 from sciread.document.structure.renderers import format_section_choices
 from sciread.document.structure.renderers import get_section_length_map
-from sciread.document.structure.renderers import get_section_overview
 from sciread.document.structure.renderers import get_sections_content
-from sciread.document.structure.renderers import get_sections_with_confidence
 from sciread.document.structure.renderers import is_likely_heading_only
 from sciread.document.structure.renderers import remove_references_section
 from sciread.document.structure.renderers import resolve_section_names
@@ -113,26 +110,6 @@ def test_choose_best_section_match_prefers_substantial_content():
     assert choose_best_section_match("missing", available, lengths) is None
 
 
-def test_format_for_human_respects_display_flags(sample_document):
-    """Human formatting should toggle metadata, confidence, and colors."""
-    full = format_for_human(sample_document)
-    assert "Sample Paper" in full
-    assert "Confidence:" in full
-    assert "\033[" in full
-
-    no_metadata = format_for_human(sample_document, show_metadata=False)
-    assert "Sample Paper" not in no_metadata
-    assert "Section 1: abstract" in no_metadata
-
-    no_confidence = format_for_human(sample_document, show_confidence=False)
-    assert "Section 1: abstract" in no_confidence
-    assert "Confidence:" not in no_confidence
-
-    plain = format_for_human(sample_document, use_colors=False)
-    assert "\033[" not in plain
-    assert "Sample Paper" in plain
-
-
 def test_format_for_llm_truncates_oversized_section():
     """LLM formatting should truncate a section that exceeds the token budget."""
     long_content = "word " * 500
@@ -170,44 +147,9 @@ def test_get_sections_content_orders_and_truncates(sample_document):
     assert sections[0][1].endswith("...[truncated]")
 
 
-def test_get_section_overview_respects_quality_and_stats_flags(sample_document):
-    """Section overview should toggle quality and stats fields."""
-    full = get_section_overview(sample_document)
-    assert "average_confidence" in full["sections"][0]
-    assert "min_chunk_size" in full["sections"][0]
-
-    no_quality = get_section_overview(sample_document, include_quality=False)
-    assert "average_confidence" not in no_quality["sections"][0]
-    assert "min_chunk_size" in no_quality["sections"][0]
-
-    no_stats = get_section_overview(sample_document, include_stats=False)
-    assert "average_confidence" in no_stats["sections"][0]
-    assert "min_chunk_size" not in no_stats["sections"][0]
-
-
-def test_get_sections_with_confidence_filters_by_quality():
-    """get_sections_with_confidence should return only sections meeting thresholds."""
-    chunks = [
-        Chunk(content="A sufficiently long abstract section here.", chunk_name="abstract", position=0, confidence=0.95),
-        Chunk(content="A short method note.", chunk_name="method", position=1, confidence=0.6),
-        Chunk(content="This is a brief section.", chunk_name="brief", position=2, confidence=0.96),
-    ]
-    doc = Document(text="x", metadata=DocumentMetadata(title="Paper"))
-    doc._set_chunks(chunks)
-
-    sections = get_sections_with_confidence(doc, min_confidence=0.9, min_length=25)
-    names = [name for name, _ in sections]
-    assert names == ["abstract"]
-
-    length_filtered = get_sections_with_confidence(doc, min_confidence=0.5, min_length=30)
-    assert all(len(content) >= 30 for _, content in length_filtered)
-
-
 def test_renderer_helpers_handle_empty_document():
     """Renderer helpers should degrade gracefully on empty documents."""
     empty_doc = Document(text="")
     assert get_sections_content(empty_doc) == []
     assert get_section_length_map(empty_doc) == {}
-    assert get_section_overview(empty_doc)["total_sections"] == 0
-    assert get_sections_with_confidence(empty_doc) == []
     assert format_for_llm(empty_doc) == ""
