@@ -5,7 +5,6 @@ from .config import DocumentSplitterConfig
 from .config import LLMProviderConfig
 from .config import MarkdownSplitterConfig
 from .config import MineruConfig
-from .config import RegexSectionSplitterConfig
 from .config import ScireadConfig
 from .config import SemanticSplitterConfig
 from .config import VectorStoreConfig
@@ -21,7 +20,6 @@ __all__ = [
     "LLMProviderConfig",
     "MarkdownSplitterConfig",
     "MineruConfig",
-    "RegexSectionSplitterConfig",
     "ScireadConfig",
     "SemanticSplitterConfig",
     "VectorStoreConfig",

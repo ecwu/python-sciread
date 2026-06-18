@@ -9,8 +9,8 @@ from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
 
 from ...document import Document
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...providers.llm import get_model
 from .executor import execute_sub_agents
 from .models import AnalysisPlan
 from .models import ComprehensiveAnalysisResult

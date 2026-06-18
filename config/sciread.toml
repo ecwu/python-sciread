@@ -1,45 +1,52 @@
 # Configuration file for sciread package
 # Copy this file to ~/.config/sciread/config.toml and update with your API keys
 
-[llm_providers.deepseek]
+[providers.llm.deepseek]
 api_key = "${DEEPSEEK_API_KEY}"
 default_model = "deepseek-v4-flash"
 base_url = "https://api.deepseek.com"
 
-[llm_providers.volcengine]
+[providers.llm.volcengine]
 # Volcengine currently also falls back to VOLCES_API from the environment.
 api_key = "${VOLCES_API}"
 default_model = "doubao-seed-2.0-code"
 base_url = "https://ark.cn-beijing.volces.com/api/coding/v3"
 
-[llm_providers.lmstudio]
+[providers.llm.lmstudio]
 api_key = "lm_studio"
 default_model = "qwen3:4b"
 base_url = "http://localhost:1234/v1"
 
-[llm_providers.ollama]
+[providers.llm.ollama]
 base_url = "http://localhost:11434/v1"
 default_model = "qwen3:4b"
 
-[llm_providers.default]
+[providers.llm.default]
 # Default provider to use when none is specified
 provider = "deepseek"
 model = "deepseek-v4-flash"
+
+[providers.embedding.default]
+# Default model for embeddings
+model = "siliconflow/BAAI/bge-m3"
+# Embedding batch size
+batch_size = 10
+# Cache embeddings for better performance
+cache_embeddings = true
+
+[providers.rerank.default]
+# Optional second-stage rerank model. Use retrieval strategy "rerank" to rerank
+# semantic candidates after vector search.
+model = "siliconflow/BAAI/bge-reranker-v2-m3"
+candidate_multiplier = 4
 
 # Document splitter configuration exposed by the current config model.
 # The document builder auto-selects MarkdownSplitter for markdown input and
 # SemanticSplitter for non-markdown input unless a splitter is provided
 # explicitly in code. The sections below configure those default splitters.
 [document_splitters]
-# Supported values: "regex_section", "markdown", "semantic"
-default_splitter = "regex_section"
-
-[document_splitters.regex_section]
-min_chunk_size = 200
-chunk_overlap = 0
-confidence_threshold = 0.3
-# Custom patterns (optional)
-# custom_patterns = { "my_pattern" = "my regex pattern" }
+# Supported values: "markdown", "semantic"
+default_splitter = "semantic"
 
 [document_splitters.markdown]
 min_chunk_size = 200
@@ -75,13 +82,3 @@ enable_cache = true       # Cache Mineru responses when possible
 [vector_store]
 # Path to store vector indices for persistent search
 path = "~/.sciread/vector_store"
-# Default model for embeddings
-embedding_model = "siliconflow/BAAI/bge-m3"
-# Embedding batch size
-batch_size = 10
-# Cache embeddings for better performance
-cache_embeddings = true
-# Optional second-stage rerank model. Use retrieval strategy "rerank" to rerank
-# semantic candidates after vector search.
-rerank_model = "siliconflow/BAAI/bge-reranker-v2-m3"
-rerank_candidate_multiplier = 4

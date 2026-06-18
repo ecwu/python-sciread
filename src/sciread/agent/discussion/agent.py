@@ -10,13 +10,13 @@ from pydantic_ai import Agent
 from rich.console import Console
 
 from ...document import Document
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ...platform.rich_output import TableColumnSpec
 from ...platform.rich_output import build_data_table
 from ...platform.rich_output import build_key_value_table
 from ...platform.rich_output import build_sections_table
 from ...platform.rich_output import build_stage_banner
+from ...providers.llm import get_model
 from .models import AgentPersonality
 from .models import DiscussionPhase
 from .models import DiscussionResult

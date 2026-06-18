@@ -7,9 +7,9 @@ from typing import Any
 if TYPE_CHECKING:
     from .document import Document
 
-from ..embedding_provider import OllamaClient
 from ..platform.config import get_config
 from ..platform.logging import get_logger
+from ..providers.embedding import OllamaClient
 from .ingestion.external_clients import MineruClient
 from .ingestion.loaders import BaseLoader
 from .ingestion.loaders import PdfLoader
@@ -300,10 +300,19 @@ class DocumentBuilder:
                 **splitter_kwargs,
             )
 
-        # For other documents, use semantic splitter with academic patterns
-        splitter_kwargs = config.document_splitters.semantic.model_dump()
+        splitter_name = config.document_splitters.default_splitter
+        if splitter_name == "markdown":
+            splitter_config = config.document_splitters.markdown
+            splitter_cls = MarkdownSplitter
+        elif splitter_name == "semantic":
+            splitter_config = config.document_splitters.semantic
+            splitter_cls = SemanticSplitter
+        else:
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: markdown, semantic")
+
+        splitter_kwargs = splitter_config.model_dump()
         splitter_kwargs.update(split_kwargs)
-        return SemanticSplitter(**splitter_kwargs)
+        return splitter_cls(**splitter_kwargs)
 
     def with_loader(self, loader: BaseLoader) -> "DocumentBuilder":
         """Set custom loader."""

@@ -3,17 +3,17 @@ from .application import run_discussion_analysis
 from .application import run_react_analysis
 from .application import run_search_react_analysis
 from .application import run_simple_analysis
-from .embedding_provider import EmbeddingFactory
-from .embedding_provider import LMStudioClient
-from .embedding_provider import OllamaClient
-from .embedding_provider import SiliconFlowClient
-from .embedding_provider import get_embedding_client
-from .llm_provider import get_model
 from .platform.logging import get_logger
 from .platform.logging import setup_logging
-from .rerank_provider import RerankFactory
-from .rerank_provider import SiliconFlowRerankClient
-from .rerank_provider import get_rerank_client
+from .providers.embedding import EmbeddingFactory
+from .providers.embedding import LMStudioClient
+from .providers.embedding import OllamaClient
+from .providers.embedding import SiliconFlowClient
+from .providers.embedding import get_embedding_client
+from .providers.llm import get_model
+from .providers.rerank import RerankFactory
+from .providers.rerank import SiliconFlowRerankClient
+from .providers.rerank import get_rerank_client
 
 __version__ = "1.1.0"
 

@@ -1,9 +1,9 @@
 """Document APIs, loaders, splitters, and retrieval helpers."""
 
-from ..embedding_provider import LMStudioClient
-from ..embedding_provider import OllamaClient
-from ..embedding_provider import SiliconFlowClient
-from ..rerank_provider import SiliconFlowRerankClient
+from ..providers.embedding import LMStudioClient
+from ..providers.embedding import OllamaClient
+from ..providers.embedding import SiliconFlowClient
+from ..providers.rerank import SiliconFlowRerankClient
 from .document import Document
 from .document_builder import DocumentBuilder
 from .ingestion.external_clients import MineruClient

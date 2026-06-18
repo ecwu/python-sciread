@@ -11,10 +11,10 @@ from sciread.document.state import get_runtime_embedding_client
 from sciread.document.state import get_runtime_rerank_client
 from sciread.document.state import set_runtime_embedding_client
 from sciread.document.state import set_runtime_rerank_client
-from sciread.embedding_provider import get_embedding_client
-from sciread.embedding_provider.base import cosine_similarity as compute_cosine_similarity
 from sciread.platform.config import get_config
-from sciread.rerank_provider import get_rerank_client
+from sciread.providers.embedding import get_embedding_client
+from sciread.providers.embedding.base import cosine_similarity as compute_cosine_similarity
+from sciread.providers.rerank import get_rerank_client
 
 if TYPE_CHECKING:
     from sciread.document.document import Document
@@ -49,10 +49,10 @@ def _resolve_runtime_embedding_client(
         return runtime_client
 
     config = get_config_fn()
-    vector_config = config.vector_store
+    embedding_config = config.providers.embedding.default
     runtime_client = get_embedding_client_fn(
-        vector_config.embedding_model,
-        cache_embeddings=vector_config.cache_embeddings,
+        embedding_config.model,
+        cache_embeddings=embedding_config.cache_embeddings,
     )
     set_runtime_embedding_client(document, runtime_client)
     return runtime_client
@@ -75,8 +75,8 @@ def _resolve_runtime_rerank_client(
         return runtime_client
 
     config = get_config_fn()
-    vector_config = config.vector_store
-    runtime_client = get_rerank_client_fn(vector_config.rerank_model)
+    rerank_config = config.providers.rerank.default
+    runtime_client = get_rerank_client_fn(rerank_config.model)
     set_runtime_rerank_client(document, runtime_client)
     return runtime_client
 
@@ -111,7 +111,10 @@ def build_vector_index(
 
         embeddings = embedding_client.get_embeddings(
             [chunk.retrieval_text or chunk.content for chunk in chunks],
-            batch_size=_resolve_batch_size(embedding_client),
+            batch_size=_resolve_batch_size(
+                embedding_client,
+                default=config.providers.embedding.default.batch_size if vector_config is not None else 10,
+            ),
         )
 
         persist_path = None
@@ -209,7 +212,7 @@ def rerank_search(
 
     try:
         config = get_config_fn()
-        candidate_multiplier = max(1, getattr(config.vector_store, "rerank_candidate_multiplier", 4))
+        candidate_multiplier = config.providers.rerank.default.candidate_multiplier
         effective_candidate_top_k = candidate_top_k or max(top_k * candidate_multiplier, top_k)
 
         semantic_candidates = semantic_search(

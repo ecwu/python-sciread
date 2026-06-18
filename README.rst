@@ -93,7 +93,7 @@ By default, ``sciread`` uses a simple PDF loader. For much better results (with 
 
 **RAG Embeddings and Reranking**
 
-RAG uses SiliconFlow ``BAAI/bge-m3`` embeddings by default. Set ``SILICONFLOW_API_KEY`` before building vector indices. You can still use local models explicitly with LM Studio's OpenAI-compatible local server on ``http://localhost:1234/v1`` or with Ollama. For second-stage ranking, use ``Document.retrieve_chunks(..., strategy="rerank")`` or ``Document.rerank_search(...)``; this reranks semantic candidates with the configured ``vector_store.rerank_model``.
+RAG uses SiliconFlow ``BAAI/bge-m3`` embeddings by default. Set ``SILICONFLOW_API_KEY`` before building vector indices. You can still use local models explicitly with LM Studio's OpenAI-compatible local server on ``http://localhost:1234/v1`` or with Ollama. For second-stage ranking, use ``Document.retrieve_chunks(..., strategy="rerank")`` or ``Document.rerank_search(...)``; this reranks semantic candidates with the configured ``providers.rerank.default.model``.
 
 Python API
 ==========
@@ -119,7 +119,8 @@ You can enable overlap-aware chunking for RAG-oriented retrieval without changin
     document = Document.from_text(markdown_text, is_markdown=True, chunk_overlap=150)
 
 The same overlap behavior can be configured globally in ``config/sciread.toml`` under
-``[document_splitters.markdown]`` or ``[document_splitters.semantic]``.
+``[document_splitters.markdown]`` or ``[document_splitters.semantic]``. These are the supported built-in splitter
+configuration sections.
 
 For retrieval-oriented workflows, ``search-react`` can compare multiple retrievers in one run while reusing the same
 document chunking and vector-store configuration. Agent-facing retrieval should use ``EvidenceRetriever`` from

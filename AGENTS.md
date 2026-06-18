@@ -195,7 +195,6 @@ Current provider and document-related settings include:
 
 Current splitter config sections include:
 
-- `document_splitters.regex_section`
 - `document_splitters.markdown`
 - `document_splitters.semantic`
 

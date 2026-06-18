@@ -16,13 +16,13 @@ from ...document.structure.renderers import SHORT_SECTION_THRESHOLD
 from ...document.structure.renderers import get_section_length_map
 from ...document.structure.renderers import get_sections_content
 from ...document.structure.renderers import is_likely_heading_only
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ...platform.rich_output import build_key_value_table
 from ...platform.rich_output import build_markdown_panel
 from ...platform.rich_output import build_mode_banner
 from ...platform.rich_output import build_sections_table
 from ...platform.rich_output import build_stage_banner
+from ...providers.llm import get_model
 from .models import ReActAnalysisState
 from .models import ReActIterationDeps
 from .models import ReActIterationInput

@@ -19,7 +19,6 @@ from .sections import prefix_similarity
 from .sections import word_similarity
 from .splitters import BaseSplitter
 from .splitters import MarkdownSplitter
-from .splitters import RegexSectionSplitter
 from .splitters import SemanticSplitter
 from .tree import SectionTree
 from .tree import SectionTreeNode
@@ -28,7 +27,6 @@ from .tree import build_section_tree
 __all__ = [
     "BaseSplitter",
     "MarkdownSplitter",
-    "RegexSectionSplitter",
     "SectionTree",
     "SectionTreeNode",
     "SemanticSplitter",

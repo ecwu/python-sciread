@@ -9,8 +9,8 @@ from typing import Any
 from pydantic_ai import Agent
 
 from ...document import Document
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...providers.llm import get_model
 from .models import AgentInsight
 from .models import AgentPersonality
 from .models import ConsensusPoint

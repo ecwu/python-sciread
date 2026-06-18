@@ -49,6 +49,7 @@ class TestDocumentBuilder:
         builder = DocumentBuilder()
         config = SimpleNamespace(
             document_splitters=SimpleNamespace(
+                default_splitter="semantic",
                 markdown=SimpleNamespace(
                     model_dump=lambda: {
                         "min_chunk_size": 200,
@@ -81,3 +82,57 @@ class TestDocumentBuilder:
         assert len(document.chunks) == 2
         assert document.chunks[0].overlap_next_chars > 0
         assert document.chunks[1].overlap_prev_chars > 0
+
+    def test_builder_uses_default_splitter_config_for_non_markdown_text(self):
+        """Test non-markdown documents use the configured default splitter."""
+        builder = DocumentBuilder()
+        config = SimpleNamespace(
+            document_splitters=SimpleNamespace(
+                default_splitter="semantic",
+                markdown=SimpleNamespace(
+                    model_dump=lambda: {
+                        "min_chunk_size": 200,
+                        "max_chunk_size": 2000,
+                        "chunk_overlap": 0,
+                        "preserve_code_blocks": True,
+                        "split_on_headers": True,
+                        "confidence_threshold": 0.7,
+                    }
+                ),
+                semantic=SimpleNamespace(
+                    model_dump=lambda: {
+                        "min_chunk_size": 1,
+                        "max_chunk_size": 2000,
+                        "chunk_overlap": 8,
+                        "preserve_code_blocks": True,
+                        "split_on_headers": True,
+                        "confidence_threshold": 0.7,
+                        "enable_academic_patterns": True,
+                        "enable_markdown_patterns": False,
+                    }
+                ),
+            )
+        )
+        text = "Introduction\n\nAlpha beta gamma.\n\nResults\n\nGamma delta epsilon."
+
+        with patch("sciread.document.document_builder.get_config", return_value=config):
+            document = builder.from_text(text)
+
+        assert len(document.chunks) == 2
+        assert document.chunks[0].overlap_next_chars > 0
+        assert document.chunks[1].overlap_prev_chars > 0
+
+    def test_builder_rejects_unknown_default_splitter(self):
+        """Unknown configured splitters should fail before chunking."""
+        builder = DocumentBuilder()
+        config = SimpleNamespace(
+            document_splitters=SimpleNamespace(
+                default_splitter="unknown",
+                markdown=SimpleNamespace(model_dump=dict),
+                semantic=SimpleNamespace(model_dump=dict),
+            )
+        )
+
+        with patch("sciread.document.document_builder.get_config", return_value=config):
+            with pytest.raises(ValueError, match="Unknown splitter: unknown"):
+                builder.from_text("Introduction\n\nBody.")

@@ -13,8 +13,8 @@ from ...document.structure.renderers import format_section_choices
 from ...document.structure.renderers import get_section_length_map
 from ...document.structure.renderers import get_sections_content
 from ...document.structure.renderers import is_likely_heading_only
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
+from ...providers.llm import get_model
 from .models import AGENT_ABBREVIATIONS
 from .models import AgentInsight
 from .models import AgentPersonality

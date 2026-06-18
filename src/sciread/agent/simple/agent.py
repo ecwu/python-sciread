@@ -19,11 +19,11 @@ from rich.console import Console
 from ...application.use_cases.common import ensure_file_exists
 from ...application.use_cases.common import load_document
 from ...document import Document
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ...platform.rich_output import build_key_value_table
 from ...platform.rich_output import build_markdown_panel
 from ...platform.rich_output import build_mode_banner
+from ...providers.llm import get_model
 from ..shared.error_handling import handle_model_retry
 from ..shared.error_handling import safe_agent_execution
 from ..shared.text_utils import clean_academic_text

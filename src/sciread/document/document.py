@@ -3,9 +3,9 @@
 from collections.abc import Iterator
 from pathlib import Path
 
-from ..embedding_provider import get_embedding_client
 from ..platform.config import get_config
 from ..platform.logging import get_logger
+from ..providers.embedding import get_embedding_client
 from .document_builder import DocumentBuilder
 from .models import Chunk
 from .models import DocumentMetadata

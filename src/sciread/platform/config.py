@@ -20,13 +20,73 @@ class LLMProviderConfig(BaseModel):
     default_model: str = Field(description="Default model name for this provider")
 
 
-class RegexSectionSplitterConfig(BaseModel):
-    """Configuration for RegexSectionSplitter."""
+class DefaultConfig(BaseModel):
+    """Default provider and model settings."""
 
-    min_chunk_size: int = Field(default=200, description="Minimum chunk size in characters")
-    chunk_overlap: int = Field(default=0, ge=0, description="Backward overlap between adjacent chunks in characters")
-    confidence_threshold: float = Field(default=0.3, description="Minimum confidence score for chunks")
-    custom_patterns: dict[str, str] = Field(default_factory=dict, description="Custom regex patterns")
+    provider: str = Field(default="deepseek", description="Default provider name")
+    model: str = Field(default="deepseek-v4-flash", description="Default model name")
+
+
+class LLMProvidersConfig(BaseModel):
+    """Configuration for LLM providers."""
+
+    default: DefaultConfig = Field(default_factory=DefaultConfig)
+    configs: dict[str, LLMProviderConfig] = Field(
+        default_factory=lambda: {
+            "deepseek": LLMProviderConfig(default_model="deepseek-v4-flash", base_url="https://api.deepseek.com"),
+            "volcengine": LLMProviderConfig(
+                default_model="doubao-seed-2.0-code",
+                base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
+            ),
+            "lmstudio": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:1234/v1", api_key="lm_studio"),
+            "ollama": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:11434/v1"),
+        },
+        description="Provider-specific LLM configuration",
+    )
+
+    def __contains__(self, provider_name: str) -> bool:
+        return provider_name in self.configs
+
+    def __getitem__(self, provider_name: str) -> LLMProviderConfig:
+        return self.configs[provider_name]
+
+    def __setitem__(self, provider_name: str, provider_config: LLMProviderConfig) -> None:
+        self.configs[provider_name] = provider_config
+
+
+class EmbeddingDefaultConfig(BaseModel):
+    """Default embedding provider settings."""
+
+    model: str = Field(default="siliconflow/BAAI/bge-m3", description="Default model for embeddings")
+    batch_size: int = Field(default=10, ge=1, description="Embedding batch size")
+    cache_embeddings: bool = Field(default=True, description="Cache embeddings for better performance")
+
+
+class EmbeddingProvidersConfig(BaseModel):
+    """Configuration for embedding providers."""
+
+    default: EmbeddingDefaultConfig = Field(default_factory=EmbeddingDefaultConfig)
+
+
+class RerankDefaultConfig(BaseModel):
+    """Default rerank provider settings."""
+
+    model: str = Field(default="siliconflow/BAAI/bge-reranker-v2-m3", description="Model for reranking semantic candidates")
+    candidate_multiplier: int = Field(default=4, ge=1, description="How many semantic candidates to rerank per requested result")
+
+
+class RerankProvidersConfig(BaseModel):
+    """Configuration for rerank providers."""
+
+    default: RerankDefaultConfig = Field(default_factory=RerankDefaultConfig)
+
+
+class ProvidersConfig(BaseModel):
+    """Configuration grouped by provider domain."""
+
+    llm: LLMProvidersConfig = Field(default_factory=LLMProvidersConfig)
+    embedding: EmbeddingProvidersConfig = Field(default_factory=EmbeddingProvidersConfig)
+    rerank: RerankProvidersConfig = Field(default_factory=RerankProvidersConfig)
 
 
 class MarkdownSplitterConfig(BaseModel):
@@ -56,8 +116,7 @@ class SemanticSplitterConfig(BaseModel):
 class DocumentSplitterConfig(BaseModel):
     """Configuration for document splitters."""
 
-    default_splitter: str = Field(default="regex_section", description="Default splitter to use")
-    regex_section: RegexSectionSplitterConfig = Field(default_factory=RegexSectionSplitterConfig)
+    default_splitter: str = Field(default="semantic", description="Default non-markdown splitter to use")
     markdown: MarkdownSplitterConfig = Field(default_factory=MarkdownSplitterConfig)
     semantic: SemanticSplitterConfig = Field(default_factory=SemanticSplitterConfig)
 
@@ -82,18 +141,6 @@ class VectorStoreConfig(BaseModel):
     """Configuration for vector store (RAG functionality)."""
 
     path: str = Field(default="~/.sciread/vector_store", description="Path to store vector indices")
-    embedding_model: str = Field(default="siliconflow/BAAI/bge-m3", description="Model for embeddings")
-    batch_size: int = Field(default=10, description="Embedding batch size")
-    cache_embeddings: bool = Field(default=True, description="Cache embeddings for better performance")
-    rerank_model: str = Field(default="siliconflow/BAAI/bge-reranker-v2-m3", description="Model for reranking semantic candidates")
-    rerank_candidate_multiplier: int = Field(default=4, ge=1, description="How many semantic candidates to rerank per requested result")
-
-
-class DefaultConfig(BaseModel):
-    """Default provider and model settings."""
-
-    provider: str = Field(default="deepseek", description="Default provider name")
-    model: str = Field(default="deepseek-v4-flash", description="Default model name")
 
 
 class ScireadConfig(BaseSettings):
@@ -105,19 +152,7 @@ class ScireadConfig(BaseSettings):
         extra="ignore",
     )
 
-    llm_providers: dict[str, LLMProviderConfig] = Field(
-        default_factory=lambda: {
-            "deepseek": LLMProviderConfig(default_model="deepseek-v4-flash", base_url="https://api.deepseek.com"),
-            "volcengine": LLMProviderConfig(
-                default_model="doubao-seed-2.0-code",
-                base_url="https://ark.cn-beijing.volces.com/api/coding/v3",
-            ),
-            "lmstudio": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:1234/v1", api_key="lm_studio"),
-            "ollama": LLMProviderConfig(default_model="qwen3:4b", base_url="http://localhost:11434/v1"),
-        }
-    )
-
-    default: DefaultConfig = Field(default=DefaultConfig(provider="deepseek", model="deepseek-v4-flash"))
+    providers: ProvidersConfig = Field(default_factory=ProvidersConfig)
     document_splitters: DocumentSplitterConfig = Field(default_factory=DocumentSplitterConfig)
     mineru: MineruConfig = Field(default_factory=MineruConfig)
     vector_store: VectorStoreConfig = Field(default_factory=VectorStoreConfig)
@@ -151,11 +186,16 @@ class ScireadConfig(BaseSettings):
             with found_config_path.open("rb") as f:
                 config_data = tomllib.load(f)
 
-            # Extract provider configurations
-            raw_providers = config_data.get("llm_providers", {})
-            providers = {}
+            # Extract provider configurations.
+            raw_provider_sections = config_data.get("providers", {})
+            if not isinstance(raw_provider_sections, dict):
+                raw_provider_sections = {}
+            raw_llm_providers = raw_provider_sections.get("llm", {})
+            if not isinstance(raw_llm_providers, dict):
+                raw_llm_providers = {}
+            llm_provider_configs = LLMProvidersConfig().configs.copy() if not raw_llm_providers else {}
 
-            for name, data in raw_providers.items():
+            for name, data in raw_llm_providers.items():
                 if name == "default":
                     continue
 
@@ -169,17 +209,41 @@ class ScireadConfig(BaseSettings):
                     api_key = os.getenv(env_var)
 
                 # If still None, it will be lazily loaded from env by get_api_key()
-                providers[name] = LLMProviderConfig(
+                llm_provider_configs[name] = LLMProviderConfig(
                     api_key=api_key,
                     base_url=data.get("base_url"),
                     default_model=data.get("default_model", name),
                 )
 
-            # Extract default configuration
-            raw_default = raw_providers.get("default", {})
-            default_settings = DefaultConfig(
-                provider=raw_default.get("provider", "deepseek"),
-                model=raw_default.get("model", "deepseek-v4-flash"),
+            # Extract default provider configurations
+            raw_llm_default = raw_llm_providers.get("default", {})
+            if not isinstance(raw_llm_default, dict):
+                raw_llm_default = {}
+            llm_default = DefaultConfig(
+                provider=raw_llm_default.get("provider", "deepseek"),
+                model=raw_llm_default.get("model", "deepseek-v4-flash"),
+            )
+
+            raw_embedding = raw_provider_sections.get("embedding", {})
+            if not isinstance(raw_embedding, dict):
+                raw_embedding = {}
+            raw_embedding_default = raw_embedding.get("default", {})
+            if not isinstance(raw_embedding_default, dict):
+                raw_embedding_default = {}
+            embedding_default = EmbeddingDefaultConfig(**raw_embedding_default)
+
+            raw_rerank = raw_provider_sections.get("rerank", {})
+            if not isinstance(raw_rerank, dict):
+                raw_rerank = {}
+            raw_rerank_default = raw_rerank.get("default", {})
+            if not isinstance(raw_rerank_default, dict):
+                raw_rerank_default = {}
+            rerank_default = RerankDefaultConfig(**raw_rerank_default)
+
+            providers = ProvidersConfig(
+                llm=LLMProvidersConfig(default=llm_default, configs=llm_provider_configs),
+                embedding=EmbeddingProvidersConfig(default=embedding_default),
+                rerank=RerankProvidersConfig(default=rerank_default),
             )
 
             # Extract document splitters
@@ -200,8 +264,7 @@ class ScireadConfig(BaseSettings):
             vector_store = VectorStoreConfig(**vector_store_config)
 
             return cls(
-                llm_providers=providers,
-                default=default_settings,
+                providers=providers,
                 document_splitters=document_splitters,
                 mineru=mineru,
                 vector_store=vector_store,
@@ -215,9 +278,9 @@ class ScireadConfig(BaseSettings):
 
     def get_provider_config(self, provider_name: str) -> LLMProviderConfig:
         """Get configuration for a specific provider."""
-        if provider_name not in self.llm_providers:
+        if provider_name not in self.providers.llm:
             raise ValueError(f"Unknown provider: {provider_name}")
-        return self.llm_providers[provider_name]
+        return self.providers.llm[provider_name]
 
     def get_api_key(self, provider_name: str) -> str:
         """Get API key for a specific provider.
@@ -225,7 +288,7 @@ class ScireadConfig(BaseSettings):
         Prioritizes:
         1. Contextual configuration (from file or explicit set)
         2. Standard environment variables (e.g., DEEPSEEK_API_KEY)
-        3. Prefixed environment variables (e.g., SCIREAD_LLM_PROVIDERS__DEEPSEEK__API_KEY)
+        3. Generic provider environment variables (e.g., CUSTOM_API_KEY)
         """
         provider_config = self.get_provider_config(provider_name)
         if provider_config.api_key:
@@ -253,14 +316,12 @@ class ScireadConfig(BaseSettings):
 
     def get_splitter_config(self, splitter_name: str):
         """Get configuration for a specific splitter."""
-        if splitter_name == "regex_section":
-            return self.document_splitters.regex_section
-        elif splitter_name == "markdown":
+        if splitter_name == "markdown":
             return self.document_splitters.markdown
         elif splitter_name == "semantic":
             return self.document_splitters.semantic
         else:
-            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: regex_section, markdown, semantic")
+            raise ValueError(f"Unknown splitter: {splitter_name}. Available splitters: markdown, semantic")
 
     def get_default_splitter_config(self):
         """Get configuration for the default splitter."""

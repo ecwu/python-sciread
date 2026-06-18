@@ -14,6 +14,37 @@ from sciread.document.retrieval.service import semantic_search
 from sciread.document.state import set_runtime_embedding_client
 
 
+def _provider_config(
+    tmp_path=None,
+    *,
+    embedding_model: str = "dummy/model",
+    cache_embeddings: bool = True,
+    embedding_batch_size: int = 10,
+    rerank_model: str = "dummy/reranker",
+    rerank_candidate_multiplier: int = 4,
+):
+    """Build the provider-focused config shape used by retrieval helpers."""
+    vector_store_path = str(tmp_path / "vector_store") if tmp_path is not None else "~/.sciread/vector_store"
+    return SimpleNamespace(
+        providers=SimpleNamespace(
+            embedding=SimpleNamespace(
+                default=SimpleNamespace(
+                    model=embedding_model,
+                    batch_size=embedding_batch_size,
+                    cache_embeddings=cache_embeddings,
+                )
+            ),
+            rerank=SimpleNamespace(
+                default=SimpleNamespace(
+                    model=rerank_model,
+                    candidate_multiplier=rerank_candidate_multiplier,
+                )
+            ),
+        ),
+        vector_store=SimpleNamespace(path=vector_store_path),
+    )
+
+
 class TestDocumentRetrievalService:
     """Test retrieval runtime behavior."""
 
@@ -70,13 +101,7 @@ class TestDocumentRetrievalService:
         vector_index = Mock()
         vector_index_cls = Mock(return_value=vector_index)
         get_embedding_client_fn = Mock(return_value=embedding_client)
-        config = SimpleNamespace(
-            vector_store=SimpleNamespace(
-                embedding_model="dummy/model",
-                cache_embeddings=True,
-                path=str(tmp_path / "vector_store"),
-            )
-        )
+        config = _provider_config(tmp_path)
 
         build_vector_index(
             doc,
@@ -185,12 +210,7 @@ class TestDocumentRetrievalService:
 
         embedding_client = Mock()
         embedding_client.get_embedding.return_value = [0.4, 0.6]
-        config = SimpleNamespace(
-            vector_store=SimpleNamespace(
-                embedding_model="dummy/model",
-                cache_embeddings=False,
-            )
-        )
+        config = _provider_config(cache_embeddings=False)
 
         results = semantic_search(
             doc,
@@ -271,14 +291,7 @@ class TestDocumentRetrievalService:
             SimpleNamespace(index=1, relevance_score=0.93),
             SimpleNamespace(index=0, relevance_score=0.2),
         ]
-        config = SimpleNamespace(
-            vector_store=SimpleNamespace(
-                embedding_model="dummy/model",
-                cache_embeddings=True,
-                rerank_model="dummy/reranker",
-                rerank_candidate_multiplier=3,
-            )
-        )
+        config = _provider_config(rerank_candidate_multiplier=3)
 
         results = rerank_search(
             doc,
@@ -308,14 +321,7 @@ class TestDocumentRetrievalService:
         embedding_client.get_embedding.return_value = [0.1, 0.2]
         rerank_client = Mock()
         rerank_client.rerank.return_value = []
-        config = SimpleNamespace(
-            vector_store=SimpleNamespace(
-                embedding_model="dummy/model",
-                cache_embeddings=True,
-                rerank_model="dummy/reranker",
-                rerank_candidate_multiplier=4,
-            )
-        )
+        config = _provider_config(rerank_candidate_multiplier=4)
 
         results = rerank_search(
             doc,

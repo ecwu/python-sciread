@@ -17,7 +17,6 @@ from ...document import Document
 from ...document.retrieval import SUPPORTED_RETRIEVERS
 from ...document.retrieval import EvidenceRetriever
 from ...document.retrieval import format_evidence_results
-from ...llm_provider import get_model
 from ...platform.logging import get_logger
 from ...platform.rich_output import TableColumnSpec
 from ...platform.rich_output import build_data_table
@@ -25,6 +24,7 @@ from ...platform.rich_output import build_key_value_table
 from ...platform.rich_output import build_markdown_panel
 from ...platform.rich_output import build_mode_banner
 from ...platform.rich_output import build_stage_banner
+from ...providers.llm import get_model
 from .models import SearchReactAnalysisResult
 from .models import SearchReactAnalysisState
 from .models import SearchReactDeps
