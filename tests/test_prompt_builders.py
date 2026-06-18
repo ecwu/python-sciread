@@ -1,8 +1,6 @@
 """Tests for prompt builders and prompt modules."""
 
 from sciread.agent.discussion.models import AgentPersonality
-from sciread.agent.discussion.prompts import consensus as consensus_prompts
-from sciread.agent.discussion.prompts import discussion as discussion_prompts
 from sciread.agent.discussion.prompts import personalities as personality_prompts
 from sciread.agent.search_react.models import SearchReactDeps
 from sciread.agent.search_react.models import SearchReactIterationInput
@@ -70,66 +68,8 @@ def test_search_react_prompt_builders_cover_first_regular_and_final_iterations()
     assert build_iteration_user_prompt(3, 3) == "最终综合轮：调用 get_all_memory()，然后返回最终报告。"
 
 
-def test_discussion_prompt_builders_render_phase_and_convergence_context() -> None:
-    """Discussion coordinator prompt helpers should inject the correct criteria and metrics."""
-    phase_prompt = discussion_prompts.build_phase_evaluation_prompt(
-        "initial_analysis",
-        iteration=2,
-        max_iterations=5,
-        time_elapsed="3m",
-        progress_metrics={
-            "total_insights": 8,
-            "agents_with_insights": 4,
-            "total_questions": 2,
-            "total_answers": 1,
-            "avg_insight_quality": 0.7,
-            "activity_level": "high",
-        },
-    )
-
-    assert "初始分析阶段标准" in phase_prompt
-    assert "当前阶段：" in phase_prompt
-    assert "轮次：" in phase_prompt
-
-    fallback_prompt = discussion_prompts.build_phase_evaluation_prompt(
-        "custom_phase",
-        iteration=1,
-        max_iterations=2,
-        time_elapsed="1m",
-        progress_metrics={
-            "total_insights": 1,
-            "agents_with_insights": 1,
-            "total_questions": 0,
-            "total_answers": 0,
-            "avg_insight_quality": 0.5,
-            "activity_level": "low",
-        },
-    )
-
-    assert "请判断当前阶段目标是否已经达成。" in fallback_prompt
-
-    convergence_prompt = discussion_prompts.build_convergence_evaluation_prompt(
-        iterations=3,
-        total_insights=10,
-        total_questions=4,
-        total_responses=4,
-        agent_participation={"critical_evaluator": 3},
-        quality_trends="stable",
-        key_patterns="strong agreement on contributions",
-    )
-
-    assert "Overall Convergence" in convergence_prompt
-    assert "strong agreement on contributions" in convergence_prompt
-
-
-def test_discussion_consensus_and_personality_prompts_are_accessible() -> None:
-    """Prompt modules should expose usable templates and builders."""
-    assert "{document_title}" in consensus_prompts.SUMMARY_SYNTHESIS_PROMPT
-    assert "Overall Significance" in consensus_prompts.SIGNIFICANCE_ASSESSMENT_PROMPT
-    assert "Key Contributions:" in consensus_prompts.CONTRIBUTION_EXTRACTION_PROMPT
-    assert "Divergent View 1:" in consensus_prompts.DIVERGENT_VIEW_ANALYSIS_PROMPT
-    assert "共识整合专家" in consensus_prompts.CONSENSUS_BUILDER_SYSTEM_PROMPT
-
+def test_discussion_personality_prompts_are_accessible() -> None:
+    """Discussion prompt coverage should track the prompts used by PersonalityAgent."""
     assert "批判性评估者" in personality_prompts.get_personality_system_prompt(AgentPersonality.CRITICAL_EVALUATOR)
     assert personality_prompts.get_personality_system_prompt("unknown") == "你是一名资深学术研究分析师。"
 
