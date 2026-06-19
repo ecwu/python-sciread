@@ -126,7 +126,16 @@ quote-style = "double"
 norecursedirs = ["migrations"]
 python_files = ["test_*.py", "*_test.py", "tests.py"]
 addopts = "-ra --strict-markers --tb=short"
-markers = ["asyncio: marks tests as async"]
+markers = [
+    "asyncio: marks tests as async",
+    "unit: pure function, model, and error-branch tests",
+    "component: tests that exercise one subsystem across several internal modules",
+    "integration: cross-boundary tests using fake or mocked providers",
+    "system: end-to-end tests through public entrypoints without external services",
+    "contracts: provider, loader, and retriever interface contract tests",
+    "live: tests that call real external services or local model servers",
+    "slow: tests that are intentionally slower than the default CI suite",
+]
 testpaths = ["tests"]
 filterwarnings = [
     "error",

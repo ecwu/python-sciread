@@ -18,8 +18,8 @@ uv run ruff check src/ tests/
 # Format
 uv run ruff format src/ tests/
 
-# Run all tests
-uv run pytest tests/
+# Run the default stable test suite
+uv run pytest -m "not live and not slow" tests/
 
 # Run a single test file
 uv run pytest tests/test_cli.py
@@ -32,8 +32,14 @@ uv run pytest tests/test_cli.py::test_render_coordinate_plan_shows_subagents_and
 uv run pytest tests/test_document/
 uv run pytest tests/test_llm_provider/
 
+# Run layered integration/system/contract tests
+uv run pytest -m "integration or system or contracts" tests/
+
+# Run optional live provider tests
+SCIREAD_RUN_LIVE=1 uv run pytest -m live tests/
+
 # Run with coverage
-uv run pytest --cov src/ tests/
+uv run pytest -m "not live and not slow" --cov=sciread --cov-fail-under=84 tests/
 ```
 
 ## Repository Layout
@@ -48,7 +54,7 @@ The current package structure is organized by subsystem:
 - `src/sciread/platform/`: shared config and logging
 - `src/sciread/entrypoints/cli.py`: CLI parser and rendering
 - `config/sciread.toml`: example project configuration
-- `tests/`: subsystem tests plus top-level CLI and integration-style tests
+- `tests/`: subsystem tests plus top-level CLI, integration, system, contract, and optional live tests
 
 ## Code Style Guidelines
 

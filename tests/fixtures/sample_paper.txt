@@ -1,0 +1,14 @@
+Abstract
+This paper introduces a deterministic text fixture for document loader and splitter tests.
+
+Introduction
+Scientific reading tools need stable behavior across document construction and section rendering.
+
+Methods
+The methods section mentions retrieval, embeddings, reranking, and deterministic fake providers.
+
+Results
+The results section provides predictable evidence that can be retrieved by lexical and semantic search.
+
+Conclusion
+Layered tests make regressions easier to diagnose.

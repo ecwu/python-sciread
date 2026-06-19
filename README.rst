@@ -156,18 +156,26 @@ Set up the local environment::
 
     uv sync --group test --group dev
 
-Run tests::
+Run the default stable test suite. This excludes tests that require external services or intentionally slow checks::
 
-    uv run pytest tests/
+    uv run pytest -m "not live and not slow" tests/
 
 Run a focused test file::
 
     uv run pytest tests/test_cli.py
     uv run pytest tests/test_document/test_document.py
 
+Run layered integration, system, and contract tests explicitly::
+
+    uv run pytest -m "integration or system or contracts" tests/
+
+Run optional live provider tests only when credentials and services are configured::
+
+    SCIREAD_RUN_LIVE=1 uv run pytest -m live tests/
+
 Run tests with coverage::
 
-    uv run pytest --cov src/ tests/
+    uv run pytest -m "not live and not slow" --cov=sciread --cov-fail-under=84 tests/
 
 Run linting::
 
